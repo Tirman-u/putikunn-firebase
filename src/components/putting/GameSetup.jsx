@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function GameSetup({ onStartGame }) {
   const [gameName, setGameName] = useState('');
   const [players, setPlayers] = useState(['']);
-  const [puttsPerRound, setPuttsPerRound] = useState(10);
 
   const addPlayer = () => {
     setPlayers([...players, '']);
@@ -30,8 +29,7 @@ export default function GameSetup({ onStartGame }) {
     if (validPlayers.length >= 1) {
       onStartGame({
         name: gameName || `Game ${new Date().toLocaleDateString()}`,
-        players: validPlayers,
-        puttsPerRound
+        players: validPlayers
       });
     }
   };
@@ -63,26 +61,15 @@ export default function GameSetup({ onStartGame }) {
           />
         </div>
 
-        {/* Putts Per Round */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-4">
-          <label className="block text-sm font-semibold text-slate-700 mb-3">
-            Putts Per Round
-          </label>
-          <div className="flex gap-2">
-            {[5, 10, 15, 20].map((num) => (
-              <button
-                key={num}
-                onClick={() => setPuttsPerRound(num)}
-                className={`flex-1 py-3 rounded-xl font-semibold transition-all ${
-                  puttsPerRound === num
-                    ? 'bg-emerald-500 text-white shadow-md'
-                    : 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                {num}
-              </button>
-            ))}
-          </div>
+        {/* Game Rules */}
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-sm mb-4 text-white">
+          <h3 className="font-bold text-lg mb-3">🥏 Jyly Rules</h3>
+          <ul className="text-sm space-y-2 opacity-95">
+            <li>• Start at 10m, throw 5 discs</li>
+            <li>• Based on makes, next distance: 0→5m, 1→6m, 2→7m, 3→8m, 4→9m, 5→10m</li>
+            <li>• Points = distance × makes (e.g., 3 makes from 8m = 24pts)</li>
+            <li>• Play 20 rounds total</li>
+          </ul>
         </div>
 
         {/* Players */}

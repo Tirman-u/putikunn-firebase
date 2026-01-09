@@ -4,15 +4,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy } from 'lucide-react';
 import { motion } from 'framer-motion';
-import OneClickScoreInput from './OneClickScoreInput';
+import ClassicScoreInput from './ClassicScoreInput';
+import BackAndForthInput from './BackAndForthInput';
 import JylyScoreTable from './JylyScoreTable';
-
-const MAX_ROUNDS = 20;
-
-const getNextDistance = (made) => {
-  const distanceMap = [5, 6, 7, 8, 9, 10];
-  return distanceMap[made] || 10;
-};
+import { 
+  GAME_FORMATS, 
+  getNextDistanceFromMade, 
+  getNextDistanceBackAndForth, 
+  calculateRoundScore,
+  isGameComplete 
+} from './gameRules';
 
 export default function PlayerView({ gameId, playerName, onExit }) {
   const [showScoreboard, setShowScoreboard] = React.useState(false);
@@ -31,30 +32,80 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     }
   });
 
-  const handleScoreSubmit = ({ made, points }) => {
+  // Handle Classic/Short/Long format submission (5 putts at once)
+  const handleClassicSubmit = (madeCount) => {
     const currentDistance = game.player_distances[playerName];
+    const gameType = game.game_type || 'classic';
+    const format = GAME_FORMATS[gameType];
     
-    const newRoundScores = { ...game.round_scores };
-    if (!newRoundScores[playerName]) {
-      newRoundScores[playerName] = [];
+    // Create 5 putt records
+    const newPutts = [];
+    for (let i = 0; i < 5; i++) {
+      const result = i < madeCount ? 'made' : 'missed';
+      newPutts.push({
+        distance: currentDistance,
+        result,
+        points: 0, // Individual putts don't score in classic formats
+        timestamp: new Date().toISOString()
+      });
     }
-    newRoundScores[playerName].push({
-      made,
-      distance: currentDistance,
-      points
-    });
 
+    const allPlayerPutts = { ...game.player_putts };
+    if (!allPlayerPutts[playerName]) {
+      allPlayerPutts[playerName] = [];
+    }
+    allPlayerPutts[playerName].push(...newPutts);
+
+    // Calculate round score
+    const roundScore = calculateRoundScore(currentDistance, madeCount);
+    
     const newTotalPoints = { ...game.total_points };
-    newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) + points;
+    newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) + roundScore;
 
-    const nextDistance = getNextDistance(made);
+    const nextDistance = getNextDistanceFromMade(gameType, madeCount);
     const newPlayerDistances = { ...game.player_distances };
     newPlayerDistances[playerName] = nextDistance;
 
     updateGameMutation.mutate({
       id: game.id,
       data: {
-        round_scores: newRoundScores,
+        player_putts: allPlayerPutts,
+        total_points: newTotalPoints,
+        player_distances: newPlayerDistances
+      }
+    });
+  };
+
+  // Handle Back & Forth format (1 putt at a time)
+  const handleBackAndForthPutt = (wasMade) => {
+    const currentDistance = game.player_distances[playerName];
+    const result = wasMade ? 'made' : 'missed';
+    const points = wasMade ? currentDistance : 0;
+
+    const newPutt = {
+      distance: currentDistance,
+      result,
+      points,
+      timestamp: new Date().toISOString()
+    };
+
+    const allPlayerPutts = { ...game.player_putts };
+    if (!allPlayerPutts[playerName]) {
+      allPlayerPutts[playerName] = [];
+    }
+    allPlayerPutts[playerName].push(newPutt);
+
+    const newTotalPoints = { ...game.total_points };
+    newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) + points;
+
+    const nextDistance = getNextDistanceBackAndForth(currentDistance, wasMade);
+    const newPlayerDistances = { ...game.player_distances };
+    newPlayerDistances[playerName] = nextDistance;
+
+    updateGameMutation.mutate({
+      id: game.id,
+      data: {
+        player_putts: allPlayerPutts,
         total_points: newTotalPoints,
         player_distances: newPlayerDistances
       }
@@ -62,34 +113,73 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   };
 
   const handleUndo = () => {
-    const playerScores = game.round_scores[playerName];
-    if (!playerScores || playerScores.length === 0) return;
+    const playerPutts = game.player_putts?.[playerName];
+    if (!playerPutts || playerPutts.length === 0) return;
 
-    const newScores = [...playerScores];
-    const lastScore = newScores.pop();
+    const gameType = game.game_type || 'classic';
+    const format = GAME_FORMATS[gameType];
+    const newPutts = [...playerPutts];
 
-    const newRoundScores = { ...game.round_scores };
-    newRoundScores[playerName] = newScores;
+    if (format.singlePuttMode) {
+      // Back & Forth: remove 1 putt
+      const lastPutt = newPutts.pop();
+      
+      const allPlayerPutts = { ...game.player_putts };
+      allPlayerPutts[playerName] = newPutts;
 
-    const newTotalPoints = { ...game.total_points };
-    newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) - lastScore.points;
+      const newTotalPoints = { ...game.total_points };
+      newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) - lastPutt.points;
 
-    // Calculate previous distance
-    const prevDistance = newScores.length > 0 
-      ? getNextDistance(newScores[newScores.length - 1].made)
-      : 10;
-
-    const newPlayerDistances = { ...game.player_distances };
-    newPlayerDistances[playerName] = prevDistance;
-
-    updateGameMutation.mutate({
-      id: game.id,
-      data: {
-        round_scores: newRoundScores,
-        total_points: newTotalPoints,
-        player_distances: newPlayerDistances
+      // Recalculate distance from previous putt
+      let prevDistance = format.startDistance;
+      if (newPutts.length > 0) {
+        prevDistance = newPutts[newPutts.length - 1].distance;
       }
-    });
+
+      const newPlayerDistances = { ...game.player_distances };
+      newPlayerDistances[playerName] = prevDistance;
+
+      updateGameMutation.mutate({
+        id: game.id,
+        data: {
+          player_putts: allPlayerPutts,
+          total_points: newTotalPoints,
+          player_distances: newPlayerDistances
+        }
+      });
+    } else {
+      // Classic/Short/Long: remove last 5 putts (1 round)
+      const lastRoundPutts = newPutts.splice(-5);
+      const madeCount = lastRoundPutts.filter(p => p.result === 'made').length;
+      const roundDistance = lastRoundPutts[0].distance;
+      const roundScore = calculateRoundScore(roundDistance, madeCount);
+
+      const allPlayerPutts = { ...game.player_putts };
+      allPlayerPutts[playerName] = newPutts;
+
+      const newTotalPoints = { ...game.total_points };
+      newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) - roundScore;
+
+      // Recalculate distance from previous round
+      let prevDistance = format.startDistance;
+      if (newPutts.length >= 5) {
+        const prevRoundPutts = newPutts.slice(-5);
+        const prevMade = prevRoundPutts.filter(p => p.result === 'made').length;
+        prevDistance = getNextDistanceFromMade(gameType, prevMade);
+      }
+
+      const newPlayerDistances = { ...game.player_distances };
+      newPlayerDistances[playerName] = prevDistance;
+
+      updateGameMutation.mutate({
+        id: game.id,
+        data: {
+          player_putts: allPlayerPutts,
+          total_points: newTotalPoints,
+          player_distances: newPlayerDistances
+        }
+      });
+    }
   };
 
   if (isLoading || !game) {
@@ -100,10 +190,12 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     );
   }
 
-  const currentRound = (game.round_scores?.[playerName]?.length || 0) + 1;
-  const currentDistance = game.player_distances?.[playerName] || 10;
-  const canUndo = (game.round_scores?.[playerName]?.length || 0) > 0;
-  const isComplete = currentRound > MAX_ROUNDS;
+  const gameType = game.game_type || 'classic';
+  const format = GAME_FORMATS[gameType];
+  const playerPutts = game.player_putts?.[playerName] || [];
+  const currentDistance = game.player_distances?.[playerName] || format.startDistance;
+  const canUndo = playerPutts.length > 0;
+  const isComplete = isGameComplete(gameType, playerPutts.length);
 
   // Scoreboard View
   if (showScoreboard) {
@@ -122,14 +214,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             <div className="w-16" />
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <JylyScoreTable 
-              players={game.players}
-              roundScores={game.round_scores}
-              totalPoints={game.total_points}
-              playerDistances={game.player_distances}
-              currentRound={Math.max(...game.players.map(p => (game.round_scores?.[p]?.length || 0) + 1))}
-            />
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+            <div className="text-center text-slate-500">Scoreboard coming soon</div>
           </div>
         </div>
       </div>
@@ -150,7 +236,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
               <Trophy className="w-16 h-16 text-white" />
             </div>
             <h1 className="text-4xl font-bold text-slate-800 mb-4">🎉 Complete!</h1>
-            <p className="text-xl text-slate-600 mb-2">You finished all 20 rounds</p>
+            <p className="text-xl text-slate-600 mb-2">You finished all rounds</p>
             <p className="text-4xl font-bold text-emerald-600">{game.total_points[playerName]} points</p>
           </motion.div>
 
@@ -176,6 +262,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   }
 
   // Scoring View
+  const currentRound = Math.floor(playerPutts.length / format.puttsPerRound) + 1;
+  const totalRounds = 20;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <div className="max-w-lg mx-auto p-4">
@@ -189,7 +278,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           </button>
           <div className="text-center">
             <h2 className="text-lg font-bold text-slate-800">{game.name}</h2>
-            <p className="text-sm text-slate-500">Round {currentRound} of {MAX_ROUNDS}</p>
+            <p className="text-sm text-slate-500">
+              {format.name} • Round {currentRound} of {totalRounds}
+            </p>
           </div>
           <button
             onClick={() => setShowScoreboard(true)}
@@ -204,7 +295,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
             <div 
               className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all duration-500"
-              style={{ width: `${((currentRound - 1) / MAX_ROUNDS) * 100}%` }}
+              style={{ width: `${((currentRound - 1) / totalRounds) * 100}%` }}
             />
           </div>
         </div>
@@ -229,13 +320,25 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         </div>
 
         {/* Score Input */}
-        <OneClickScoreInput
-          player={playerName}
-          currentDistance={currentDistance}
-          onSubmit={handleScoreSubmit}
-          canUndo={canUndo}
-          onUndo={handleUndo}
-        />
+        {format.singlePuttMode ? (
+          <BackAndForthInput
+            player={playerName}
+            currentDistance={currentDistance}
+            onMade={() => handleBackAndForthPutt(true)}
+            onMissed={() => handleBackAndForthPutt(false)}
+            canUndo={canUndo}
+            onUndo={handleUndo}
+          />
+        ) : (
+          <ClassicScoreInput
+            player={playerName}
+            currentDistance={currentDistance}
+            onSubmit={handleClassicSubmit}
+            canUndo={canUndo}
+            onUndo={handleUndo}
+            distanceMap={format.distanceMap}
+          />
+        )}
       </div>
     </div>
   );

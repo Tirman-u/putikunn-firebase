@@ -26,9 +26,8 @@ export default function Home() {
       host_user: user.email,
       players: [],
       player_distances: {},
-      round_scores: {},
+      player_putts: {},
       total_points: {},
-      current_round: 1,
       status: 'active',
       date: new Date().toISOString()
     });

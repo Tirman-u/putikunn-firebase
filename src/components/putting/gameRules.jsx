@@ -1,0 +1,87 @@
+// Game format configurations
+export const GAME_FORMATS = {
+  classic: {
+    name: 'Classic',
+    minDistance: 5,
+    maxDistance: 10,
+    startDistance: 10,
+    puttsPerRound: 5,
+    distanceMap: [5, 6, 7, 8, 9, 10]
+  },
+  short: {
+    name: 'Short',
+    minDistance: 3,
+    maxDistance: 8,
+    startDistance: 8,
+    puttsPerRound: 5,
+    distanceMap: [3, 4, 5, 6, 7, 8]
+  },
+  long: {
+    name: 'Long',
+    minDistance: 10,
+    maxDistance: 15,
+    startDistance: 15,
+    puttsPerRound: 5,
+    distanceMap: [10, 11, 12, 13, 14, 15]
+  },
+  back_and_forth: {
+    name: 'Back & Forth',
+    minDistance: 5,
+    maxDistance: 10,
+    startDistance: 5,
+    puttsPerRound: 5,
+    singlePuttMode: true
+  }
+};
+
+export const MAX_ROUNDS = 20;
+
+// Calculate next distance for Classic/Short/Long formats
+export function getNextDistanceFromMade(gameType, madeCount) {
+  const format = GAME_FORMATS[gameType];
+  if (!format || !format.distanceMap) return format.startDistance;
+  
+  return format.distanceMap[madeCount] || format.maxDistance;
+}
+
+// Calculate next distance for Back & Forth format
+export function getNextDistanceBackAndForth(currentDistance, wasMade) {
+  const format = GAME_FORMATS.back_and_forth;
+  let newDistance = wasMade ? currentDistance + 1 : currentDistance - 1;
+  return Math.max(format.minDistance, Math.min(format.maxDistance, newDistance));
+}
+
+// Calculate points for a putt
+export function calculatePoints(gameType, distance, result) {
+  if (result === 'missed') return 0;
+  
+  // For Back & Forth, each made putt scores the distance
+  if (gameType === 'back_and_forth') {
+    return distance;
+  }
+  
+  // For other formats, scoring happens at round level, not per putt
+  return 0;
+}
+
+// Calculate round score for Classic/Short/Long
+export function calculateRoundScore(distance, madeCount) {
+  return distance * madeCount;
+}
+
+// Check if player completed all rounds
+export function isGameComplete(gameType, puttCount) {
+  const format = GAME_FORMATS[gameType];
+  const totalPutts = MAX_ROUNDS * format.puttsPerRound;
+  return puttCount >= totalPutts;
+}
+
+// Get current round number
+export function getCurrentRound(puttCount, puttsPerRound) {
+  return Math.floor(puttCount / puttsPerRound) + 1;
+}
+
+// Get putts in current round
+export function getPuttsInCurrentRound(puttCount, puttsPerRound) {
+  return puttCount % puttsPerRound;
+}

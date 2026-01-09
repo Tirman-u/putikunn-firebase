@@ -57,15 +57,19 @@ export default function JoinGame({ onJoin, onBack }) {
         onJoin({ game, playerName: playerName.trim() });
       } else {
         // Add player to game
+        const gameType = game.game_type || 'classic';
+        const startDistances = { classic: 10, short: 8, long: 15, back_and_forth: 5 };
+        const startDistance = startDistances[gameType] || 10;
+
         const updatedPlayers = [...game.players, playerName.trim()];
-        const updatedDistances = { ...game.player_distances, [playerName.trim()]: 10 };
-        const updatedScores = { ...game.round_scores, [playerName.trim()]: [] };
+        const updatedDistances = { ...game.player_distances, [playerName.trim()]: startDistance };
+        const updatedPutts = { ...game.player_putts, [playerName.trim()]: [] };
         const updatedPoints = { ...game.total_points, [playerName.trim()]: 0 };
 
         const updatedGame = await base44.entities.Game.update(game.id, {
           players: updatedPlayers,
           player_distances: updatedDistances,
-          round_scores: updatedScores,
+          player_putts: updatedPutts,
           total_points: updatedPoints
         });
 

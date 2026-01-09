@@ -1,19 +1,19 @@
-import Home from './pages/Home';
-import ManageGames from './pages/ManageGames';
 import Dashboard from './pages/Dashboard';
 import GameResult from './pages/GameResult';
 import GroupResult from './pages/GroupResult';
+import Home from './pages/Home';
+import ManageGames from './pages/ManageGames';
 
 
 export const PAGES = {
-    "Home": Home,
-    "ManageGames": ManageGames,
     "Dashboard": Dashboard,
     "GameResult": GameResult,
     "GroupResult": GroupResult,
+    "Home": Home,
+    "ManageGames": ManageGames,
 }
 
 export const pagesConfig = {
-    mainPage: "Home",
+    mainPage: "Dashboard",
     Pages: PAGES,
 };

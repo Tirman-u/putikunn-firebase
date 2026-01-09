@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Play, Copy, Check } from 'lucide-react';
+import { Play, Copy, Check, ArrowLeft } from 'lucide-react';
+import GameFormatSelector from './GameFormatSelector';
 
-export default function HostSetup({ onStartGame }) {
+export default function HostSetup({ onStartGame, onBack }) {
   const [gameName, setGameName] = useState('');
+  const [gameType, setGameType] = useState('classic');
   const [copied, setCopied] = useState(false);
   
   // Generate random 4-digit PIN
@@ -15,7 +17,8 @@ export default function HostSetup({ onStartGame }) {
   const handleStart = () => {
     onStartGame({
       name: gameName || `Game ${new Date().toLocaleDateString()}`,
-      pin
+      pin,
+      gameType
     });
   };
 
@@ -28,6 +31,17 @@ export default function HostSetup({ onStartGame }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
       <div className="max-w-lg mx-auto pt-8">
+        {/* Back Button */}
+        <div className="mb-6">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-medium">Back</span>
+          </button>
+        </div>
+
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-emerald-200">
             <span className="text-4xl">🥏</span>
@@ -46,6 +60,13 @@ export default function HostSetup({ onStartGame }) {
             placeholder="e.g., Thursday Practice"
             className="h-12 rounded-xl border-slate-200"
           />
+        </div>
+
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-4">
+          <label className="block text-sm font-semibold text-slate-700 mb-3">
+            Game Format
+          </label>
+          <GameFormatSelector selected={gameType} onSelect={setGameType} />
         </div>
 
         <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg mb-6 text-white">

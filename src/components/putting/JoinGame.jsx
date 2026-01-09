@@ -1,14 +1,34 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowRight, LogIn } from 'lucide-react';
+import { ArrowRight, LogIn, ArrowLeft, Clock } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
 
-export default function JoinGame({ onJoin }) {
+export default function JoinGame({ onJoin, onBack }) {
   const [pin, setPin] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => base44.auth.me()
+  });
+
+  const { data: recentGames = [] } = useQuery({
+    queryKey: ['recent-joined-games'],
+    queryFn: async () => {
+      const allGames = await base44.entities.Game.list();
+      const myGames = allGames
+        .filter(g => g.players?.includes(user?.full_name))
+        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+        .slice(0, 5);
+      return myGames;
+    },
+    enabled: !!user
+  });
 
   const handleJoin = async () => {
     if (!pin.trim() || !playerName.trim()) {
@@ -59,7 +79,18 @@ export default function JoinGame({ onJoin }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
-      <div className="max-w-lg mx-auto pt-16">
+      <div className="max-w-lg mx-auto pt-8">
+        {/* Back Button */}
+        <div className="mb-6">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-medium">Back</span>
+          </button>
+        </div>
+
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-emerald-200">
             <span className="text-4xl">🥏</span>
@@ -109,6 +140,40 @@ export default function JoinGame({ onJoin }) {
             Join Game
           </Button>
         </div>
+
+        {/* Recent Games */}
+        {recentGames.length > 0 && (
+          <div className="mt-8">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Recent Games
+            </h3>
+            <div className="space-y-2">
+              {recentGames.map((game) => (
+                <button
+                  key={game.id}
+                  onClick={() => {
+                    setPin(game.pin);
+                    setPlayerName(user?.full_name || '');
+                  }}
+                  className="w-full bg-white rounded-xl p-3 border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all text-left"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-slate-800 text-sm">{game.name}</div>
+                      <div className="text-xs text-slate-500">
+                        {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'No date'}
+                      </div>
+                    </div>
+                    <div className="text-xs px-2 py-1 bg-slate-100 rounded font-mono">
+                      {game.pin}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

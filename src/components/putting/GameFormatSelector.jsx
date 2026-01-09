@@ -1,0 +1,62 @@
+import React from 'react';
+import { Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const GAME_FORMATS = [
+  {
+    id: 'classic',
+    name: 'Classic',
+    distance: '5-10m',
+    description: 'Standard Jyly format',
+    color: 'emerald'
+  },
+  {
+    id: 'back_and_forth',
+    name: 'Back & Forth',
+    distance: '5-10m',
+    description: 'Made→farther, Miss→closer',
+    color: 'blue'
+  },
+  {
+    id: 'short',
+    name: 'Short',
+    distance: '3-8m',
+    description: 'Close range practice',
+    color: 'amber'
+  },
+  {
+    id: 'long',
+    name: 'Long',
+    distance: '10-15m',
+    description: 'Distance challenge',
+    color: 'purple'
+  }
+];
+
+export default function GameFormatSelector({ selected, onSelect }) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {GAME_FORMATS.map((format) => (
+        <button
+          key={format.id}
+          onClick={() => onSelect(format.id)}
+          className={cn(
+            "relative p-4 rounded-xl border-2 transition-all text-left",
+            selected === format.id
+              ? `border-${format.color}-500 bg-${format.color}-50`
+              : "border-slate-200 bg-white hover:border-slate-300"
+          )}
+        >
+          {selected === format.id && (
+            <div className="absolute top-2 right-2 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
+              <Check className="w-4 h-4 text-white" />
+            </div>
+          )}
+          <div className="font-bold text-slate-800 mb-1">{format.name}</div>
+          <div className="text-sm text-slate-600 mb-1">{format.distance}</div>
+          <div className="text-xs text-slate-500">{format.description}</div>
+        </button>
+      ))}
+    </div>
+  );
+}

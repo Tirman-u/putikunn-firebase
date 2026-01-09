@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Trash2, Share2, FolderPlus, Folder, Calendar } from 'lucide-react';
+import { ArrowLeft, Trash2, Share2, FolderPlus, Folder, Calendar, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
@@ -108,14 +108,24 @@ export default function ManageGames() {
             </h2>
             <div className="space-y-3">
               {groups.map((group) => (
-                <div key={group.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+                <Link
+                  key={group.id}
+                  to={`${createPageUrl('GroupResult')}?id=${group.id}`}
+                  className="block bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-emerald-300 hover:shadow-md transition-all"
+                >
                   <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-bold text-slate-800">{group.name}</div>
-                      <div className="text-sm text-slate-500">{group.game_ids?.length || 0} games</div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                        <Folder className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800">{group.name}</div>
+                        <div className="text-sm text-slate-500">{group.game_ids?.length || 0} games</div>
+                      </div>
                     </div>
+                    <ChevronRight className="w-5 h-5 text-slate-400" />
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
@@ -133,13 +143,14 @@ export default function ManageGames() {
               {games.map((game) => (
                 <div
                   key={game.id}
-                  className="bg-white rounded-xl p-4 shadow-sm border border-slate-100"
+                  className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-slate-300 transition-all group"
                 >
                   <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
                       checked={selectedGames.includes(game.id)}
                       onChange={(e) => {
+                        e.stopPropagation();
                         if (e.target.checked) {
                           setSelectedGames([...selectedGames, game.id]);
                         } else {
@@ -148,9 +159,12 @@ export default function ManageGames() {
                       }}
                       className="mt-1 w-5 h-5 rounded"
                     />
-                    <div className="flex-1">
+                    <Link
+                      to={`${createPageUrl('GameResult')}?id=${game.id}`}
+                      className="flex-1"
+                    >
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-slate-800">{game.name}</span>
+                        <span className="font-bold text-slate-800 group-hover:text-emerald-600 transition-colors">{game.name}</span>
                         <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">
                           {getGameTypeName(game.game_type)}
                         </span>
@@ -162,9 +176,10 @@ export default function ManageGames() {
                       <div className="text-sm text-slate-600 mt-1">
                         {game.players?.length || 0} players • PIN: {game.pin}
                       </div>
-                    </div>
+                    </Link>
                     <Button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         if (confirm('Delete this game?')) {
                           deleteGameMutation.mutate(game.id);
                         }

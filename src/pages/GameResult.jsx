@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trash2, Share2, Calendar, Users, Target } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format as formatDate } from 'date-fns';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 
 export default function GameResult() {
@@ -52,7 +52,7 @@ export default function GameResult() {
   }
 
   const gameType = game.game_type || 'classic';
-  const format = GAME_FORMATS[gameType];
+  const gameFormat = GAME_FORMATS[gameType];
 
   // Calculate statistics for each player
   const playerStats = game.players.map(player => {
@@ -73,7 +73,7 @@ export default function GameResult() {
   }).sort((a, b) => b.totalPoints - a.totalPoints);
 
   const handleShare = () => {
-    const shareText = `${game.name} - ${format.name}\n\nResults:\n${playerStats.map(p => 
+    const shareText = `${game.name} - ${gameFormat.name}\n\nResults:\n${playerStats.map(p => 
       `${p.name}: ${p.totalPoints} pts (${p.puttingPercentage}%)`
     ).join('\n')}`;
     
@@ -112,8 +112,8 @@ export default function GameResult() {
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <div className="text-sm text-slate-500 mb-1">Format</div>
-              <div className="font-bold text-slate-800">{format.name}</div>
-              <div className="text-xs text-slate-500">{format.minDistance}m - {format.maxDistance}m</div>
+              <div className="font-bold text-slate-800">{gameFormat.name}</div>
+              <div className="text-xs text-slate-500">{gameFormat.minDistance}m - {gameFormat.maxDistance}m</div>
             </div>
             <div>
               <div className="text-sm text-slate-500 mb-1 flex items-center gap-1">
@@ -121,7 +121,7 @@ export default function GameResult() {
                 Date
               </div>
               <div className="font-bold text-slate-800">
-                {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'No date'}
+                {game.date ? formatDate(new Date(game.date), 'MMM d, yyyy') : 'No date'}
               </div>
             </div>
           </div>

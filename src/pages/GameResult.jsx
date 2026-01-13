@@ -13,13 +13,16 @@ export default function GameResult() {
   const gameId = searchParams.get('id');
   const queryClient = useQueryClient();
 
-  const { data: game, isLoading } = useQuery({
+  const { data: game, isLoading, error } = useQuery({
     queryKey: ['game', gameId],
     queryFn: async () => {
       const games = await base44.entities.Game.list();
-      return games.find(g => g.id === gameId);
+      const found = games.find(g => g.id === gameId);
+      if (!found) throw new Error('Game not found');
+      return found;
     },
-    enabled: !!gameId
+    enabled: !!gameId,
+    retry: false
   });
 
   const deleteGameMutation = useMutation({
@@ -29,10 +32,21 @@ export default function GameResult() {
     }
   });
 
-  if (isLoading || !game) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center">
         <div className="text-slate-400">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error || !game) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="text-slate-400 mb-4">Game not found</div>
+          <Button onClick={() => navigate(-1)}>Go Back</Button>
+        </div>
       </div>
     );
   }

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Play, Copy, Check, ArrowLeft } from 'lucide-react';
 import GameFormatSelector from './GameFormatSelector';
+import FormatRulesPopup from './FormatRulesPopup';
 
 export default function HostSetup({ onStartGame, onBack }) {
   const [gameName, setGameName] = useState('');
@@ -42,12 +43,12 @@ export default function HostSetup({ onStartGame, onBack }) {
           </button>
         </div>
 
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-emerald-200">
-            <span className="text-4xl">🥏</span>
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-emerald-200">
+            <span className="text-3xl">🥏</span>
           </div>
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Host Jyly Game</h1>
-          <p className="text-slate-500">Create a session for players to join</p>
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">Host Game</h1>
+          <p className="text-sm text-slate-500">Create a session</p>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-4">
@@ -63,9 +64,12 @@ export default function HostSetup({ onStartGame, onBack }) {
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-4">
-          <label className="block text-sm font-semibold text-slate-700 mb-3">
-            Game Format
-          </label>
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-semibold text-slate-700">
+              Game Format
+            </label>
+            <FormatRulesPopup format={gameType} />
+          </div>
           <GameFormatSelector selected={gameType} onSelect={setGameType} />
         </div>
 
@@ -93,15 +97,7 @@ export default function HostSetup({ onStartGame, onBack }) {
           </Button>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
-          <h3 className="font-bold text-lg mb-3">🥏 Jyly Rules</h3>
-          <ul className="text-sm space-y-2 text-slate-600">
-            <li>• Start at 10m, throw 5 discs</li>
-            <li>• Based on makes, next distance: 0→5m, 1→6m, 2→7m, 3→8m, 4→9m, 5→10m</li>
-            <li>• Points = distance × makes (e.g., 3 makes from 8m = 24pts)</li>
-            <li>• Play 20 rounds total</li>
-          </ul>
-        </div>
+
 
         <Button
           onClick={handleStart}

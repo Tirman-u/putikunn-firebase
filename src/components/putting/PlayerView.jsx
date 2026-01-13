@@ -7,6 +7,8 @@ import { motion } from 'framer-motion';
 import ClassicScoreInput from './ClassicScoreInput';
 import BackAndForthInput from './BackAndForthInput';
 import JylyScoreTable from './JylyScoreTable';
+import ProgressBar from './ProgressBar';
+import MobileLeaderboard from './MobileLeaderboard';
 import { 
   GAME_FORMATS, 
   getNextDistanceFromMade, 
@@ -16,7 +18,7 @@ import {
 } from './gameRules';
 
 export default function PlayerView({ gameId, playerName, onExit }) {
-  const [showScoreboard, setShowScoreboard] = React.useState(false);
+  const [showLeaderboard, setShowLeaderboard] = React.useState(false);
   const queryClient = useQueryClient();
 
   const { data: game, isLoading } = useQuery({
@@ -197,31 +199,6 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const canUndo = playerPutts.length > 0;
   const isComplete = isGameComplete(gameType, playerPutts.length);
 
-  // Scoreboard View
-  if (showScoreboard) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
-        <div className="max-w-4xl mx-auto p-4">
-          <div className="flex items-center justify-between mb-6 pt-4">
-            <button
-              onClick={() => setShowScoreboard(false)}
-              className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="font-medium">Back</span>
-            </button>
-            <h2 className="text-xl font-bold text-slate-800">Scoreboard</h2>
-            <div className="w-16" />
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-            <div className="text-center text-slate-500">Scoreboard coming soon</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Completed View
   if (isComplete) {
     return (
@@ -242,11 +219,11 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
           <div className="space-y-3">
             <Button
-              onClick={() => setShowScoreboard(true)}
+              onClick={() => setShowLeaderboard(true)}
               className="w-full h-14 bg-slate-600 hover:bg-slate-700 rounded-xl"
             >
               <Trophy className="w-5 h-5 mr-2" />
-              View Scoreboard
+              View Leaderboard
             </Button>
             <Button
               onClick={onExit}
@@ -283,7 +260,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             </p>
           </div>
           <button
-            onClick={() => setShowScoreboard(true)}
+            onClick={() => setShowLeaderboard(true)}
             className="text-emerald-600 hover:text-emerald-700"
           >
             <Trophy className="w-5 h-5" />
@@ -291,29 +268,22 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         </div>
 
         {/* Progress Bar */}
-        <div className="mb-6">
-          <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all duration-500"
-              style={{ width: `${((currentRound - 1) / totalRounds) * 100}%` }}
-            />
-          </div>
-        </div>
+        <ProgressBar putts={playerPutts} gameType={gameType} />
 
         {/* Your Stats */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-6">
-          <div className="flex items-center justify-around">
-            <div className="text-center">
-              <div className="text-sm text-slate-500">Your Points</div>
-              <div className="text-3xl font-bold text-emerald-600">
+        <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
+          <div className="flex items-center justify-around text-center">
+            <div>
+              <div className="text-xs text-slate-500">Points</div>
+              <div className="text-2xl font-bold text-emerald-600">
                 {game.total_points[playerName] || 0}
               </div>
             </div>
-            <div className="h-12 w-px bg-slate-200" />
-            <div className="text-center">
-              <div className="text-sm text-slate-500">Rounds Done</div>
-              <div className="text-3xl font-bold text-slate-600">
-                {currentRound - 1}
+            <div className="h-10 w-px bg-slate-200" />
+            <div>
+              <div className="text-xs text-slate-500">Round</div>
+              <div className="text-2xl font-bold text-slate-600">
+                {currentRound}/{totalRounds}
               </div>
             </div>
           </div>
@@ -340,6 +310,11 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           />
         )}
       </div>
+
+      {/* Mobile Leaderboard */}
+      {showLeaderboard && (
+        <MobileLeaderboard game={game} onClose={() => setShowLeaderboard(false)} />
+      )}
     </div>
   );
 }

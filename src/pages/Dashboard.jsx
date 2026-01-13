@@ -2,9 +2,11 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Target, TrendingUp, Award } from 'lucide-react';
+import { ArrowLeft, Target, TrendingUp, Award, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { format } from 'date-fns';
+import { GAME_FORMATS } from '@/components/putting/gameRules';
 
 export default function Dashboard() {
   const { data: user } = useQuery({
@@ -35,20 +37,20 @@ export default function Dashboard() {
 
   // Calculate statistics
   const myName = user?.full_name;
-  const myScores = games
-    .filter(g => g.players?.includes(myName) && g.round_scores?.[myName])
-    .flatMap(g => g.round_scores[myName] || []);
-
-  const totalPutts = myScores.reduce((sum, r) => sum + 5, 0); // 5 putts per round
-  const madePutts = myScores.reduce((sum, r) => sum + (r.made || 0), 0);
+  
+  // Calculate overall putting percentage from all games
+  const myGames = games.filter(g => g.players?.includes(myName));
+  const allPutts = myGames.flatMap(g => g.player_putts?.[myName] || []);
+  const totalPutts = allPutts.length;
+  const madePutts = allPutts.filter(p => p.result === 'made').length;
   const puttingPercentage = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
 
   // Distance analysis
-  const distanceStats = myScores.reduce((acc, round) => {
-    const dist = round.distance;
+  const distanceStats = allPutts.reduce((acc, putt) => {
+    const dist = putt.distance;
     if (!acc[dist]) acc[dist] = { made: 0, attempts: 0 };
-    acc[dist].made += round.made || 0;
-    acc[dist].attempts += 5;
+    if (putt.result === 'made') acc[dist].made += 1;
+    acc[dist].attempts += 1;
     return acc;
   }, {});
 
@@ -155,7 +157,7 @@ export default function Dashboard() {
         </div>
 
         {/* League Stats */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
           <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
             <Award className="w-5 h-5" />
             Group Game Stats
@@ -170,6 +172,70 @@ export default function Dashboard() {
               <div className="text-3xl font-bold text-emerald-600">{bestScore}</div>
             </div>
           </div>
+        </div>
+
+        {/* Games History Table */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+          <h2 className="text-lg font-bold text-slate-800 mb-4">Game History</h2>
+          {myGames.length === 0 ? (
+            <div className="text-center py-8 text-slate-400">No games yet</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left py-3 px-2 text-slate-600 font-semibold">Date</th>
+                    <th className="text-left py-3 px-2 text-slate-600 font-semibold">Format</th>
+                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Score</th>
+                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">%</th>
+                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Putts</th>
+                    <th className="text-center py-3 px-2 text-slate-600 font-semibold"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {myGames
+                    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+                    .map((game) => {
+                      const putts = game.player_putts?.[myName] || [];
+                      const made = putts.filter(p => p.result === 'made').length;
+                      const percentage = putts.length > 0 ? ((made / putts.length) * 100).toFixed(0) : 0;
+                      const score = game.total_points?.[myName] || 0;
+                      const gameFormat = GAME_FORMATS[game.game_type || 'classic'];
+                      
+                      return (
+                        <tr key={game.id} className="border-b border-slate-100 hover:bg-slate-50">
+                          <td className="py-3 px-2 text-slate-700">
+                            {game.date ? format(new Date(game.date), 'MMM d') : '-'}
+                          </td>
+                          <td className="py-3 px-2">
+                            <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">
+                              {gameFormat.name}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-right font-bold text-emerald-600">
+                            {score}
+                          </td>
+                          <td className="py-3 px-2 text-right text-slate-700">
+                            {percentage}%
+                          </td>
+                          <td className="py-3 px-2 text-right text-slate-500">
+                            {made}/{putts.length}
+                          </td>
+                          <td className="py-3 px-2 text-center">
+                            <Link
+                              to={`${createPageUrl('GameResult')}?id=${game.id}`}
+                              className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>

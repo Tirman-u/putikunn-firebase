@@ -234,6 +234,11 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             </Button>
           </div>
         </div>
+
+        {/* Mobile Leaderboard */}
+        {showLeaderboard && (
+          <MobileLeaderboard game={game} onClose={() => setShowLeaderboard(false)} />
+        )}
       </div>
     );
   }

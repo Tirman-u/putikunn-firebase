@@ -97,36 +97,47 @@ export default function PuttingKing() {
             <h2 className="text-xl font-bold text-slate-800 mb-3">My Tournaments</h2>
             <div className="space-y-3">
               {myTournaments.map(tournament => (
-                <div key={tournament.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <div className="font-bold text-lg text-slate-800">{tournament.name}</div>
-                      <div className="text-sm text-slate-500">
-                        Status: {tournament.status} • Created {format(new Date(tournament.created_date), 'MMM d')}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Link
-                      to={`${createPageUrl('PuttingKingOverview')}?id=${tournament.id}`}
-                      className="flex-1"
-                    >
-                      <Button variant="outline" className="w-full">
-                        <Trophy className="w-4 h-4 mr-2" />
-                        View
-                      </Button>
-                    </Link>
-                    <Link
-                      to={`${createPageUrl('PuttingKingSetup')}?id=${tournament.id}`}
-                      className="flex-1"
-                    >
-                      <Button variant="outline" className="w-full">
-                        <Settings className="w-4 h-4 mr-2" />
-                        Manage
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
+               <div key={tournament.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                 <div className="flex items-center justify-between mb-3">
+                   <div>
+                     <div className="font-bold text-lg text-slate-800">{tournament.name}</div>
+                     <div className="text-sm text-slate-500">
+                       Status: {tournament.status} • Created {format(new Date(tournament.created_date), 'MMM d')}
+                     </div>
+                   </div>
+                 </div>
+                 <div className="flex gap-2">
+                   <Link
+                     to={`${createPageUrl('PuttingKingOverview')}?id=${tournament.id}`}
+                     className="flex-1"
+                   >
+                     <Button variant="outline" className="w-full">
+                       <Trophy className="w-4 h-4 mr-2" />
+                       View
+                     </Button>
+                   </Link>
+                   <Link
+                     to={`${createPageUrl('PuttingKingSetup')}?id=${tournament.id}`}
+                     className="flex-1"
+                   >
+                     <Button variant="outline" className="w-full">
+                       <Settings className="w-4 h-4 mr-2" />
+                       Manage
+                     </Button>
+                   </Link>
+                   <Button
+                     onClick={() => {
+                       if (confirm(`Delete "${tournament.name}"? This action cannot be undone.`)) {
+                         deleteMutation.mutate(tournament.id);
+                       }
+                     }}
+                     variant="outline"
+                     className="w-12 text-red-600 hover:text-red-700 hover:bg-red-50"
+                   >
+                     <Trash2 className="w-4 h-4" />
+                   </Button>
+                 </div>
+               </div>
               ))}
             </div>
           </div>

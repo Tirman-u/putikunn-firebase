@@ -16,6 +16,11 @@ export default function Home() {
   const [gameId, setGameId] = useState(null);
   const [playerName, setPlayerName] = useState(null);
 
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => base44.auth.me()
+  });
+
   const handleHostGame = async (gameData) => {
     const user = await base44.auth.me();
     
@@ -48,11 +53,10 @@ export default function Home() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
         <div className="max-w-lg mx-auto pt-16">
           <div className="text-center mb-12">
-            <div className="w-24 h-24 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-200">
-              <span className="text-5xl">🥏</span>
-            </div>
-            <h1 className="text-4xl font-bold text-slate-800 mb-3">Jyly Putting Game</h1>
-            <p className="text-slate-500 text-lg">Choose your role</p>
+            <h1 className="text-4xl font-bold text-slate-800 mb-2">
+              Welcome {user?.full_name || 'Guest'}!
+            </h1>
+            <p className="text-slate-600 text-xl mb-8">Ready to make some putts?</p>
           </div>
 
           <div className="space-y-4">

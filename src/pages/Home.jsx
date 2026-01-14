@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -16,8 +16,7 @@ export default function Home() {
   });
 
   return (
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
         <div className="max-w-lg mx-auto pt-16">
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-slate-800 mb-2">

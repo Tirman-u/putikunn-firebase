@@ -1,14 +1,15 @@
 import React from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Plus, Trophy, Settings, ArrowLeft } from 'lucide-react';
+import { Plus, Trophy, Settings, ArrowLeft, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 
 export default function PuttingKing() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -19,6 +20,13 @@ export default function PuttingKing() {
     queryKey: ['putting-king-tournaments'],
     queryFn: async () => {
       return await base44.entities.PuttingKingTournament.list();
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (tournamentId) => base44.entities.PuttingKingTournament.delete(tournamentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['putting-king-tournaments'] });
     }
   });
 

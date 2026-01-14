@@ -12,7 +12,8 @@ import MobileLeaderboard from './MobileLeaderboard';
 import { 
   GAME_FORMATS, 
   getNextDistanceFromMade, 
-  getNextDistanceBackAndForth, 
+  getNextDistanceBackAndForth,
+  getNextDistanceStreak,
   calculateRoundScore,
   isGameComplete 
 } from './gameRules';
@@ -35,11 +36,11 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     }
   });
 
-  // Handle Classic/Short/Long format submission (5 putts at once)
+  // Handle Classic/Short/Long/Random format submission (5 putts at once)
   const handleClassicSubmit = (madeCount) => {
-    const currentDistance = game.player_distances[playerName];
     const gameType = game.game_type || 'classic';
     const format = GAME_FORMATS[gameType];
+    const currentDistance = game.player_distances[playerName];
     
     // Create 5 putt records
     const newPutts = [];
@@ -65,7 +66,17 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const newTotalPoints = { ...game.total_points };
     newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) + roundScore;
 
-    const nextDistance = getNextDistanceFromMade(gameType, madeCount);
+    // Calculate next distance
+    let nextDistance;
+    if (gameType === 'random_distance') {
+      // Get truly random distance for next round
+      const min = format.minDistance;
+      const max = format.maxDistance;
+      nextDistance = Math.floor(Math.random() * (max - min + 1)) + min;
+    } else {
+      nextDistance = getNextDistanceFromMade(gameType, madeCount);
+    }
+
     const newPlayerDistances = { ...game.player_distances };
     newPlayerDistances[playerName] = nextDistance;
 
@@ -79,8 +90,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     });
   };
 
-  // Handle Back & Forth format (1 putt at a time)
+  // Handle Back & Forth / Streak / Random format (1 putt at a time)
   const handleBackAndForthPutt = (wasMade) => {
+    const gameType = game.game_type || 'classic';
+    const format = GAME_FORMATS[gameType];
     const currentDistance = game.player_distances[playerName];
     const result = wasMade ? 'made' : 'missed';
     const points = wasMade ? currentDistance : 0;
@@ -101,7 +114,16 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const newTotalPoints = { ...game.total_points };
     newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) + points;
 
-    const nextDistance = getNextDistanceBackAndForth(currentDistance, wasMade);
+    // Calculate next distance based on format
+    let nextDistance;
+    if (gameType === 'back_and_forth') {
+      nextDistance = getNextDistanceBackAndForth(currentDistance, wasMade);
+    } else if (gameType === 'streak_challenge') {
+      nextDistance = format.startDistance; // Always same distance for streak
+    } else {
+      nextDistance = currentDistance;
+    }
+
     const newPlayerDistances = { ...game.player_distances };
     newPlayerDistances[playerName] = nextDistance;
 
@@ -304,6 +326,15 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             onMissed={() => handleBackAndForthPutt(false)}
             canUndo={canUndo}
             onUndo={handleUndo}
+            showStreak={gameType === 'streak_challenge'}
+            currentStreak={gameType === 'streak_challenge' ? playerPutts.filter((p, i) => {
+              const streak = [];
+              for (let j = playerPutts.length - 1; j >= 0; j--) {
+                if (playerPutts[j].result === 'made') streak.push(playerPutts[j]);
+                else break;
+              }
+              return streak.length;
+            }).length : 0}
           />
         ) : (
           <ClassicScoreInput

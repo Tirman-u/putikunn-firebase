@@ -93,13 +93,15 @@ export default function GroupResult() {
     });
     
     const puttingPercentage = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
-    const totalScore = Object.values(game.total_points || {}).reduce((sum, pts) => sum + pts, 0);
+    const bestScore = Object.values(game.total_points || {}).length > 0 
+      ? Math.max(...Object.values(game.total_points || {})) 
+      : 0;
 
     return {
       ...game,
       formatName: format.name,
       puttingPercentage,
-      totalScore
+      bestScore
     };
   }).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
@@ -174,7 +176,7 @@ export default function GroupResult() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-emerald-600">{game.totalScore}</div>
+                          <div className="text-2xl font-bold text-emerald-600">{game.bestScore}</div>
                           <div className="text-xs text-slate-500">{game.puttingPercentage}% made</div>
                         </div>
                       </div>

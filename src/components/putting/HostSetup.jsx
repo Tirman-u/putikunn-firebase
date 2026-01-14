@@ -5,7 +5,7 @@ import { Play, Copy, Check, ArrowLeft } from 'lucide-react';
 import GameFormatSelector from './GameFormatSelector';
 import FormatRulesPopup from './FormatRulesPopup';
 
-export default function HostSetup({ onStartGame, onBack }) {
+export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   const [gameName, setGameName] = useState('');
   const [gameType, setGameType] = useState('classic');
   const [copied, setCopied] = useState(false);

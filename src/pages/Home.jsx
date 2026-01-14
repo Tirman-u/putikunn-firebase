@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Users, UserPlus, Settings, BarChart3, User, Mail } from 'lucide-react';
+import { Users, UserPlus, Settings, User, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
@@ -10,6 +10,7 @@ import HostSetup from '@/components/putting/HostSetup';
 import JoinGame from '@/components/putting/JoinGame';
 import HostView from '@/components/putting/HostView';
 import PlayerView from '@/components/putting/PlayerView';
+import { GAME_FORMATS } from '@/components/putting/gameRules';
 
 export default function Home() {
   const [mode, setMode] = useState(null); // null, 'host', 'player'
@@ -21,17 +22,7 @@ export default function Home() {
     queryFn: () => base44.auth.me()
   });
 
-  const { data: pendingInvitations = [] } = useQuery({
-    queryKey: ['pending-invitations', user?.email],
-    queryFn: async () => {
-      const invitations = await base44.entities.GameInvitation.list();
-      return invitations.filter(inv => 
-        inv.to_user_email === user.email && inv.status === 'pending'
-      );
-    },
-    enabled: !!user,
-    refetchInterval: 5000
-  });
+
 
   const handleHostGame = async (gameData) => {
     const user = await base44.auth.me();
@@ -102,6 +93,21 @@ export default function Home() {
               </div>
             </button>
 
+            <button
+              onClick={() => setMode('solo')}
+              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                  <Target className="w-7 h-7 text-emerald-600" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-lg font-bold text-slate-800">Solo Practice</h3>
+                  <p className="text-sm text-slate-500">Practice alone without hosting</p>
+                </div>
+              </div>
+            </button>
+
             <div className="pt-4 border-t-2 border-slate-200 mt-6 space-y-3">
             <Link
               to={createPageUrl('ManageGames')}
@@ -119,21 +125,6 @@ export default function Home() {
             </Link>
 
             <Link
-              to={createPageUrl('Dashboard')}
-              className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200 transition-colors">
-                  <BarChart3 className="w-6 h-6 text-slate-600" />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-base font-bold text-slate-800">My Dashboard</h3>
-                  <p className="text-xs text-slate-500">Stats and analytics</p>
-                </div>
-              </div>
-            </Link>
-
-            <Link
               to={createPageUrl('Profile')}
               className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block"
             >
@@ -143,28 +134,8 @@ export default function Home() {
                 </div>
                 <div className="text-left flex-1">
                   <h3 className="text-base font-bold text-slate-800">My Profile</h3>
-                  <p className="text-xs text-slate-500">View and edit profile</p>
+                  <p className="text-xs text-slate-500">Stats and game history</p>
                 </div>
-              </div>
-            </Link>
-
-            <Link
-              to={createPageUrl('Invitations')}
-              className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block relative"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200 transition-colors">
-                  <Mail className="w-6 h-6 text-slate-600" />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-base font-bold text-slate-800">Invitations</h3>
-                  <p className="text-xs text-slate-500">Manage game invites</p>
-                </div>
-                {pendingInvitations.length > 0 && (
-                  <div className="absolute top-3 right-3 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
-                    {pendingInvitations.length}
-                  </div>
-                )}
               </div>
             </Link>
             </div>
@@ -177,6 +148,28 @@ export default function Home() {
   // Host setup
   if (mode === 'host-setup') {
     return <HostSetup onStartGame={handleHostGame} onBack={() => setMode(null)} />;
+  }
+
+  // Solo mode
+  if (mode === 'solo') {
+    return <HostSetup onStartGame={async (gameData) => {
+      const user = await base44.auth.me();
+      const game = await base44.entities.Game.create({
+        name: gameData.name || 'Solo Practice',
+        pin: '0000',
+        game_type: gameData.gameType || 'classic',
+        host_user: user.email,
+        players: [user.full_name],
+        player_distances: { [user.full_name]: GAME_FORMATS[gameData.gameType || 'classic'].startDistance },
+        player_putts: { [user.full_name]: [] },
+        total_points: { [user.full_name]: 0 },
+        status: 'active',
+        date: new Date().toISOString()
+      });
+      setGameId(game.id);
+      setPlayerName(user.full_name);
+      setMode('player');
+    }} onBack={() => setMode(null)} isSolo={true} />;
   }
 
   // Join game

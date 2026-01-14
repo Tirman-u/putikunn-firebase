@@ -2,15 +2,13 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Copy, Check, Users, UserPlus } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Users } from 'lucide-react';
 import JylyScoreTable from './JylyScoreTable';
-import InviteFriendsDialog from '../invitations/InviteFriendsDialog';
 
 const MAX_ROUNDS = 20;
 
 export default function HostView({ gameId, onExit }) {
   const [copied, setCopied] = useState(false);
-  const [showInviteDialog, setShowInviteDialog] = useState(false);
 
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],
@@ -71,14 +69,6 @@ export default function HostView({ gameId, onExit }) {
                   {copied ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
                   {copied ? 'Copied' : 'Copy'}
                 </Button>
-                <Button
-                  onClick={() => setShowInviteDialog(true)}
-                  size="sm"
-                  className="bg-white/20 hover:bg-white/30 text-white border-white/30"
-                >
-                  <UserPlus className="w-4 h-4 mr-1" />
-                  Invite
-                </Button>
               </div>
               <div className="flex items-center gap-2 text-sm opacity-90">
                 <Users className="w-4 h-4" />
@@ -122,15 +112,6 @@ export default function HostView({ gameId, onExit }) {
           )}
         </div>
       </div>
-
-      {/* Invite Dialog */}
-      {showInviteDialog && (
-        <InviteFriendsDialog 
-          game={game}
-          isOpen={showInviteDialog}
-          onClose={() => setShowInviteDialog(false)}
-        />
-      )}
     </div>
   );
 }

@@ -96,13 +96,16 @@ export default function PuttingKing() {
           <div>
             <h2 className="text-xl font-bold text-slate-800 mb-3">My Tournaments</h2>
             <div className="space-y-3">
-              {myTournaments.map(tournament => (
+              {myTournaments.map(tournament => {
+               const isTournamentFinished = tournament.current_round === tournament.total_rounds;
+               const displayStatus = isTournamentFinished ? 'finished' : tournament.status;
+               return (
                <div key={tournament.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
                  <div className="flex items-center justify-between mb-3">
                    <div>
                      <div className="font-bold text-lg text-slate-800">{tournament.name}</div>
                      <div className="text-sm text-slate-500">
-                       Status: {tournament.status} • Created {format(new Date(tournament.created_date), 'MMM d')}
+                       Status: {displayStatus} • Created {format(new Date(tournament.created_date), 'MMM d')}
                      </div>
                    </div>
                  </div>

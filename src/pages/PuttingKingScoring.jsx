@@ -45,6 +45,21 @@ export default function PuttingKingScoring() {
       const currentScore = team === 'A' ? match.score_a : match.score_b;
       let newScore = currentScore + (made ? distance.points : 0);
 
+      // Risk/reward mechanics on missed putts
+      if (!made) {
+        const sortedDistances = [...distances].sort((a, b) => a.points - b.points);
+        const isShortestDistance = distance.id === sortedDistances[0].id;
+        const isFarthestDistance = distance.id === sortedDistances[sortedDistances.length - 1].id;
+
+        if (isShortestDistance) {
+          newScore -= 1;
+          toast.info('Missed the shortest! -1');
+        } else if (isFarthestDistance) {
+          newScore += 1;
+          toast.success('Good effort from far away! +1');
+        }
+      }
+
       // Bust logic
       if (newScore > tournament.target_score) {
         newScore = tournament.bust_reset_score;

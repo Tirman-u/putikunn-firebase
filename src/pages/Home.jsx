@@ -109,7 +109,7 @@ export default function Home() {
             </button>
 
             <button
-              onClick={() => window.location.href = createPageUrl('PuttingKingHome')}
+              onClick={() => window.location.href = createPageUrl('PuttingKing')}
               className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all group"
             >
               <div className="flex items-center gap-4">

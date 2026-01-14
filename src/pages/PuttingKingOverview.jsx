@@ -358,10 +358,10 @@ export default function PuttingKingOverview() {
                 </div>
               );
             })}
-          </div>
+            </div>
 
-          {/* Player Details */}
-          <div className="space-y-6">
+            {/* Leaderboard Column */}
+            <div className="space-y-6">
             {/* Head-to-Head Matchups */}
             {leaderboard.length >= 2 && (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">

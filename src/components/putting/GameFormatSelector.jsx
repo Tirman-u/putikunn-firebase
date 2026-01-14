@@ -44,13 +44,6 @@ const GAME_FORMATS = [
     distance: '3-15m',
     description: 'Random distances each round',
     color: 'indigo'
-  },
-  {
-    id: 'putting_king',
-    name: 'Putting King!',
-    distance: 'Tournament',
-    description: '2v2 battles to 21',
-    color: 'purple'
   }
 ];
 

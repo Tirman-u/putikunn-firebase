@@ -19,10 +19,6 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   );
 
   const handleStart = () => {
-    if (gameType === 'putting_king') {
-      navigate(createPageUrl('PuttingKing'));
-      return;
-    }
     onStartGame({
       name: gameName || `Game ${new Date().toLocaleDateString()}`,
       pin,

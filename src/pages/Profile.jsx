@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Camera, Trophy, Target, TrendingUp, Edit2, Save, X, Award, ExternalLink, Filter } from 'lucide-react';
+import { ArrowLeft, Camera, Trophy, Target, TrendingUp, Edit2, Save, X, Award, ExternalLink, Filter, Eye, EyeOff } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
+import AIInsights from '@/components/profile/AIInsights';
+import AchievementsList, { getAchievements } from '@/components/profile/AchievementsList';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -19,6 +21,7 @@ export default function Profile() {
   const [uploading, setUploading] = useState(false);
   const [sortBy, setSortBy] = useState('date'); // date, score, format
   const [filterFormat, setFilterFormat] = useState('all');
+  const [showAllAchievements, setShowAllAchievements] = useState(false);
 
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ['user'],
@@ -136,50 +139,16 @@ export default function Profile() {
     : 0;
 
   // Achievements
-  const achievements = [
-    { 
-      id: 'first_game', 
-      name: 'First Game', 
-      description: 'Completed your first game',
-      unlocked: totalGames > 0,
-      icon: '🎯'
-    },
-    { 
-      id: 'ten_games', 
-      name: '10 Games', 
-      description: 'Played 10 games',
-      unlocked: totalGames >= 10,
-      icon: '🔥'
-    },
-    { 
-      id: 'perfect_round', 
-      name: 'Perfect Round', 
-      description: 'Made all 5 putts in a round',
-      unlocked: myGames.some(g => {
-        const putts = g.player_putts?.[myName] || [];
-        for (let i = 0; i < putts.length - 4; i += 5) {
-          const round = putts.slice(i, i + 5);
-          if (round.length === 5 && round.every(p => p.result === 'made')) return true;
-        }
-        return false;
-      }),
-      icon: '⭐'
-    },
-    { 
-      id: 'high_scorer', 
-      name: 'High Scorer', 
-      description: 'Score over 500 points in a game',
-      unlocked: bestScore > 500,
-      icon: '🏆'
-    },
-    { 
-      id: 'sharpshooter', 
-      name: 'Sharpshooter', 
-      description: 'Achieve 90%+ putting accuracy',
-      unlocked: parseFloat(puttingPercentage) >= 90,
-      icon: '🎖️'
-    }
-  ];
+  const isAdmin = user?.role === 'admin';
+  const achievements = getAchievements({
+    totalGames,
+    puttingPercentage,
+    bestScore,
+    avgScore,
+    allPutts,
+    myGames,
+    myName
+  }, showAllAchievements && isAdmin);
 
   const unlockedAchievements = achievements.filter(a => a.unlocked);
 
@@ -399,29 +368,36 @@ export default function Profile() {
           </div>
         )}
 
+        {/* AI Insights */}
+        <AIInsights games={myGames} userName={myName} />
+
         {/* Achievements */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">Achievements ({unlockedAchievements.length}/{achievements.length})</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {achievements.map(achievement => (
-              <div 
-                key={achievement.id}
-                className={`p-4 rounded-xl border-2 ${
-                  achievement.unlocked 
-                    ? 'bg-emerald-50 border-emerald-200' 
-                    : 'bg-slate-50 border-slate-200 opacity-50'
-                }`}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-slate-800">
+              Achievements ({unlockedAchievements.length}/{showAllAchievements && isAdmin ? achievements.length : unlockedAchievements.length})
+            </h3>
+            {isAdmin && (
+              <Button
+                onClick={() => setShowAllAchievements(!showAllAchievements)}
+                variant="outline"
+                size="sm"
               >
-                <div className="flex items-center gap-3">
-                  <div className="text-3xl">{achievement.icon}</div>
-                  <div>
-                    <div className="font-bold text-slate-800">{achievement.name}</div>
-                    <div className="text-sm text-slate-600">{achievement.description}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                {showAllAchievements ? (
+                  <>
+                    <EyeOff className="w-4 h-4 mr-2" />
+                    Hide Locked
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Show All
+                  </>
+                )}
+              </Button>
+            )}
           </div>
+          <AchievementsList achievements={achievements} />
         </div>
 
         {/* Game History with Filters */}

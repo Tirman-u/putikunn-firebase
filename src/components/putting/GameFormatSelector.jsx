@@ -30,6 +30,34 @@ const GAME_FORMATS = [
     distance: '10-15m',
     description: 'Distance challenge',
     color: 'purple'
+  },
+  {
+    id: 'streak_challenge',
+    name: 'Streak',
+    distance: '5-10m',
+    description: 'Keep the streak alive',
+    color: 'red'
+  },
+  {
+    id: 'pressure_test',
+    name: 'Pressure',
+    distance: '8m',
+    description: 'Make 3 in a row',
+    color: 'orange'
+  },
+  {
+    id: 'random_distance',
+    name: 'Random',
+    distance: '3-15m',
+    description: 'Unpredictable distances',
+    color: 'indigo'
+  },
+  {
+    id: 'elimination',
+    name: 'Elimination',
+    distance: '5-12m',
+    description: 'Advance or repeat',
+    color: 'pink'
   }
 ];
 

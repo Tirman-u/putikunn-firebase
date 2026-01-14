@@ -209,50 +209,80 @@ export default function GameResult() {
             </div>
           </div>
         ) : (
-          // Card view for back & forth format
-          <div className="space-y-4">
-            {playerStats.map((player, index) => (
-              <div key={player.name} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600">
-                      {index + 1}
-                    </div>
-                    <div>
-                      <div className="font-bold text-lg text-slate-800">{player.name}</div>
-                      <div className="text-sm text-slate-500">
-                        {player.totalPutts} putts • {player.madePutts} made
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold text-emerald-600">{player.totalPoints}</div>
-                    <div className="text-sm text-slate-500">{player.puttingPercentage}%</div>
-                  </div>
-                </div>
+          // Table view for back & forth format with dots
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left p-4 font-semibold text-slate-700 bg-slate-50 sticky left-0 z-10">Player</th>
+                    {[...Array(20)].map((_, i) => (
+                      <th key={i} className="text-center p-2 font-semibold text-slate-700 bg-slate-50 text-sm min-w-[60px]">
+                        {i + 1}
+                      </th>
+                    ))}
+                    <th className="text-center p-4 font-semibold text-slate-700 bg-slate-50 sticky right-0 z-10">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {playerStats.map((player, pIndex) => {
+                    // Group putts into rounds of 5
+                    const rounds = [];
+                    for (let i = 0; i < 100; i += 5) {
+                      const roundPutts = player.putts.slice(i, i + 5);
+                      if (roundPutts.length > 0) {
+                        rounds.push(roundPutts);
+                      }
+                    }
 
-                {/* Distance Progression */}
-                {player.putts.length > 0 && (
-                  <div>
-                    <div className="text-sm font-semibold text-slate-700 mb-2">Distance Progression</div>
-                    <div className="flex flex-wrap gap-1">
-                      {player.putts.map((putt, idx) => (
-                        <div
-                          key={idx}
-                          className={`w-8 h-8 rounded flex items-center justify-center text-xs font-medium ${
-                            putt.result === 'made'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-slate-100 text-slate-500'
-                          }`}
-                        >
-                          {putt.distance}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                    return (
+                      <tr key={player.name} className="border-b border-slate-100 hover:bg-slate-50/50">
+                        <td className="p-4 font-medium text-slate-800 bg-white sticky left-0 z-10 border-r border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">
+                              {pIndex + 1}
+                            </div>
+                            <span>{player.name}</span>
+                          </div>
+                        </td>
+                        {[...Array(20)].map((_, roundIndex) => {
+                          const round = rounds[roundIndex];
+                          return (
+                            <td key={roundIndex} className="p-2 text-center">
+                              {round ? (
+                                <div className="flex flex-col items-center gap-1">
+                                  <div className="text-base font-bold text-slate-700">
+                                    {round.reduce((sum, p) => sum + (p.points || 0), 0)}
+                                  </div>
+                                  <div className="flex gap-0.5">
+                                    {round.map((putt, puttIdx) => (
+                                      <div
+                                        key={puttIdx}
+                                        className={`w-1.5 h-1.5 rounded-full ${
+                                          putt.result === 'made' 
+                                            ? 'bg-emerald-500' 
+                                            : 'bg-red-500'
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-slate-300">-</div>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="p-4 text-center bg-white sticky right-0 z-10 border-l border-slate-100">
+                          <div className="font-bold text-lg text-emerald-600">{player.totalPoints}</div>
+                          <div className="text-xs text-slate-500">{player.puttingPercentage}%</div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

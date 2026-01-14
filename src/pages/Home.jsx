@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Users, UserPlus, Settings, BarChart3 } from 'lucide-react';
+import { Users, UserPlus, Settings, BarChart3, User, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
@@ -19,6 +19,18 @@ export default function Home() {
   const { data: user } = useQuery({
     queryKey: ['user'],
     queryFn: () => base44.auth.me()
+  });
+
+  const { data: pendingInvitations = [] } = useQuery({
+    queryKey: ['pending-invitations', user?.email],
+    queryFn: async () => {
+      const invitations = await base44.entities.GameInvitation.list();
+      return invitations.filter(inv => 
+        inv.to_user_email === user.email && inv.status === 'pending'
+      );
+    },
+    enabled: !!user,
+    refetchInterval: 5000
   });
 
   const handleHostGame = async (gameData) => {
@@ -120,7 +132,42 @@ export default function Home() {
                 </div>
               </div>
             </Link>
-          </div>
+
+            <Link
+              to={createPageUrl('Profile')}
+              className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200 transition-colors">
+                  <User className="w-6 h-6 text-slate-600" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-base font-bold text-slate-800">My Profile</h3>
+                  <p className="text-xs text-slate-500">View and edit profile</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              to={createPageUrl('Invitations')}
+              className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block relative"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200 transition-colors">
+                  <Mail className="w-6 h-6 text-slate-600" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-base font-bold text-slate-800">Invitations</h3>
+                  <p className="text-xs text-slate-500">Manage game invites</p>
+                </div>
+                {pendingInvitations.length > 0 && (
+                  <div className="absolute top-3 right-3 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
+                    {pendingInvitations.length}
+                  </div>
+                )}
+              </div>
+            </Link>
+            </div>
           </div>
         </div>
       </div>

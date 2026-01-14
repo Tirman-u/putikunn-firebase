@@ -8,7 +8,8 @@ import JylyScoreTable from './JylyScoreTable';
 const MAX_ROUNDS = 20;
 
 export default function HostView({ gameId, onExit }) {
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
 
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],

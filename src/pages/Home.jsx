@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Settings, User, Trophy } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Users, UserPlus, Settings, User, Target, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
@@ -12,7 +13,7 @@ import PlayerView from '@/components/putting/PlayerView';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 
 export default function Home() {
-  const [gameMode, setGameMode] = useState(null); // null, 'host-setup', 'join', 'solo', 'host', 'player'
+  const [mode, setMode] = useState(null); // null, 'host', 'player'
   const [gameId, setGameId] = useState(null);
   const [playerName, setPlayerName] = useState(null);
 
@@ -20,6 +21,8 @@ export default function Home() {
     queryKey: ['user'],
     queryFn: () => base44.auth.me()
   });
+
+
 
   const handleHostGame = async (gameData) => {
     const user = await base44.auth.me();
@@ -38,81 +41,89 @@ export default function Home() {
     });
 
     setGameId(game.id);
-    setGameMode('host');
+    setMode('host');
   };
 
   const handleJoinGame = ({ game, playerName }) => {
     setGameId(game.id);
     setPlayerName(playerName);
-    setGameMode('player');
+    setMode('player');
   };
 
-  // Game modes
-  if (gameMode === 'host-setup') {
-    return <HostSetup onStartGame={handleHostGame} onBack={() => setGameMode(null)} />;
-  }
+  // Initial selection screen
+  if (!mode) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
+        <div className="max-w-lg mx-auto pt-16">
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-slate-800 mb-2">
+              Welcome {user?.full_name || 'Guest'}!
+            </h1>
+            <p className="text-slate-600 text-xl mb-8">Ready to make some putts?</p>
+          </div>
 
-  if (gameMode === 'solo') {
-    return <HostSetup onStartGame={async (gameData) => {
-      const user = await base44.auth.me();
-      const game = await base44.entities.Game.create({
-        name: gameData.name || 'Solo Practice',
-        pin: '0000',
-        game_type: gameData.gameType || 'classic',
-        host_user: user.email,
-        players: [user.full_name],
-        player_distances: { [user.full_name]: GAME_FORMATS[gameData.gameType || 'classic'].startDistance },
-        player_putts: { [user.full_name]: [] },
-        total_points: { [user.full_name]: 0 },
-        status: 'active',
-        date: new Date().toISOString()
-      });
-      setGameId(game.id);
-      setPlayerName(user.full_name);
-      setGameMode('player');
-    }} onBack={() => setGameMode(null)} isSolo={true} />;
-  }
-
-  if (gameMode === 'join') {
-    return <JoinGame onJoin={handleJoinGame} onBack={() => setGameMode(null)} />;
-  }
-
-  if (gameMode === 'host') {
-    return <HostView gameId={gameId} onExit={() => setGameMode(null)} />;
-  }
-
-  if (gameMode === 'player') {
-    return <PlayerView gameId={gameId} playerName={playerName} onExit={() => setGameMode(null)} />;
-  }
-
-  // Main home page
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
-      <div className="max-w-lg mx-auto pt-16">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-slate-800 mb-2">
-            Welcome {user?.full_name || 'Guest'}!
-          </h1>
-          <p className="text-slate-600 text-xl mb-8">Ready to make some putts?</p>
-        </div>
-
-        <div className="space-y-4">
-          <Link
-            to={createPageUrl('PuttingKingHome')}
-            className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                <Trophy className="w-7 h-7 text-purple-600" />
+          <div className="space-y-4">
+            <button
+              onClick={() => setMode('host-setup')}
+              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                  <Users className="w-7 h-7 text-emerald-600" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-lg font-bold text-slate-800">Host Game</h3>
+                  <p className="text-sm text-slate-500">Create a session and get a PIN</p>
+                </div>
               </div>
-              <div className="text-left flex-1">
-                <h3 className="text-lg font-bold text-slate-800">Putting King</h3>
-                <p className="text-sm text-slate-500">Manage tournaments and competitions</p>
-              </div>
-            </div>
-          </Link>
+            </button>
 
-          <div className="pt-4 border-t-2 border-slate-200 mt-6 space-y-3">
+            <button
+              onClick={() => setMode('join')}
+              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                  <UserPlus className="w-7 h-7 text-emerald-600" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-lg font-bold text-slate-800">Join Game</h3>
+                  <p className="text-sm text-slate-500">Enter a PIN to join a session</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setMode('solo')}
+              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                  <Target className="w-7 h-7 text-emerald-600" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-lg font-bold text-slate-800">Solo Practice</h3>
+                  <p className="text-sm text-slate-500">Practice alone without hosting</p>
+                </div>
+              </div>
+            </button>
+
+            <Link
+              to={createPageUrl('PuttingKingHome')}
+              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                  <Trophy className="w-7 h-7 text-purple-600" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-lg font-bold text-slate-800">Putting King</h3>
+                  <p className="text-sm text-slate-500">Manage tournaments and competitions</p>
+                </div>
+              </div>
+            </Link>
+
+            <div className="pt-4 border-t-2 border-slate-200 mt-6 space-y-3">
             <Link
               to={createPageUrl('ManageGames')}
               className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block"
@@ -142,9 +153,54 @@ export default function Home() {
                 </div>
               </div>
             </Link>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // Host setup
+  if (mode === 'host-setup') {
+    return <HostSetup onStartGame={handleHostGame} onBack={() => setMode(null)} />;
+  }
+
+  // Solo mode
+  if (mode === 'solo') {
+    return <HostSetup onStartGame={async (gameData) => {
+      const user = await base44.auth.me();
+      const game = await base44.entities.Game.create({
+        name: gameData.name || 'Solo Practice',
+        pin: '0000',
+        game_type: gameData.gameType || 'classic',
+        host_user: user.email,
+        players: [user.full_name],
+        player_distances: { [user.full_name]: GAME_FORMATS[gameData.gameType || 'classic'].startDistance },
+        player_putts: { [user.full_name]: [] },
+        total_points: { [user.full_name]: 0 },
+        status: 'active',
+        date: new Date().toISOString()
+      });
+      setGameId(game.id);
+      setPlayerName(user.full_name);
+      setMode('player');
+    }} onBack={() => setMode(null)} isSolo={true} />;
+  }
+
+  // Join game
+  if (mode === 'join') {
+    return <JoinGame onJoin={handleJoinGame} onBack={() => setMode(null)} />;
+  }
+
+  // Host view
+  if (mode === 'host') {
+    return <HostView gameId={gameId} onExit={() => setMode(null)} />;
+  }
+
+  // Player view
+  if (mode === 'player') {
+    return <PlayerView gameId={gameId} playerName={playerName} onExit={() => setMode(null)} />;
+  }
+
+  return null;
 }

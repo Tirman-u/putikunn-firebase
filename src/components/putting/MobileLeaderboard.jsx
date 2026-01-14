@@ -1,16 +1,33 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { base44 } from '@/api/base44Client';
 import { Trophy, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function MobileLeaderboard({ game, onClose }) {
-  if (!game) return null;
+  const [liveGame, setLiveGame] = useState(game);
 
-  const playerStats = game.players.map(player => {
-    const putts = game.player_putts?.[player] || [];
+  useEffect(() => {
+    if (!game?.id) return;
+    
+    // Subscribe to real-time updates
+    const unsubscribe = base44.entities.Game.subscribe((event) => {
+      if (event.id === game.id && event.type === 'update') {
+        setLiveGame(event.data);
+      }
+    });
+
+    return unsubscribe;
+  }, [game?.id]);
+
+  const currentGame = liveGame || game;
+  if (!currentGame) return null;
+
+  const playerStats = currentGame.players.map(player => {
+    const putts = currentGame.player_putts?.[player] || [];
     const totalPutts = putts.length;
     const madePutts = putts.filter(p => p.result === 'made').length;
     const puttingPercentage = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
-    const totalPoints = game.total_points?.[player] || 0;
+    const totalPoints = currentGame.total_points?.[player] || 0;
 
     return {
       name: player,

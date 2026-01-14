@@ -31,7 +31,7 @@ export default function PuttingKing() {
   });
 
   const myTournaments = tournaments.filter(t => t.host_user === user?.email);
-  const activeTournaments = tournaments.filter(t => t.status === 'active');
+  const activeTournaments = tournaments.filter(t => t.status === 'active' && t.current_round < t.total_rounds);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">

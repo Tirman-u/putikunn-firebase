@@ -300,7 +300,7 @@ export default function PuttingKingOverview() {
 
                           {/* Stations Column */}
                           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-slate-800">Stations</h2>
+                            <h2 className="text-xl font-bold text-slate-800">Stations</h2>
             {stations.map(station => {
               const match = getStationMatch(station.id);
               return (

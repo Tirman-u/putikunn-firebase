@@ -22,6 +22,6 @@ export const PAGES = {
 }
 
 export const pagesConfig = {
-    mainPage: "Home",
+    mainPage: "PuttingKingSetup",
     Pages: PAGES,
 };

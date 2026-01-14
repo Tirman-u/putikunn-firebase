@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Users, UserPlus, Settings, User, Target } from 'lucide-react';
+import { Users, UserPlus, Settings, User, Target, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
@@ -107,6 +107,21 @@ export default function Home() {
                 </div>
               </div>
             </button>
+
+            <Link
+              to={createPageUrl('PuttingKingHome')}
+              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                  <Trophy className="w-7 h-7 text-purple-600" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-lg font-bold text-slate-800">Putting King</h3>
+                  <p className="text-sm text-slate-500">Manage tournaments and competitions</p>
+                </div>
+              </div>
+            </Link>
 
             <div className="pt-4 border-t-2 border-slate-200 mt-6 space-y-3">
             <Link

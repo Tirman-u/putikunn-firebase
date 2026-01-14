@@ -16,6 +16,7 @@ export default function PuttingKingSetup() {
   const [tournamentName, setTournamentName] = useState('');
   const [targetScore, setTargetScore] = useState(21);
   const [bustReset, setBustReset] = useState(11);
+  const [totalRounds, setTotalRounds] = useState(6);
   const [distances, setDistances] = useState([
     { id: 'd1', label: '5m', points: 1, enabled: true, order: 1 },
     { id: 'd2', label: '7m', points: 2, enabled: true, order: 2 },
@@ -40,6 +41,8 @@ export default function PuttingKingSetup() {
         status: 'setup',
         target_score: data.targetScore,
         bust_reset_score: data.bustReset,
+        total_rounds: data.totalRounds,
+        current_round: 1,
         distances: data.distances,
         host_user: user.email
       });
@@ -78,28 +81,25 @@ export default function PuttingKingSetup() {
   });
 
   const startTournamentMutation = useMutation({
-    mutationFn: async (tournamentId) => {
-      // Get all stations and players
+    mutationFn: async ({ tournamentId, shuffledPlayers }) => {
+      // Get all stations
       const allStations = await base44.entities.PuttingKingStation.list();
       const tournamentStations = allStations.filter(s => s.tournament_id === tournamentId && s.enabled)
         .sort((a, b) => a.order_index - b.order_index);
 
-      const allPlayers = await base44.entities.PuttingKingPlayer.list();
-      const tournamentPlayers = allPlayers.filter(p => p.tournament_id === tournamentId && p.active);
-
       // Distribute players to stations
       const playersPerStation = 4;
-      const shuffledPlayers = [...tournamentPlayers].sort(() => Math.random() - 0.5);
 
       for (let i = 0; i < tournamentStations.length && i * playersPerStation < shuffledPlayers.length; i++) {
         const station = tournamentStations[i];
         const stationPlayers = shuffledPlayers.slice(i * playersPerStation, (i + 1) * playersPerStation);
 
         if (stationPlayers.length === 4) {
-          // Create initial match
+          // Create initial match for round 1
           const match = await base44.entities.PuttingKingMatch.create({
             tournament_id: tournamentId,
             station_id: station.id,
+            round_number: 1,
             status: 'ready',
             team_a_players: [stationPlayers[0].user_email, stationPlayers[1].user_email],
             team_b_players: [stationPlayers[2].user_email, stationPlayers[3].user_email],
@@ -112,18 +112,27 @@ export default function PuttingKingSetup() {
             await base44.entities.PuttingKingPlayer.update(player.id, {
               current_status: 'ready',
               current_station_id: station.id,
-              current_match_id: match.id
+              current_match_id: match.id,
+              last_partner_email: null
             });
           }
         }
       }
 
       // Update tournament status
-      await base44.entities.PuttingKingTournament.update(tournamentId, { status: 'active' });
+      await base44.entities.PuttingKingTournament.update(tournamentId, { status: 'active', current_round: 1 });
     },
-    onSuccess: (_, tournamentId) => {
+    onSuccess: (_, { tournamentId }) => {
       queryClient.invalidateQueries();
       navigate(`${createPageUrl('PuttingKingOverview')}?id=${tournamentId}`);
+    }
+  });
+
+  const shufflePlayersMutation = useMutation({
+    mutationFn: async (tournamentId) => {
+      const allPlayers = await base44.entities.PuttingKingPlayer.list();
+      const tournamentPlayers = allPlayers.filter(p => p.tournament_id === tournamentId && p.active);
+      return [...tournamentPlayers].sort(() => Math.random() - 0.5);
     }
   });
 
@@ -138,6 +147,7 @@ export default function PuttingKingSetup() {
       name: tournamentName,
       targetScore,
       bustReset,
+      totalRounds,
       distances,
       stations,
       players: validPlayers
@@ -212,6 +222,17 @@ export default function PuttingKingSetup() {
                     onChange={(e) => setBustReset(Number(e.target.value))}
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Total Rounds</label>
+                <Input
+                  type="number"
+                  value={totalRounds}
+                  onChange={(e) => setTotalRounds(Number(e.target.value))}
+                  min={1}
+                  max={20}
+                />
+                <p className="text-xs text-slate-500 mt-1">How many rounds to play (default: 6)</p>
               </div>
             </div>
           </div>
@@ -338,14 +359,24 @@ export default function PuttingKingSetup() {
               Create Tournament
             </Button>
           ) : (
-            <Button
-              onClick={() => startTournamentMutation.mutate(tournamentId)}
-              disabled={startTournamentMutation.isPending}
-              className="w-full h-14 bg-green-600 hover:bg-green-700"
-            >
-              <Play className="w-5 h-5 mr-2" />
-              Start Tournament
-            </Button>
+            <div className="space-y-3">
+              <Button
+                onClick={async () => {
+                  const allPlayers = await base44.entities.PuttingKingPlayer.list();
+                  const tournamentPlayers = allPlayers.filter(p => p.tournament_id === tournamentId && p.active);
+                  const shuffled = [...tournamentPlayers].sort(() => Math.random() - 0.5);
+                  startTournamentMutation.mutate({ tournamentId, shuffledPlayers: shuffled });
+                }}
+                disabled={startTournamentMutation.isPending}
+                className="w-full h-14 bg-green-600 hover:bg-green-700"
+              >
+                <Play className="w-5 h-5 mr-2" />
+                Shuffle & Start Tournament
+              </Button>
+              <p className="text-xs text-center text-slate-500">
+                Players will be randomly shuffled and assigned to stations
+              </p>
+            </div>
           )}
         </div>
       </div>

@@ -146,83 +146,80 @@ export default function PuttingKingScoring() {
           <span className="font-medium">Back</span>
         </button>
 
-        {/* Scores */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="bg-purple-500 text-white rounded-2xl p-4 text-center">
-            <div className="text-xs font-semibold mb-1 opacity-90">Team A</div>
-            <div className="text-4xl font-bold mb-2">{match.score_a}</div>
-            {match.team_a_players.map(email => (
-              <div key={email} className="text-xs opacity-90">{getPlayerName(email)}</div>
-            ))}
-          </div>
-          <div className="bg-blue-500 text-white rounded-2xl p-4 text-center">
-            <div className="text-xs font-semibold mb-1 opacity-90">Team B</div>
-            <div className="text-4xl font-bold mb-2">{match.score_b}</div>
-            {match.team_b_players.map(email => (
-              <div key={email} className="text-xs opacity-90">{getPlayerName(email)}</div>
-            ))}
-          </div>
-        </div>
-
-        {/* Team A Scoring */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border-2 border-purple-300 mb-4">
-          <h3 className="font-bold text-purple-600 mb-3 text-lg">Team A</h3>
-          <div className="space-y-2">
-            {distances.map(distance => (
-              <div key={distance.id} className="flex items-center gap-2">
-                <div className="flex-1 font-medium text-slate-700">
-                  {distance.label} ({distance.points}pts)
+        {/* Team Cards with Integrated Scoring */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Team A */}
+          <div className="bg-white rounded-2xl shadow-sm border-2 border-purple-300 overflow-hidden">
+            <div className="bg-purple-500 text-white p-4 text-center">
+              <div className="text-xs font-semibold mb-1 opacity-90">Team A</div>
+              <div className="text-4xl font-bold mb-2">{match.score_a}</div>
+              {match.team_a_players.map(email => (
+                <div key={email} className="text-xs opacity-90">{getPlayerName(email)}</div>
+              ))}
+            </div>
+            <div className="p-4 space-y-2">
+              {distances.map(distance => (
+                <div key={distance.id} className="flex items-center gap-2">
+                  <div className="flex-1 font-medium text-slate-700 text-sm">
+                    {distance.label} ({distance.points}pts)
+                  </div>
+                  <Button
+                    onClick={() => scoreMutation.mutate({ team: 'A', distance, made: true })}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 flex-1"
+                    disabled={scoreMutation.isPending}
+                  >
+                    Made
+                  </Button>
+                  <Button
+                    onClick={() => scoreMutation.mutate({ team: 'A', distance, made: false })}
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    disabled={scoreMutation.isPending}
+                  >
+                    Miss
+                  </Button>
                 </div>
-                <Button
-                  onClick={() => scoreMutation.mutate({ team: 'A', distance, made: true })}
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 flex-1"
-                  disabled={scoreMutation.isPending}
-                >
-                  Made
-                </Button>
-                <Button
-                  onClick={() => scoreMutation.mutate({ team: 'A', distance, made: false })}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                  disabled={scoreMutation.isPending}
-                >
-                  Miss
-                </Button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Team B Scoring */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border-2 border-blue-300">
-          <h3 className="font-bold text-blue-600 mb-3 text-lg">Team B</h3>
-          <div className="space-y-2">
-            {distances.map(distance => (
-              <div key={distance.id} className="flex items-center gap-2">
-                <div className="flex-1 font-medium text-slate-700">
-                  {distance.label} ({distance.points}pts)
+          {/* Team B */}
+          <div className="bg-white rounded-2xl shadow-sm border-2 border-blue-300 overflow-hidden">
+            <div className="bg-blue-500 text-white p-4 text-center">
+              <div className="text-xs font-semibold mb-1 opacity-90">Team B</div>
+              <div className="text-4xl font-bold mb-2">{match.score_b}</div>
+              {match.team_b_players.map(email => (
+                <div key={email} className="text-xs opacity-90">{getPlayerName(email)}</div>
+              ))}
+            </div>
+            <div className="p-4 space-y-2">
+              {distances.map(distance => (
+                <div key={distance.id} className="flex items-center gap-2">
+                  <div className="flex-1 font-medium text-slate-700 text-sm">
+                    {distance.label} ({distance.points}pts)
+                  </div>
+                  <Button
+                    onClick={() => scoreMutation.mutate({ team: 'B', distance, made: true })}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 flex-1"
+                    disabled={scoreMutation.isPending}
+                  >
+                    Made
+                  </Button>
+                  <Button
+                    onClick={() => scoreMutation.mutate({ team: 'B', distance, made: false })}
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    disabled={scoreMutation.isPending}
+                  >
+                    Miss
+                  </Button>
                 </div>
-                <Button
-                  onClick={() => scoreMutation.mutate({ team: 'B', distance, made: true })}
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 flex-1"
-                  disabled={scoreMutation.isPending}
-                >
-                  Made
-                </Button>
-                <Button
-                  onClick={() => scoreMutation.mutate({ team: 'B', distance, made: false })}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                  disabled={scoreMutation.isPending}
-                >
-                  Miss
-                </Button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>

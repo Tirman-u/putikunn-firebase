@@ -105,74 +105,56 @@ export default function PuttingKingOverview() {
       const tournamentStations = allStations.filter(s => s.tournament_id === tournament.id && s.enabled)
         .sort((a, b) => a.order_index - b.order_index);
 
-      // Get all current round matches to determine winners/losers
-      const allMatches = await base44.entities.PuttingKingMatch.list();
-      const currentMatches = allMatches.filter(m => 
-        m.tournament_id === tournament.id && 
-        m.round_number === tournament.current_round &&
-        m.status === 'finished'
-      );
-
-      // Build pairs based on match results
-      const pairs = [];
-      for (const match of currentMatches) {
-        const winnerTeam = match.winner_team === 'A' ? match.team_a_players : match.team_b_players;
-        const loserTeam = match.winner_team === 'A' ? match.team_b_players : match.team_a_players;
-        
-        pairs.push({
-          players: winnerTeam,
-          won: true,
-          station_order: tournamentStations.findIndex(s => s.id === match.station_id)
-        });
-        
-        pairs.push({
-          players: loserTeam,
-          won: false,
-          station_order: tournamentStations.findIndex(s => s.id === match.station_id)
-        });
-      }
-
-      // Sort pairs: winners up, losers down, maintaining relative positions
-      const winnerPairs = pairs.filter(p => p.won).sort((a, b) => a.station_order - b.station_order);
-      const loserPairs = pairs.filter(p => !p.won).sort((a, b) => a.station_order - b.station_order);
-      
-      // Combine: winners go to top stations, losers to bottom
-      const sortedPairs = [...winnerPairs, ...loserPairs];
-
-      // Get player objects for updates
+      // Get all players sorted individually by performance (Mexicano style)
       const allPlayers = await base44.entities.PuttingKingPlayer.list();
-      const tournamentPlayers = allPlayers.filter(p => p.tournament_id === tournament.id);
-
-      // Create matches by pairing winners vs winners, losers vs losers
-      for (let i = 0; i < sortedPairs.length; i += 2) {
-        if (i + 1 >= sortedPairs.length) break;
-        
-        const stationIndex = Math.floor(i / 2);
-        if (stationIndex >= tournamentStations.length) break;
-        
-        const station = tournamentStations[stationIndex];
-        const pair1 = sortedPairs[i];
-        const pair2 = sortedPairs[i + 1];
-
-        const match = await base44.entities.PuttingKingMatch.create({
-          tournament_id: tournament.id,
-          station_id: station.id,
-          round_number: nextRound,
-          status: 'ready',
-          team_a_players: pair1.players,
-          team_b_players: pair2.players,
-          score_a: 0,
-          score_b: 0
+      const tournamentPlayers = allPlayers
+        .filter(p => p.tournament_id === tournament.id && p.active)
+        .sort((a, b) => {
+          if (b.tournament_points !== a.tournament_points) {
+            return b.tournament_points - a.tournament_points;
+          }
+          return b.wins - a.wins;
         });
 
-        // Update all 4 players
-        const allMatchPlayers = [...pair1.players, ...pair2.players];
-        for (const email of allMatchPlayers) {
-          const player = tournamentPlayers.find(p => p.user_email === email);
-          if (player) {
-            const partner = pair1.players.includes(email) 
-              ? pair1.players.find(e => e !== email)
-              : pair2.players.find(e => e !== email);
+      const playersPerStation = 4;
+      
+      // Create new matches with rotation - distribute players to stations
+      for (let i = 0; i < tournamentStations.length && i * playersPerStation < tournamentPlayers.length; i++) {
+        const station = tournamentStations[i];
+        const stationPlayers = tournamentPlayers.slice(i * playersPerStation, (i + 1) * playersPerStation);
+
+        if (stationPlayers.length === 4) {
+          const [p1, p2, p3, p4] = stationPlayers;
+          
+          // Create teams avoiding last round partners
+          let teamA = [p1.user_email, p2.user_email];
+          let teamB = [p3.user_email, p4.user_email];
+          
+          // Try different combinations to avoid repeating partners
+          if (p1.last_partner_email === p2.user_email) {
+            teamA = [p1.user_email, p3.user_email];
+            teamB = [p2.user_email, p4.user_email];
+          } else if (p3.last_partner_email === p4.user_email) {
+            teamA = [p1.user_email, p3.user_email];
+            teamB = [p2.user_email, p4.user_email];
+          }
+
+          const match = await base44.entities.PuttingKingMatch.create({
+            tournament_id: tournament.id,
+            station_id: station.id,
+            round_number: nextRound,
+            status: 'ready',
+            team_a_players: teamA,
+            team_b_players: teamB,
+            score_a: 0,
+            score_b: 0
+          });
+
+          // Update player states with new partners
+          for (const player of stationPlayers) {
+            const partner = teamA.includes(player.user_email)
+              ? teamA.find(e => e !== player.user_email)
+              : teamB.find(e => e !== player.user_email);
               
             await base44.entities.PuttingKingPlayer.update(player.id, {
               current_status: 'ready',

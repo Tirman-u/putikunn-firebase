@@ -1,0 +1,128 @@
+import React from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Plus, Trophy, Settings } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { format } from 'date-fns';
+
+export default function PuttingKing() {
+  const navigate = useNavigate();
+
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => base44.auth.me()
+  });
+
+  const { data: tournaments = [] } = useQuery({
+    queryKey: ['putting-king-tournaments'],
+    queryFn: async () => {
+      return await base44.entities.PuttingKingTournament.list();
+    }
+  });
+
+  const myTournaments = tournaments.filter(t => t.host_user === user?.email);
+  const activeTournaments = tournaments.filter(t => t.status === 'active');
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
+      <div className="max-w-4xl mx-auto pt-8">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <Trophy className="w-10 h-10 text-white" />
+          </div>
+          <h1 className="text-4xl font-bold text-slate-800 mb-2">Putting King!</h1>
+          <p className="text-slate-600">2v2 Tournament Battles</p>
+        </div>
+
+        {/* Create Tournament */}
+        <div className="mb-6">
+          <Button
+            onClick={() => navigate(createPageUrl('PuttingKingSetup'))}
+            className="w-full h-16 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-lg font-bold rounded-2xl"
+          >
+            <Plus className="w-6 h-6 mr-2" />
+            Create New Tournament
+          </Button>
+        </div>
+
+        {/* Active Tournaments */}
+        {activeTournaments.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-slate-800 mb-3">Live Tournaments</h2>
+            <div className="space-y-3">
+              {activeTournaments.map(tournament => (
+                <Link
+                  key={tournament.id}
+                  to={`${createPageUrl('PuttingKingOverview')}?id=${tournament.id}`}
+                  className="block bg-white rounded-2xl p-5 shadow-sm border-2 border-purple-200 hover:border-purple-400 hover:shadow-lg transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-lg text-slate-800">{tournament.name}</div>
+                      <div className="text-sm text-slate-500">
+                        Target: {tournament.target_score} • Started {format(new Date(tournament.created_date), 'MMM d')}
+                      </div>
+                    </div>
+                    <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+                      Live
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* My Tournaments */}
+        {myTournaments.length > 0 && (
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 mb-3">My Tournaments</h2>
+            <div className="space-y-3">
+              {myTournaments.map(tournament => (
+                <div key={tournament.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <div className="font-bold text-lg text-slate-800">{tournament.name}</div>
+                      <div className="text-sm text-slate-500">
+                        Status: {tournament.status} • Created {format(new Date(tournament.created_date), 'MMM d')}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link
+                      to={`${createPageUrl('PuttingKingOverview')}?id=${tournament.id}`}
+                      className="flex-1"
+                    >
+                      <Button variant="outline" className="w-full">
+                        <Trophy className="w-4 h-4 mr-2" />
+                        View
+                      </Button>
+                    </Link>
+                    <Link
+                      to={`${createPageUrl('PuttingKingSetup')}?id=${tournament.id}`}
+                      className="flex-1"
+                    >
+                      <Button variant="outline" className="w-full">
+                        <Settings className="w-4 h-4 mr-2" />
+                        Manage
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tournaments.length === 0 && (
+          <div className="text-center py-12 text-slate-400">
+            <Trophy className="w-16 h-16 mx-auto mb-4 opacity-50" />
+            <p>No tournaments yet. Create one to get started!</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

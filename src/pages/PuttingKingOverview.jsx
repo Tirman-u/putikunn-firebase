@@ -1,14 +1,17 @@
 import React from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Trophy } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Trophy, Play } from 'lucide-react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { toast } from 'sonner';
 
 export default function PuttingKingOverview() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tournamentId = searchParams.get('id');
+  const queryClient = useQueryClient();
 
   const { data: tournament } = useQuery({
     queryKey: ['tournament', tournamentId],
@@ -51,6 +54,11 @@ export default function PuttingKingOverview() {
     refetchInterval: 2000
   });
 
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => base44.auth.me()
+  });
+
   const leaderboard = [...players]
     .sort((a, b) => {
       if (b.tournament_points !== a.tournament_points) {
@@ -82,6 +90,84 @@ export default function PuttingKingOverview() {
     return player?.user_name || email.split('@')[0];
   };
 
+  // Check if all current round matches are finished
+  const currentRoundMatches = matches.filter(m => m.round_number === tournament?.current_round);
+  const allMatchesFinished = currentRoundMatches.length > 0 && currentRoundMatches.every(m => m.status === 'finished');
+  const canStartNextRound = allMatchesFinished && tournament?.current_round < tournament?.total_rounds;
+  const isHost = user?.email === tournament?.host_user;
+
+  const startNextRoundMutation = useMutation({
+    mutationFn: async () => {
+      const nextRound = tournament.current_round + 1;
+      
+      // Get all stations
+      const allStations = await base44.entities.PuttingKingStation.list();
+      const tournamentStations = allStations.filter(s => s.tournament_id === tournament.id && s.enabled)
+        .sort((a, b) => a.order_index - b.order_index);
+
+      // Get all players sorted by performance (Mexicano style)
+      const allPlayers = await base44.entities.PuttingKingPlayer.list();
+      const tournamentPlayers = allPlayers
+        .filter(p => p.tournament_id === tournament.id && p.active)
+        .sort((a, b) => {
+          if (b.tournament_points !== a.tournament_points) {
+            return b.tournament_points - a.tournament_points;
+          }
+          return b.wins - a.wins;
+        });
+
+      const playersPerStation = 4;
+      
+      // Create new matches with rotation
+      for (let i = 0; i < tournamentStations.length && i * playersPerStation < tournamentPlayers.length; i++) {
+        const station = tournamentStations[i];
+        const stationPlayers = tournamentPlayers.slice(i * playersPerStation, (i + 1) * playersPerStation);
+
+        if (stationPlayers.length === 4) {
+          const [p1, p2, p3, p4] = stationPlayers;
+          
+          let teamA = [p1.user_email, p2.user_email];
+          let teamB = [p3.user_email, p4.user_email];
+          
+          // Try to avoid same partner as last round
+          if (p1.last_partner_email === p2.user_email) {
+            teamA = [p1.user_email, p3.user_email];
+            teamB = [p2.user_email, p4.user_email];
+          }
+
+          const match = await base44.entities.PuttingKingMatch.create({
+            tournament_id: tournament.id,
+            station_id: station.id,
+            round_number: nextRound,
+            status: 'ready',
+            team_a_players: teamA,
+            team_b_players: teamB,
+            score_a: 0,
+            score_b: 0
+          });
+
+          // Update player states
+          for (const player of stationPlayers) {
+            await base44.entities.PuttingKingPlayer.update(player.id, {
+              current_status: 'ready',
+              current_station_id: station.id,
+              current_match_id: match.id
+            });
+          }
+        }
+      }
+
+      // Update tournament to next round
+      await base44.entities.PuttingKingTournament.update(tournament.id, { 
+        current_round: nextRound 
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success(`Round ${tournament.current_round + 1} started!`);
+    }
+  });
+
   if (!tournament) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
@@ -99,7 +185,7 @@ export default function PuttingKingOverview() {
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">{tournament.name}</h1>
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex items-center justify-center gap-3 mb-4">
             <div className="inline-block px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
               {tournament.status}
             </div>
@@ -107,6 +193,26 @@ export default function PuttingKingOverview() {
               Round {tournament.current_round} / {tournament.total_rounds}
             </div>
           </div>
+
+          {/* Start Next Round Button (Host Only) */}
+          {isHost && allMatchesFinished && (
+            <div className="flex flex-col items-center gap-2">
+              {canStartNextRound ? (
+                <Button
+                  onClick={() => startNextRoundMutation.mutate()}
+                  disabled={startNextRoundMutation.isPending}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Start Round {tournament.current_round + 1}
+                </Button>
+              ) : (
+                <div className="px-4 py-2 bg-amber-100 text-amber-700 rounded-full text-sm font-semibold">
+                  Tournament Complete!
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

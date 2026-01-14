@@ -44,11 +44,14 @@ export default function GroupResult() {
   const playerGamesCount = {};
   let totalPutts = 0;
   let madePutts = 0;
-  const allGameScores = [];
+  const allGameBestScores = [];
 
   games.forEach(game => {
-    const gameTotal = Object.values(game.total_points || {}).reduce((sum, pts) => sum + pts, 0);
-    allGameScores.push(gameTotal);
+    // Get the best individual player score for this game
+    const gameBestScore = Object.values(game.total_points || {}).length > 0
+      ? Math.max(...Object.values(game.total_points || {}))
+      : 0;
+    allGameBestScores.push(gameBestScore);
     
     game.players?.forEach(player => {
       const points = game.total_points?.[player] || 0;
@@ -67,8 +70,8 @@ export default function GroupResult() {
   });
 
   const avgPuttingPercentage = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
-  const bestScore = allGameScores.length > 0 ? Math.max(...allGameScores) : 0;
-  const avgScore = allGameScores.length > 0 ? Math.round(allGameScores.reduce((sum, s) => sum + s, 0) / allGameScores.length) : 0;
+  const bestScore = allGameBestScores.length > 0 ? Math.max(...allGameBestScores) : 0;
+  const avgScore = allGameBestScores.length > 0 ? Math.round(allGameBestScores.reduce((sum, s) => sum + s, 0) / allGameBestScores.length) : 0;
 
   // Player ranking
   const playerRanking = Object.entries(playerScores)

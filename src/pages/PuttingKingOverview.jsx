@@ -98,6 +98,23 @@ export default function PuttingKingOverview() {
   const isHost = user?.email === tournament?.host_user;
   const displayStatus = isTournamentFinished ? 'finished' : tournament?.status;
 
+  // Calculate head-to-head stats for each player pair
+  const getHeadToHeadStats = (player1Email, player2Email) => {
+    const player1Wins = matches.filter(m => 
+      m.tournament_id === tournament?.id &&
+      ((m.team_a_players.includes(player1Email) && m.winner_team === 'A') ||
+       (m.team_b_players.includes(player1Email) && m.winner_team === 'B'))
+    ).length;
+    
+    const player2Wins = matches.filter(m => 
+      m.tournament_id === tournament?.id &&
+      ((m.team_a_players.includes(player2Email) && m.winner_team === 'A') ||
+       (m.team_b_players.includes(player2Email) && m.winner_team === 'B'))
+    ).length;
+
+    return { player1Wins, player2Wins };
+  };
+
   const startNextRoundMutation = useMutation({
     mutationFn: async () => {
       const nextRound = tournament.current_round + 1;

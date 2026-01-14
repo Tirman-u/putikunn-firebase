@@ -396,7 +396,7 @@ export default function PuttingKingOverview() {
             <div>
               <h2 className="text-xl font-bold text-slate-800 mb-4">Final Rankings</h2>
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {leaderboard.map((player, idx) => (
                           <div key={player.id} className="p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
                             <div className="flex items-center gap-3 mb-2">

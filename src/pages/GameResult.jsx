@@ -84,16 +84,26 @@ export default function GameResult() {
     };
   }).sort((a, b) => b.totalPoints - a.totalPoints);
 
-  const handleShare = () => {
+  const handleShare = async () => {
     const shareText = `${game.name} - ${gameFormat.name}\n\nResults:\n${playerStats.map(p => 
       `${p.name}: ${p.totalPoints} pts (${p.puttingPercentage}%)`
     ).join('\n')}`;
     
-    if (navigator.share) {
-      navigator.share({ text: shareText });
-    } else {
-      navigator.clipboard.writeText(shareText);
-      alert('Results copied to clipboard!');
+    try {
+      if (navigator.share) {
+        await navigator.share({ text: shareText });
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        alert('Results copied to clipboard!');
+      }
+    } catch (error) {
+      // Fallback to clipboard if share fails
+      try {
+        await navigator.clipboard.writeText(shareText);
+        alert('Results copied to clipboard!');
+      } catch {
+        alert('Unable to share. Please copy manually.');
+      }
     }
   };
 

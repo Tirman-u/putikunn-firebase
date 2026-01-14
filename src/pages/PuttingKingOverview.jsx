@@ -398,37 +398,22 @@ export default function PuttingKingOverview() {
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                       <div className="space-y-2">
                         {leaderboard.map((player, idx) => (
-                          <div key={player.id} className="p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                                idx === 0 ? 'bg-yellow-400 text-yellow-900' :
-                                idx === 1 ? 'bg-slate-300 text-slate-700' :
-                                idx === 2 ? 'bg-orange-300 text-orange-800' :
-                                'bg-slate-100 text-slate-600'
-                              }`}>
-                                {idx + 1}
-                              </div>
-                              <div className="flex-1">
-                                <div className="font-semibold text-slate-800">{player.user_name}</div>
-                              </div>
-                              <div className="text-lg font-bold text-purple-600">{player.tournament_points} pts</div>
+                          <div key={player.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors rounded-lg">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                              idx === 0 ? 'bg-yellow-400 text-yellow-900' :
+                              idx === 1 ? 'bg-slate-300 text-slate-700' :
+                              idx === 2 ? 'bg-orange-300 text-orange-800' :
+                              'bg-slate-100 text-slate-600'
+                            }`}>
+                              {idx + 1}
                             </div>
-                            <div className="grid grid-cols-3 gap-2 text-xs">
-                              <div className="text-center">
-                                <div className="text-slate-500">Record</div>
-                                <div className="font-semibold text-slate-700">{player.wins}W-{player.losses}L</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-slate-500">Putts Made</div>
-                                <div className="font-semibold text-slate-700">{player.total_made_putts}/{player.total_attempts}</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-slate-500">Accuracy</div>
-                                <div className="font-semibold text-emerald-600">
-                                  {player.total_attempts > 0 ? ((player.total_made_putts / player.total_attempts) * 100).toFixed(0) : 0}%
-                                </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-slate-800 truncate">{player.user_name}</div>
+                              <div className="text-xs text-slate-500">
+                                {player.wins}W-{player.losses}L • {player.total_attempts > 0 ? ((player.total_made_putts / player.total_attempts) * 100).toFixed(0) : 0}%
                               </div>
                             </div>
+                            <div className="text-lg font-bold text-purple-600 flex-shrink-0">{player.tournament_points}</div>
                           </div>
                         ))}
                       </div>

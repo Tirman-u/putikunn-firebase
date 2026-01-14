@@ -292,17 +292,16 @@ export default function PuttingKingOverview() {
                             </div>
                             </div>
                             </div>
+                            );
+                            })}
                             </div>
-                          );
-                          })}
-                          </div>
-                          </div>
-                          </div>
+                            </div>
+                            </div>
 
-                          {/* Stations Column */}
-                          <div className="space-y-4">
+                            {/* Stations Column */}
+                            <div className="space-y-4">
                             <h2 className="text-xl font-bold text-slate-800">Stations</h2>
-            {stations.map(station => {
+                            {stations.map(station => {
               const match = getStationMatch(station.id);
               return (
                 <div key={station.id} className="bg-white rounded-2xl p-6 shadow-sm border-2 border-purple-200">

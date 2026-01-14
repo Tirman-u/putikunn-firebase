@@ -289,9 +289,10 @@ export default function PuttingKingOverview() {
                             <div className={`text-lg font-bold ${isWinner === 'B' ? 'text-blue-600' : 'text-slate-600'}`}>
                               {match.score_b}
                             </div>
-                          </div>
-                          </div>
-                          </div>
+                            </div>
+                            </div>
+                            </div>
+                            </div>
                           );
                           })}
                           </div>

@@ -108,8 +108,8 @@ export default function Home() {
               </div>
             </button>
 
-            <Link
-              to={createPageUrl('PuttingKingHome')}
+            <button
+              onClick={() => window.location.href = createPageUrl('PuttingKingHome')}
               className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all group"
             >
               <div className="flex items-center gap-4">
@@ -121,7 +121,7 @@ export default function Home() {
                   <p className="text-sm text-slate-500">Manage tournaments and competitions</p>
                 </div>
               </div>
-            </Link>
+            </button>
 
             <div className="pt-8 border-t-2 border-slate-200 mt-8 space-y-3">
             <Link

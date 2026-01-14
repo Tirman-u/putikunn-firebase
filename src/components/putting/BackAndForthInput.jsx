@@ -18,7 +18,9 @@ export default function BackAndForthInput({
   onMade, 
   onMissed, 
   canUndo, 
-  onUndo 
+  onUndo,
+  showStreak = false,
+  currentStreak = 0
 }) {
   const nextMade = Math.min(currentDistance + 1, 10);
   const nextMissed = Math.max(currentDistance - 1, 5);
@@ -37,6 +39,12 @@ export default function BackAndForthInput({
             <span className="text-2xl font-bold text-white">{currentDistance}m</span>
           </div>
         </div>
+        {showStreak && (
+          <div className="mt-3">
+            <div className="text-sm text-slate-500">Current Streak</div>
+            <div className="text-3xl font-bold text-red-600">🔥 {currentStreak}</div>
+          </div>
+        )}
       </div>
 
       {/* Instructions */}

@@ -359,9 +359,42 @@ export default function PuttingKingOverview() {
             })}
           </div>
 
-          {/* Leaderboard */}
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-800 mb-4">Leaderboard</h2>
+          {/* Player Details */}
+          <div className="space-y-6">
+            {/* Head-to-Head Matchups */}
+            {leaderboard.length >= 2 && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <h3 className="text-lg font-bold text-slate-800 mb-4">Head-to-Head Records</h3>
+                <div className="space-y-3">
+                  {leaderboard.slice(0, 3).map((player1, idx) =>
+                    leaderboard.slice(idx + 1, idx + 2).map(player2 => {
+                      const h2h = getHeadToHeadStats(player1.user_email, player2.user_email);
+                      return (
+                        <div key={`${player1.id}-${player2.id}`} className="p-3 bg-slate-50 rounded-xl">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="text-sm font-semibold text-slate-700">{player1.user_name}</div>
+                            </div>
+                            <div className="text-center px-4">
+                              <div className="text-lg font-bold text-slate-800">
+                                {h2h.player1Wins} - {h2h.player2Wins}
+                              </div>
+                            </div>
+                            <div className="flex-1 text-right">
+                              <div className="text-sm font-semibold text-slate-700">{player2.user_name}</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Leaderboard */}
+            <div>
+              <h2 className="text-xl font-bold text-slate-800 mb-4">Final Rankings</h2>
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                       <div className="space-y-3">
                         {leaderboard.map((player, idx) => (

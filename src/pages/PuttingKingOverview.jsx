@@ -65,7 +65,16 @@ export default function PuttingKingOverview() {
     });
 
   const getStationMatch = (stationId) => {
-    return matches.find(m => m.station_id === stationId && (m.status === 'ready' || m.status === 'playing'));
+    // Get the most recent match for this station (including finished ones if no active match)
+    const activeMatch = matches.find(m => m.station_id === stationId && (m.status === 'ready' || m.status === 'playing'));
+    if (activeMatch) return activeMatch;
+    
+    // If no active match, show the last finished match
+    const finishedMatches = matches
+      .filter(m => m.station_id === stationId && m.status === 'finished')
+      .sort((a, b) => new Date(b.finished_at || 0) - new Date(a.finished_at || 0));
+    
+    return finishedMatches[0];
   };
 
   const getPlayerName = (email) => {
@@ -109,9 +118,10 @@ export default function PuttingKingOverview() {
                       <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
                         match.status === 'playing' ? 'bg-green-100 text-green-700' :
                         match.status === 'ready' ? 'bg-blue-100 text-blue-700' :
+                        match.status === 'finished' ? 'bg-amber-100 text-amber-700' :
                         'bg-slate-100 text-slate-600'
                       }`}>
-                        {match.status}
+                        {match.status === 'finished' ? 'Finished' : match.status}
                       </div>
                     )}
                   </div>
@@ -134,11 +144,17 @@ export default function PuttingKingOverview() {
                           <div className="text-3xl font-bold text-blue-600 mt-2">{match.score_b}</div>
                         </div>
                       </div>
-                      <Link to={`${createPageUrl('PuttingKingScoring')}?match=${match.id}`}>
-                        <button className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold">
-                          Score Match
-                        </button>
-                      </Link>
+                      {match.status === 'finished' ? (
+                        <div className="text-center py-2 text-sm text-slate-500">
+                          Winner: Team {match.winner_team} • Rotating players...
+                        </div>
+                      ) : (
+                        <Link to={`${createPageUrl('PuttingKingScoring')}?match=${match.id}`}>
+                          <button className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold">
+                            Score Match
+                          </button>
+                        </Link>
+                      )}
                     </>
                   ) : (
                     <div className="text-center py-8 text-slate-400">

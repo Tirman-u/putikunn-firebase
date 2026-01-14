@@ -2,7 +2,7 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Plus, Trophy, Settings } from 'lucide-react';
+import { Plus, Trophy, Settings, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
@@ -28,6 +28,14 @@ export default function PuttingKing() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
       <div className="max-w-4xl mx-auto pt-8">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-6"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="font-medium">Back</span>
+        </button>
+
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg">
             <Trophy className="w-10 h-10 text-white" />

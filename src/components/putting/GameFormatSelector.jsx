@@ -34,30 +34,23 @@ const GAME_FORMATS = [
   {
     id: 'streak_challenge',
     name: 'Streak',
-    distance: '5-10m',
-    description: 'Keep the streak alive',
+    distance: '7m',
+    description: 'How many in a row?',
     color: 'red'
-  },
-  {
-    id: 'pressure_test',
-    name: 'Pressure',
-    distance: '8m',
-    description: 'Make 3 in a row',
-    color: 'orange'
   },
   {
     id: 'random_distance',
     name: 'Random',
     distance: '3-15m',
-    description: 'Unpredictable distances',
+    description: 'Random distances each round',
     color: 'indigo'
   },
   {
-    id: 'elimination',
-    name: 'Elimination',
-    distance: '5-12m',
-    description: 'Advance or repeat',
-    color: 'pink'
+    id: 'putting_king',
+    name: 'Putting King!',
+    distance: 'Tournament',
+    description: '2v2 battles to 21',
+    color: 'purple'
   }
 ];
 

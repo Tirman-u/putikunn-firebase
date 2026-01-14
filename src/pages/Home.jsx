@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Users, UserPlus, Settings, User, Target, Crown } from 'lucide-react';
+import { Users, UserPlus, Settings, User, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
@@ -109,21 +109,6 @@ export default function Home() {
             </button>
 
             <div className="pt-4 border-t-2 border-slate-200 mt-6 space-y-3">
-            <Link
-              to={createPageUrl('PuttingKing')}
-              className="w-full bg-white rounded-2xl p-5 shadow-sm border border-purple-200 hover:border-purple-300 hover:shadow-md transition-all group block"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                  <Crown className="w-6 h-6 text-purple-600" />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-base font-bold text-slate-800">Putting King!</h3>
-                  <p className="text-xs text-slate-500">2v2 Tournament Battles</p>
-                </div>
-              </div>
-            </Link>
-
             <Link
               to={createPageUrl('ManageGames')}
               className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block"

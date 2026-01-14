@@ -34,21 +34,12 @@ export const GAME_FORMATS = {
   },
   streak_challenge: {
     name: 'Streak Challenge',
-    minDistance: 5,
-    maxDistance: 10,
+    minDistance: 7,
+    maxDistance: 7,
     startDistance: 7,
     puttsPerRound: 1,
     singlePuttMode: true,
     streakMode: true
-  },
-  pressure_test: {
-    name: 'Pressure Test',
-    minDistance: 5,
-    maxDistance: 10,
-    startDistance: 8,
-    puttsPerRound: 3,
-    distanceMap: [8, 8, 8, 8, 8, 8],
-    pressureMode: true
   },
   random_distance: {
     name: 'Random Distance',
@@ -57,14 +48,6 @@ export const GAME_FORMATS = {
     startDistance: 7,
     puttsPerRound: 5,
     randomMode: true
-  },
-  elimination: {
-    name: 'Elimination',
-    minDistance: 5,
-    maxDistance: 12,
-    startDistance: 5,
-    puttsPerRound: 3,
-    eliminationMode: true
   }
 };
 
@@ -85,27 +68,11 @@ export function getNextDistanceBackAndForth(currentDistance, wasMade) {
   return Math.max(format.minDistance, Math.min(format.maxDistance, newDistance));
 }
 
-// Calculate next distance for Streak Challenge
-export function getNextDistanceStreak(currentDistance, wasMade, currentStreak) {
+// Calculate next distance for Streak Challenge (stays at same distance)
+export function getNextDistanceStreak(currentDistance, wasMade) {
   const format = GAME_FORMATS.streak_challenge;
-  if (!wasMade) return format.startDistance;
-  
-  // Every 3 makes, increase distance by 1m
-  if (currentStreak % 3 === 0) {
-    return Math.min(currentDistance + 1, format.maxDistance);
-  }
-  return currentDistance;
-}
-
-// Calculate next distance for Elimination mode
-export function getNextDistanceElimination(currentDistance, madePutts, totalAttempts) {
-  const format = GAME_FORMATS.elimination;
-  // If you make 2 or more out of 3, advance to next distance
-  if (madePutts >= 2) {
-    return Math.min(currentDistance + 1, format.maxDistance);
-  }
-  // Otherwise stay at same distance
-  return currentDistance;
+  // Always stay at the same distance - streak tracks consecutive makes
+  return format.startDistance;
 }
 
 // Get random distance for Random Distance mode
@@ -121,11 +88,6 @@ export function calculatePoints(gameType, distance, result) {
   // For Back & Forth and Streak Challenge, each made putt scores the distance
   if (gameType === 'back_and_forth' || gameType === 'streak_challenge') {
     return distance;
-  }
-  
-  // For Pressure Test, bonus points for making all 3 in a row
-  if (gameType === 'pressure_test') {
-    return 0; // Calculated at round level
   }
   
   // For other formats, scoring happens at round level, not per putt

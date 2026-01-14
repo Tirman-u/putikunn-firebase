@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Play, Copy, Check, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 import GameFormatSelector from './GameFormatSelector';
 import FormatRulesPopup from './FormatRulesPopup';
 
@@ -9,6 +11,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   const [gameName, setGameName] = useState('');
   const [gameType, setGameType] = useState('classic');
   const [copied, setCopied] = useState(false);
+  const navigate = useNavigate();
   
   // Generate random 4-digit PIN
   const [pin] = useState(() => 
@@ -16,6 +19,10 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   );
 
   const handleStart = () => {
+    if (gameType === 'putting_king') {
+      navigate(createPageUrl('PuttingKing'));
+      return;
+    }
     onStartGame({
       name: gameName || `Game ${new Date().toLocaleDateString()}`,
       pin,

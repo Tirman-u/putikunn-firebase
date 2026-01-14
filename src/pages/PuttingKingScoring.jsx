@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -41,10 +41,9 @@ export default function PuttingKingScoring() {
   });
 
   const scoreMutation = useMutation({
-    mutationFn: async ({ playerEmail, distance, made, points }) => {
-      const team = match.team_a_players.includes(playerEmail) ? 'A' : 'B';
+    mutationFn: async ({ team, distance, made }) => {
       const currentScore = team === 'A' ? match.score_a : match.score_b;
-      let newScore = currentScore + (made ? points : 0);
+      let newScore = currentScore + (made ? distance.points : 0);
 
       // Bust logic
       if (newScore > tournament.target_score) {
@@ -54,14 +53,7 @@ export default function PuttingKingScoring() {
 
       // Update match
       const updateData = {
-        [`score_${team.toLowerCase()}`]: newScore,
-        events: [...(match.events || []), {
-          player: playerEmail,
-          distance: distance.label,
-          made,
-          points: made ? points : 0,
-          timestamp: new Date().toISOString()
-        }]
+        [`score_${team.toLowerCase()}`]: newScore
       };
 
       // Check for win
@@ -72,23 +64,6 @@ export default function PuttingKingScoring() {
       }
 
       const updatedMatch = await base44.entities.PuttingKingMatch.update(match.id, updateData);
-
-      // Update player stats
-      const player = players.find(p => p.user_email === playerEmail);
-      if (player) {
-        const statsByDist = { ...(player.stats_by_distance || {}) };
-        if (!statsByDist[distance.label]) {
-          statsByDist[distance.label] = { made: 0, attempts: 0 };
-        }
-        statsByDist[distance.label].attempts += 1;
-        if (made) statsByDist[distance.label].made += 1;
-
-        await base44.entities.PuttingKingPlayer.update(player.id, {
-          total_attempts: player.total_attempts + 1,
-          total_made_putts: player.total_made_putts + (made ? 1 : 0),
-          stats_by_distance: statsByDist
-        });
-      }
 
       // If match finished, handle rotation
       if (newScore === tournament.target_score) {
@@ -154,12 +129,11 @@ export default function PuttingKingScoring() {
     );
   }
 
-  const allPlayers = [...match.team_a_players, ...match.team_b_players];
   const distances = tournament.distances.filter(d => d.enabled).sort((a, b) => a.order - b.order);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
-      <div className="max-w-2xl mx-auto pt-8">
+      <div className="max-w-2xl mx-auto pt-4">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-6"
@@ -169,60 +143,80 @@ export default function PuttingKingScoring() {
         </button>
 
         {/* Scores */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-purple-500 text-white rounded-2xl p-6 text-center">
-            <div className="text-sm font-semibold mb-2">Team A</div>
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-purple-500 text-white rounded-2xl p-4 text-center">
+            <div className="text-xs font-semibold mb-1 opacity-90">Team A</div>
+            <div className="text-4xl font-bold mb-2">{match.score_a}</div>
             {match.team_a_players.map(email => (
-              <div key={email} className="text-sm opacity-90">{getPlayerName(email)}</div>
+              <div key={email} className="text-xs opacity-90">{getPlayerName(email)}</div>
             ))}
-            <div className="text-5xl font-bold mt-4">{match.score_a}</div>
           </div>
-          <div className="bg-blue-500 text-white rounded-2xl p-6 text-center">
-            <div className="text-sm font-semibold mb-2">Team B</div>
+          <div className="bg-blue-500 text-white rounded-2xl p-4 text-center">
+            <div className="text-xs font-semibold mb-1 opacity-90">Team B</div>
+            <div className="text-4xl font-bold mb-2">{match.score_b}</div>
             {match.team_b_players.map(email => (
-              <div key={email} className="text-sm opacity-90">{getPlayerName(email)}</div>
+              <div key={email} className="text-xs opacity-90">{getPlayerName(email)}</div>
             ))}
-            <div className="text-5xl font-bold mt-4">{match.score_b}</div>
           </div>
         </div>
 
-        {/* Scoring */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-          <h3 className="font-bold text-slate-800 mb-4">Score Putts</h3>
-          <div className="space-y-4">
+        {/* Team A Scoring */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border-2 border-purple-300 mb-4">
+          <h3 className="font-bold text-purple-600 mb-3 text-lg">Team A</h3>
+          <div className="space-y-2">
             {distances.map(distance => (
-              <div key={distance.id} className="border-b border-slate-200 pb-4 last:border-0">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <span className="font-bold text-slate-800">{distance.label}</span>
-                    <span className="ml-2 text-sm text-slate-500">{distance.points} pts</span>
-                  </div>
+              <div key={distance.id} className="flex items-center gap-2">
+                <div className="flex-1 font-medium text-slate-700">
+                  {distance.label} ({distance.points}pts)
                 </div>
-                <div className="space-y-2">
-                  {allPlayers.map(email => (
-                    <div key={email} className="flex items-center gap-2">
-                      <div className="flex-1 text-sm text-slate-700">{getPlayerName(email)}</div>
-                      <Button
-                        onClick={() => scoreMutation.mutate({ playerEmail: email, distance, made: true, points: distance.points })}
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700"
-                        disabled={scoreMutation.isPending}
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        Made
-                      </Button>
-                      <Button
-                        onClick={() => scoreMutation.mutate({ playerEmail: email, distance, made: false, points: 0 })}
-                        size="sm"
-                        variant="outline"
-                        disabled={scoreMutation.isPending}
-                      >
-                        <XCircle className="w-4 h-4 mr-1" />
-                        Miss
-                      </Button>
-                    </div>
-                  ))}
+                <Button
+                  onClick={() => scoreMutation.mutate({ team: 'A', distance, made: true })}
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 flex-1"
+                  disabled={scoreMutation.isPending}
+                >
+                  Made
+                </Button>
+                <Button
+                  onClick={() => scoreMutation.mutate({ team: 'A', distance, made: false })}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  disabled={scoreMutation.isPending}
+                >
+                  Miss
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Team B Scoring */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border-2 border-blue-300">
+          <h3 className="font-bold text-blue-600 mb-3 text-lg">Team B</h3>
+          <div className="space-y-2">
+            {distances.map(distance => (
+              <div key={distance.id} className="flex items-center gap-2">
+                <div className="flex-1 font-medium text-slate-700">
+                  {distance.label} ({distance.points}pts)
                 </div>
+                <Button
+                  onClick={() => scoreMutation.mutate({ team: 'B', distance, made: true })}
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 flex-1"
+                  disabled={scoreMutation.isPending}
+                >
+                  Made
+                </Button>
+                <Button
+                  onClick={() => scoreMutation.mutate({ team: 'B', distance, made: false })}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  disabled={scoreMutation.isPending}
+                >
+                  Miss
+                </Button>
               </div>
             ))}
           </div>

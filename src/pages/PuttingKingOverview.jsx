@@ -289,18 +289,17 @@ export default function PuttingKingOverview() {
                             <div className={`text-lg font-bold ${isWinner === 'B' ? 'text-blue-600' : 'text-slate-600'}`}>
                               {match.score_b}
                             </div>
-                            </div>
-                            </div>
-                            </div>
-                            </div>
-                            );
-                            })}
-                            </div>
-                            </div>
-                            </div>
+                          </div>
+                          </div>
+                          </div>
+                          );
+                          })}
+                          </div>
+                          </div>
+                          </div>
 
-                            {/* Stations Column */}
-                            <div className="space-y-4">
+                          {/* Stations Column */}
+                          <div className="space-y-4">
             <h2 className="text-xl font-bold text-slate-800">Stations</h2>
             {stations.map(station => {
               const match = getStationMatch(station.id);

@@ -416,9 +416,10 @@ export default function PuttingKingOverview() {
                   </div>
                 ))}
               </div>
-            </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+              </div>
+              </div>
+              </div>
+              </div>
+              </div>
+              );
+              }

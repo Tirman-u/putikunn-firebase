@@ -89,7 +89,7 @@ export default function Profile() {
     }
   };
 
-  if (userLoading || gamesLoading) {
+  if (userLoading || gamesLoading || tournamentsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center">
         <div className="text-slate-400">Loading...</div>

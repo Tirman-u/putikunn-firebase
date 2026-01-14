@@ -42,11 +42,14 @@ export default function GroupResult() {
   // Calculate group statistics
   const playerScores = {};
   const playerGamesCount = {};
-  let totalGroupScore = 0;
   let totalPutts = 0;
   let madePutts = 0;
+  const allGameScores = [];
 
   games.forEach(game => {
+    const gameTotal = Object.values(game.total_points || {}).reduce((sum, pts) => sum + pts, 0);
+    allGameScores.push(gameTotal);
+    
     game.players?.forEach(player => {
       const points = game.total_points?.[player] || 0;
       const putts = game.player_putts?.[player] || [];
@@ -58,13 +61,14 @@ export default function GroupResult() {
       
       playerScores[player] += points;
       playerGamesCount[player] += 1;
-      totalGroupScore += points;
       totalPutts += putts.length;
       madePutts += putts.filter(p => p.result === 'made').length;
     });
   });
 
   const avgPuttingPercentage = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
+  const bestScore = allGameScores.length > 0 ? Math.max(...allGameScores) : 0;
+  const avgScore = allGameScores.length > 0 ? Math.round(allGameScores.reduce((sum, s) => sum + s, 0) / allGameScores.length) : 0;
 
   // Player ranking
   const playerRanking = Object.entries(playerScores)
@@ -121,10 +125,14 @@ export default function GroupResult() {
             {/* Group Summary */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
               <h2 className="text-lg font-bold text-slate-800 mb-4">Group Summary</h2>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="text-center p-4 bg-emerald-50 rounded-xl">
-                  <div className="text-sm text-emerald-700 mb-1">Total Score</div>
-                  <div className="text-3xl font-bold text-emerald-600">{totalGroupScore}</div>
+                  <div className="text-sm text-emerald-700 mb-1">Best Score</div>
+                  <div className="text-3xl font-bold text-emerald-600">{bestScore}</div>
+                </div>
+                <div className="text-center p-4 bg-amber-50 rounded-xl">
+                  <div className="text-sm text-amber-700 mb-1">Avg Score</div>
+                  <div className="text-3xl font-bold text-amber-600">{avgScore}</div>
                 </div>
                 <div className="text-center p-4 bg-slate-50 rounded-xl">
                   <div className="text-sm text-slate-600 mb-1">Avg Putting %</div>

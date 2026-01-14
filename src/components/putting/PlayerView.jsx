@@ -29,8 +29,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
   const updateGameMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Game.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+    onSuccess: (updatedGame) => {
+      // Update cache immediately with the response
+      queryClient.setQueryData(['game', gameId], updatedGame);
     }
   });
 

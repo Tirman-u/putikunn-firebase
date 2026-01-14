@@ -229,8 +229,60 @@ export default function PuttingKingOverview() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Stations */}
-          <div className="lg:col-span-2 space-y-4">
+          {/* Match History and Statistics */}
+          <div className="lg:col-span-2">
+            {/* Match History */}
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-slate-800 mb-3">Match History</h2>
+              <div className="space-y-3">
+                {matches
+                  .filter(m => m.tournament_id === tournament.id)
+                  .sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))
+                  .slice(0, 5)
+                  .map(match => {
+                    const station = stations.find(s => s.id === match.station_id);
+                    const isWinner = match.winner_team;
+                    return (
+                      <div key={match.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-semibold text-slate-700">{station?.name} - Round {match.round_number}</div>
+                          <div className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                            match.status === 'finished' ? 'bg-amber-100 text-amber-700' :
+                            match.status === 'playing' ? 'bg-green-100 text-green-700' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            {match.status}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className={`p-2 rounded ${isWinner === 'A' ? 'bg-purple-100' : 'bg-slate-50'}`}>
+                            <div className="text-xs text-slate-600 mb-1">Team A</div>
+                            <div className="text-sm font-semibold text-slate-700">
+                              {match.team_a_players.map(e => getPlayerName(e)).join(', ')}
+                            </div>
+                            <div className={`text-lg font-bold ${isWinner === 'A' ? 'text-purple-600' : 'text-slate-600'}`}>
+                              {match.score_a}
+                            </div>
+                          </div>
+                          <div className={`p-2 rounded ${isWinner === 'B' ? 'bg-blue-100' : 'bg-slate-50'}`}>
+                            <div className="text-xs text-slate-600 mb-1">Team B</div>
+                            <div className="text-sm font-semibold text-slate-700">
+                              {match.team_b_players.map(e => getPlayerName(e)).join(', ')}
+                            </div>
+                            <div className={`text-lg font-bold ${isWinner === 'B' ? 'text-blue-600' : 'text-slate-600'}`}>
+                              {match.score_b}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Stations */}
+          </div>
+          <div className="space-y-4">
             <h2 className="text-xl font-bold text-slate-800">Stations</h2>
             {stations.map(station => {
               const match = getStationMatch(station.id);

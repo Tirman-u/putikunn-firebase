@@ -62,13 +62,25 @@ export default function GameResult() {
     const puttingPercentage = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
     const totalPoints = game.total_points?.[player] || 0;
 
+    // Group putts into frames (5 putts per frame for classic/short/long)
+    const frames = [];
+    if (!gameFormat.singlePuttMode) {
+      for (let i = 0; i < putts.length; i += 5) {
+        const framePutts = putts.slice(i, i + 5);
+        const distance = framePutts[0]?.distance || 0;
+        const made = framePutts.filter(p => p.result === 'made').length;
+        frames.push({ distance, made });
+      }
+    }
+
     return {
       name: player,
       totalPutts,
       madePutts,
       puttingPercentage,
       totalPoints,
-      putts
+      putts,
+      frames
     };
   }).sort((a, b) => b.totalPoints - a.totalPoints);
 
@@ -138,50 +150,111 @@ export default function GameResult() {
         </div>
 
         {/* Player Results */}
-        <div className="space-y-4">
-          {playerStats.map((player, index) => (
-            <div key={player.name} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <div className="font-bold text-lg text-slate-800">{player.name}</div>
-                    <div className="text-sm text-slate-500">
-                      {player.totalPutts} putts • {player.madePutts} made
+        {!gameFormat.singlePuttMode ? (
+          // Table view for classic, short, long formats
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left p-4 font-semibold text-slate-700 bg-slate-50 sticky left-0 z-10">Player</th>
+                    {[...Array(20)].map((_, i) => (
+                      <th key={i} className="text-center p-2 font-semibold text-slate-700 bg-slate-50 text-sm min-w-[60px]">
+                        {i + 1}
+                      </th>
+                    ))}
+                    <th className="text-center p-4 font-semibold text-slate-700 bg-slate-50 sticky right-0 z-10">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {playerStats.map((player, pIndex) => (
+                    <tr key={player.name} className="border-b border-slate-100 hover:bg-slate-50/50">
+                      <td className="p-4 font-medium text-slate-800 bg-white sticky left-0 z-10 border-r border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">
+                            {pIndex + 1}
+                          </div>
+                          <span>{player.name}</span>
+                        </div>
+                      </td>
+                      {[...Array(20)].map((_, frameIndex) => {
+                        const frame = player.frames[frameIndex];
+                        return (
+                          <td key={frameIndex} className="p-2 text-center">
+                            {frame ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <div className="text-xs text-slate-500 font-medium">{frame.distance}m</div>
+                                <div className={`text-base font-bold ${
+                                  frame.made === 5 ? 'text-emerald-600' : 
+                                  frame.made >= 3 ? 'text-emerald-500' : 
+                                  'text-slate-600'
+                                }`}>
+                                  {frame.made}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-slate-300">-</div>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="p-4 text-center bg-white sticky right-0 z-10 border-l border-slate-100">
+                        <div className="font-bold text-lg text-emerald-600">{player.totalPoints}</div>
+                        <div className="text-xs text-slate-500">{player.puttingPercentage}%</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          // Card view for back & forth format
+          <div className="space-y-4">
+            {playerStats.map((player, index) => (
+              <div key={player.name} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div className="font-bold text-lg text-slate-800">{player.name}</div>
+                      <div className="text-sm text-slate-500">
+                        {player.totalPutts} putts • {player.madePutts} made
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-emerald-600">{player.totalPoints}</div>
-                  <div className="text-sm text-slate-500">{player.puttingPercentage}%</div>
-                </div>
-              </div>
-
-              {/* Distance Progression */}
-              {player.putts.length > 0 && (
-                <div>
-                  <div className="text-sm font-semibold text-slate-700 mb-2">Distance Progression</div>
-                  <div className="flex flex-wrap gap-1">
-                    {player.putts.map((putt, idx) => (
-                      <div
-                        key={idx}
-                        className={`w-8 h-8 rounded flex items-center justify-center text-xs font-medium ${
-                          putt.result === 'made'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}
-                      >
-                        {putt.distance}
-                      </div>
-                    ))}
+                  <div className="text-right">
+                    <div className="text-3xl font-bold text-emerald-600">{player.totalPoints}</div>
+                    <div className="text-sm text-slate-500">{player.puttingPercentage}%</div>
                   </div>
                 </div>
-              )}
-            </div>
-          ))}
-        </div>
+
+                {/* Distance Progression */}
+                {player.putts.length > 0 && (
+                  <div>
+                    <div className="text-sm font-semibold text-slate-700 mb-2">Distance Progression</div>
+                    <div className="flex flex-wrap gap-1">
+                      {player.putts.map((putt, idx) => (
+                        <div
+                          key={idx}
+                          className={`w-8 h-8 rounded flex items-center justify-center text-xs font-medium ${
+                            putt.result === 'made'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {putt.distance}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

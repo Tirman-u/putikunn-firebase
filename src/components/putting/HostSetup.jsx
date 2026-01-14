@@ -47,8 +47,8 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
           <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-emerald-200">
             <span className="text-3xl">🥏</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-1">Host Game</h1>
-          <p className="text-sm text-slate-500">Create a session</p>
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">{isSolo ? 'Solo Practice' : 'Host Game'}</h1>
+          <p className="text-sm text-slate-500">{isSolo ? 'Practice alone at your own pace' : 'Create a session'}</p>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-4">
@@ -73,29 +73,31 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
           <GameFormatSelector selected={gameType} onSelect={setGameType} />
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg mb-6 text-white">
-          <div className="text-center mb-4">
-            <h3 className="text-sm font-semibold mb-2 opacity-90">Your Game PIN</h3>
-            <div className="text-5xl font-bold tracking-widest mb-3">{pin}</div>
-            <p className="text-sm opacity-90">Share this PIN with players</p>
+        {!isSolo && (
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg mb-6 text-white">
+            <div className="text-center mb-4">
+              <h3 className="text-sm font-semibold mb-2 opacity-90">Your Game PIN</h3>
+              <div className="text-5xl font-bold tracking-widest mb-3">{pin}</div>
+              <p className="text-sm opacity-90">Share this PIN with players</p>
+            </div>
+            <Button
+              onClick={copyPin}
+              className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 h-12 rounded-xl"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-5 h-5 mr-2" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-5 h-5 mr-2" />
+                  Copy PIN
+                </>
+              )}
+            </Button>
           </div>
-          <Button
-            onClick={copyPin}
-            className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 h-12 rounded-xl"
-          >
-            {copied ? (
-              <>
-                <Check className="w-5 h-5 mr-2" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy className="w-5 h-5 mr-2" />
-                Copy PIN
-              </>
-            )}
-          </Button>
-        </div>
+        )}
 
 
 
@@ -104,7 +106,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
           className="w-full h-16 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-xl font-bold rounded-2xl shadow-xl shadow-emerald-200"
         >
           <Play className="w-6 h-6 mr-3" />
-          Start Game
+          {isSolo ? 'Start Practice' : 'Start Game'}
         </Button>
       </div>
     </div>

@@ -287,9 +287,8 @@ export default function PuttingKingOverview() {
                               {match.team_b_players.map(e => getPlayerName(e)).join(', ')}
                             </div>
                             <div className={`text-lg font-bold ${isWinner === 'B' ? 'text-blue-600' : 'text-slate-600'}`}>
-                              {match.score_b}
-                            </div>
-                            </div>
+                                {match.score_b}
+                              </div>
                             </div>
                             </div>
                             </div>

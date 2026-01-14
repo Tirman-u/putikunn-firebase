@@ -39,6 +39,20 @@ export default function Profile() {
     enabled: !!user
   });
 
+  const { data: tournamentPlayers = [], isLoading: tournamentsLoading } = useQuery({
+    queryKey: ['user-tournaments'],
+    queryFn: async () => {
+      const allPlayers = await base44.entities.PuttingKingPlayer.list();
+      return allPlayers.filter(p => p.user_email === user?.email);
+    },
+    enabled: !!user
+  });
+
+  const { data: tournaments = [] } = useQuery({
+    queryKey: ['putting-king-tournaments'],
+    queryFn: () => base44.entities.PuttingKingTournament.list()
+  });
+
   const updateUserMutation = useMutation({
     mutationFn: (data) => base44.auth.updateMe(data),
     onSuccess: () => {

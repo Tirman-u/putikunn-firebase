@@ -382,6 +382,57 @@ export default function Profile() {
           </div>
         )}
 
+        {/* Tournament Results */}
+        {tournamentPlayers.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-purple-600" />
+              Tournament Results
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left py-3 px-2 text-slate-600 font-semibold">Tournament</th>
+                    <th className="text-center py-3 px-2 text-slate-600 font-semibold">Wins</th>
+                    <th className="text-center py-3 px-2 text-slate-600 font-semibold">Losses</th>
+                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Points</th>
+                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Accuracy</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tournamentPlayers.map((player) => {
+                    const tournament = tournaments.find(t => t.id === player.tournament_id);
+                    const accuracy = player.total_attempts > 0 
+                      ? ((player.total_made_putts / player.total_attempts) * 100).toFixed(1)
+                      : 0;
+
+                    return (
+                      <tr key={player.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="py-3 px-2 font-medium text-slate-700">
+                          {tournament?.name || 'Unknown'}
+                        </td>
+                        <td className="py-3 px-2 text-center text-slate-700 font-semibold">
+                          {player.wins}
+                        </td>
+                        <td className="py-3 px-2 text-center text-slate-700 font-semibold">
+                          {player.losses}
+                        </td>
+                        <td className="py-3 px-2 text-right font-bold text-purple-600">
+                          {player.tournament_points}
+                        </td>
+                        <td className="py-3 px-2 text-right text-slate-700">
+                          {accuracy}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* AI Insights */}
         <AIInsights games={myGames} userName={myName} />
 

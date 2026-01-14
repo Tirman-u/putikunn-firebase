@@ -94,7 +94,9 @@ export default function PuttingKingOverview() {
   const currentRoundMatches = matches.filter(m => m.round_number === tournament?.current_round);
   const allMatchesFinished = currentRoundMatches.length > 0 && currentRoundMatches.every(m => m.status === 'finished');
   const canStartNextRound = allMatchesFinished && tournament?.current_round < tournament?.total_rounds;
+  const isTournamentFinished = tournament?.current_round === tournament?.total_rounds && allMatchesFinished;
   const isHost = user?.email === tournament?.host_user;
+  const displayStatus = isTournamentFinished ? 'finished' : tournament?.status;
 
   const startNextRoundMutation = useMutation({
     mutationFn: async () => {

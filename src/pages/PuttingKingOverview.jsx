@@ -444,8 +444,26 @@ export default function PuttingKingOverview() {
                       )}
 
                       {match.status === 'finished' && (
-                        <div className="text-center py-2 text-sm text-slate-500">
-                          Winner: Team {match.winner_team}
+                        <div className="space-y-2">
+                          <div className="text-center py-2 text-sm text-slate-500">
+                            Winner: Team {match.winner_team}
+                          </div>
+                          <Button
+                            onClick={async () => {
+                              await base44.entities.PuttingKingMatch.update(match.id, {
+                                status: 'playing',
+                                winner_team: null,
+                                finished_at: null
+                              });
+                              queryClient.invalidateQueries();
+                              setActiveScoringMatchId(match.id);
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                          >
+                            Edit Score
+                          </Button>
                         </div>
                       )}
                     </>

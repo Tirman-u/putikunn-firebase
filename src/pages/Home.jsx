@@ -217,6 +217,7 @@ export default function Home() {
         name: gameData.name || 'Solo Practice',
         pin: '0000',
         game_type: gameData.gameType || 'classic',
+        putt_type: gameData.puttType || 'regular',
         host_user: user.email,
         players: [user.full_name],
         player_distances: { [user.full_name]: GAME_FORMATS[gameData.gameType || 'classic'].startDistance },

@@ -21,11 +21,11 @@ export default function JoinGame({ onJoin, onBack }) {
     queryKey: ['recent-games'],
     queryFn: async () => {
       const allGames = await base44.entities.Game.list();
-      const myGames = allGames
-        .filter(g => g.players?.includes(user?.full_name) || g.host_user === user?.email)
+      const activeGames = allGames
+        .filter(g => g.status !== 'completed')
         .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-        .slice(0, 5);
-      return myGames;
+        .slice(0, 10);
+      return activeGames;
     },
     enabled: !!user
   });
@@ -150,7 +150,7 @@ export default function JoinGame({ onJoin, onBack }) {
           <div className="mt-8">
             <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Recent Games (Joined & Hosted)
+              Active Games
             </h3>
             <div className="space-y-2">
               {recentGames.map((game) => (

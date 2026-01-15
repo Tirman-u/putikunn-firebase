@@ -220,16 +220,27 @@ export default function ManageGames() {
                   className="block bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-emerald-300 hover:shadow-md transition-all"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                        <Folder className="w-5 h-5 text-emerald-600" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-800">{group.name}</div>
-                        <div className="text-sm text-slate-500">{group.game_ids?.length || 0} games</div>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-slate-400" />
+                    <div className="flex items-center gap-3 flex-1">
+                            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                              <Folder className="w-5 h-5 text-emerald-600" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-800">{group.name}</div>
+                              <div className="text-sm text-slate-500">{group.game_ids?.length || 0} games</div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (confirm(`Delete group "${group.name}"?`)) {
+                                deleteGroupMutation.mutate(group.id);
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-700 mr-2"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          <ChevronRight className="w-5 h-5 text-slate-400" />
                   </div>
                 </Link>
               ))}

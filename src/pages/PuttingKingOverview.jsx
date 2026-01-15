@@ -1,17 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Play } from 'lucide-react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { createPageUrl } from '@/utils';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import PuttingKingScoreInput from '@/components/putting/PuttingKingScoreInput';
+import SuddenDeathDialog from '@/components/putting/SuddenDeathDialog';
 
 export default function PuttingKingOverview() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tournamentId = searchParams.get('id');
   const queryClient = useQueryClient();
+  const [activeScoringMatchId, setActiveScoringMatchId] = useState(null);
+  const [suddenDeathMatch, setSuddenDeathMatch] = useState(null);
 
   const { data: tournament } = useQuery({
     queryKey: ['tournament', tournamentId],
@@ -97,23 +100,6 @@ export default function PuttingKingOverview() {
   const isTournamentFinished = tournament?.current_round === tournament?.total_rounds && allMatchesFinished;
   const isHost = user?.email === tournament?.host_user;
   const displayStatus = isTournamentFinished ? 'finished' : tournament?.status;
-
-  // Calculate head-to-head stats for each player pair
-  const getHeadToHeadStats = (player1Email, player2Email) => {
-    const player1Wins = matches.filter(m => 
-      m.tournament_id === tournament?.id &&
-      ((m.team_a_players.includes(player1Email) && m.winner_team === 'A') ||
-       (m.team_b_players.includes(player1Email) && m.winner_team === 'B'))
-    ).length;
-    
-    const player2Wins = matches.filter(m => 
-      m.tournament_id === tournament?.id &&
-      ((m.team_a_players.includes(player2Email) && m.winner_team === 'A') ||
-       (m.team_b_players.includes(player2Email) && m.winner_team === 'B'))
-    ).length;
-
-    return { player1Wins, player2Wins };
-  };
 
   const startNextRoundMutation = useMutation({
     mutationFn: async () => {

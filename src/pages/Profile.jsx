@@ -65,7 +65,8 @@ export default function Profile() {
     setEditData({
       full_name: user.full_name,
       bio: user.bio || '',
-      profile_picture: user.profile_picture || ''
+      profile_picture: user.profile_picture || '',
+      gender: user.gender || ''
     });
     setIsEditing(true);
   };
@@ -221,6 +222,11 @@ export default function Profile() {
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-slate-800">{user.full_name}</h2>
                 <p className="text-slate-500">{user.email}</p>
+                {user.gender && (
+                  <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-semibold mt-1">
+                    {user.gender === 'M' ? 'Male' : 'Female'}
+                  </span>
+                )}
                 {user.bio && <p className="text-slate-600 mt-2">{user.bio}</p>}
               </div>
               <Button onClick={handleEdit} variant="outline" size="sm">
@@ -255,6 +261,22 @@ export default function Profile() {
                       value={editData.full_name}
                       onChange={(e) => setEditData({ ...editData, full_name: e.target.value })}
                     />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-600 mb-1 block">Gender</label>
+                    <Select 
+                      value={editData.gender || 'none'}
+                      onValueChange={(value) => setEditData({ ...editData, gender: value === 'none' ? '' : value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Not specified</SelectItem>
+                        <SelectItem value="M">Male</SelectItem>
+                        <SelectItem value="N">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-sm text-slate-600 mb-1 block">Bio</label>

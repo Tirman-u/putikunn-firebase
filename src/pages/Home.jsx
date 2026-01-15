@@ -11,6 +11,7 @@ import JoinGame from '@/components/putting/JoinGame';
 import HostView from '@/components/putting/HostView';
 import PlayerView from '@/components/putting/PlayerView';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
+import PuttingRecords from '@/components/leaderboard/PuttingRecords';
 
 export default function Home() {
   const [mode, setMode] = useState(null); // null, 'host', 'player'
@@ -21,6 +22,11 @@ export default function Home() {
     queryKey: ['user'],
     queryFn: () => base44.auth.me()
   });
+
+  const userRole = user?.role || 'user';
+  const canHostGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
+  const canManageGames = ['admin', 'super_admin'].includes(userRole);
+  const canAccessPuttingKing = ['admin', 'super_admin'].includes(userRole);
 
 
 
@@ -55,28 +61,35 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
         <div className="max-w-lg mx-auto pt-16">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-slate-800 mb-2">
               Welcome {user?.full_name || 'Guest'}!
             </h1>
-            <p className="text-slate-600 text-xl mb-8">Ready to make some putts?</p>
+            <p className="text-slate-600 text-xl mb-6">Ready to make some putts?</p>
+          </div>
+
+          {/* Putting Records Section */}
+          <div className="mb-8">
+            <PuttingRecords />
           </div>
 
           <div className="space-y-4">
-            <button
-              onClick={() => setMode('host-setup')}
-              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                  <Users className="w-7 h-7 text-emerald-600" />
+            {canHostGames && (
+              <button
+                onClick={() => setMode('host-setup')}
+                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                    <Users className="w-7 h-7 text-emerald-600" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="text-lg font-bold text-slate-800">Host Game</h3>
+                    <p className="text-sm text-slate-500">Create a session and get a PIN</p>
+                  </div>
                 </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Host Game</h3>
-                  <p className="text-sm text-slate-500">Create a session and get a PIN</p>
-                </div>
-              </div>
-            </button>
+              </button>
+            )}
 
             <button
               onClick={() => setMode('join')}
@@ -108,36 +121,40 @@ export default function Home() {
               </div>
             </button>
 
-            <button
-              onClick={() => window.location.href = createPageUrl('PuttingKing')}
-              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                  <Trophy className="w-7 h-7 text-purple-600" />
+            {canAccessPuttingKing && (
+              <button
+                onClick={() => window.location.href = createPageUrl('PuttingKing')}
+                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                    <Trophy className="w-7 h-7 text-purple-600" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="text-lg font-bold text-slate-800">Putting King</h3>
+                    <p className="text-sm text-slate-500">Manage tournaments and competitions</p>
+                  </div>
                 </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Putting King</h3>
-                  <p className="text-sm text-slate-500">Manage tournaments and competitions</p>
-                </div>
-              </div>
-            </button>
+              </button>
+            )}
 
             <div className="pt-8 border-t-2 border-slate-200 mt-8 space-y-3">
-            <Link
-              to={createPageUrl('ManageGames')}
-              className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200 transition-colors">
-                  <Settings className="w-6 h-6 text-slate-600" />
+            {canManageGames && (
+              <Link
+                to={createPageUrl('ManageGames')}
+                className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200 transition-colors">
+                    <Settings className="w-6 h-6 text-slate-600" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="text-base font-bold text-slate-800">Manage Games</h3>
+                    <p className="text-xs text-slate-500">View and organize your games</p>
+                  </div>
                 </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-base font-bold text-slate-800">Manage Games</h3>
-                  <p className="text-xs text-slate-500">View and organize your games</p>
-                </div>
-              </div>
-            </Link>
+              </Link>
+            )}
 
             <Link
               to={createPageUrl('Profile')}
@@ -153,6 +170,23 @@ export default function Home() {
                 </div>
               </div>
             </Link>
+
+            {userRole === 'super_admin' && (
+              <Link
+                to={createPageUrl('AdminUsers')}
+                className="w-full bg-white rounded-2xl p-5 shadow-sm border border-red-200 hover:border-red-300 hover:shadow-md transition-all group block"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center group-hover:bg-red-200 transition-colors">
+                    <User className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="text-base font-bold text-slate-800">User Management</h3>
+                    <p className="text-xs text-slate-500">Manage roles and permissions</p>
+                  </div>
+                </div>
+              </Link>
+            )}
             </div>
           </div>
         </div>

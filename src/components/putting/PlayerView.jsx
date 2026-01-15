@@ -9,6 +9,7 @@ import BackAndForthInput from './BackAndForthInput';
 import JylyScoreTable from './JylyScoreTable';
 import ProgressBar from './ProgressBar';
 import MobileLeaderboard from './MobileLeaderboard';
+import PuttTypeSelector from './PuttTypeSelector';
 import { 
   GAME_FORMATS, 
   getNextDistanceFromMade, 
@@ -20,6 +21,7 @@ import {
 
 export default function PlayerView({ gameId, playerName, onExit }) {
   const [showLeaderboard, setShowLeaderboard] = React.useState(false);
+  const [puttType, setPuttType] = React.useState('regular');
   const queryClient = useQueryClient();
 
   const { data: game, isLoading } = useQuery({
@@ -50,7 +52,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         distance: currentDistance,
         result,
         points: 0, // Individual putts don't score in classic formats
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        putt_type: puttType
       });
     }
 
@@ -102,7 +105,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       distance: currentDistance,
       result,
       points,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      putt_type: puttType
     };
 
     const allPlayerPutts = { ...game.player_putts };
@@ -316,6 +320,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             </div>
           </div>
         </div>
+
+        {/* Putt Type Selector */}
+        <PuttTypeSelector selectedType={puttType} onSelect={setPuttType} />
 
         {/* Score Input */}
         {format.singlePuttMode ? (

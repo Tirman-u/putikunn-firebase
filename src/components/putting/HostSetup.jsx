@@ -23,7 +23,8 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
     onStartGame({
       name: gameName || `Game ${new Date().toLocaleDateString()}`,
       pin,
-      gameType
+      gameType,
+      puttType
     });
   };
 

@@ -101,6 +101,128 @@ export default function PuttingKingOverview() {
   const isHost = user?.email === tournament?.host_user;
   const displayStatus = isTournamentFinished ? 'finished' : tournament?.status;
 
+  const scoreMutation = useMutation({
+    mutationFn: async ({ matchId, scoreData }) => {
+      const match = matches.find(m => m.id === matchId);
+      
+      if (scoreData.isManual) {
+        // Manual score entry
+        const finalScoreA = scoreData.finalScoreA;
+        const finalScoreB = scoreData.finalScoreB;
+        
+        // Check if tie
+        if (finalScoreA === finalScoreB) {
+          setSuddenDeathMatch({ ...match, score_a: finalScoreA, score_b: finalScoreB });
+          return;
+        }
+        
+        // Update match with final scores
+        const winnerTeam = finalScoreA > finalScoreB ? 'A' : 'B';
+        await base44.entities.PuttingKingMatch.update(matchId, {
+          score_a: finalScoreA,
+          score_b: finalScoreB,
+          status: 'finished',
+          winner_team: winnerTeam,
+          finished_at: new Date().toISOString()
+        });
+        
+        await handleMatchEnd({ ...match, score_a: finalScoreA, score_b: finalScoreB }, winnerTeam, finalScoreA, finalScoreB);
+        setActiveScoringMatchId(null);
+        return;
+      }
+      
+      // Putt-by-putt scoring
+      const { team, distance, made } = scoreData;
+      const currentScore = team === 'A' ? match.score_a : match.score_b;
+      let newScore = currentScore + (made ? distance.points_for_made : distance.points_for_missed);
+
+      // Bust logic
+      if (newScore > tournament.target_score) {
+        newScore = tournament.bust_reset_score;
+        toast.error(`Bust! Score reset to ${tournament.bust_reset_score}`);
+      }
+
+      const updateData = {
+        [`score_${team.toLowerCase()}`]: newScore
+      };
+
+      // Check for win
+      if (newScore === tournament.target_score) {
+        updateData.status = 'finished';
+        updateData.winner_team = team;
+        updateData.finished_at = new Date().toISOString();
+      }
+
+      await base44.entities.PuttingKingMatch.update(matchId, updateData);
+
+      if (newScore === tournament.target_score) {
+        await handleMatchEnd(
+          { ...match, ...updateData }, 
+          team, 
+          team === 'A' ? newScore : match.score_a,
+          team === 'B' ? newScore : match.score_b
+        );
+        setActiveScoringMatchId(null);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+    }
+  });
+
+  const handleMatchEnd = async (finishedMatch, winnerTeam, finalScoreA, finalScoreB) => {
+    const winners = winnerTeam === 'A' ? finishedMatch.team_a_players : finishedMatch.team_b_players;
+    const losers = winnerTeam === 'A' ? finishedMatch.team_b_players : finishedMatch.team_a_players;
+
+    // Update player points based on actual scores
+    for (const email of winners) {
+      const player = players.find(p => p.user_email === email);
+      if (player) {
+        const partner = winners.find(e => e !== email);
+        await base44.entities.PuttingKingPlayer.update(player.id, {
+          tournament_points: player.tournament_points + finalScoreA,
+          wins: player.wins + 1,
+          current_status: 'waiting_partner',
+          last_partner_email: partner
+        });
+      }
+    }
+
+    for (const email of losers) {
+      const player = players.find(p => p.user_email === email);
+      if (player) {
+        const partner = losers.find(e => e !== email);
+        await base44.entities.PuttingKingPlayer.update(player.id, {
+          tournament_points: player.tournament_points + finalScoreB,
+          losses: player.losses + 1,
+          current_status: 'waiting_partner',
+          last_partner_email: partner
+        });
+      }
+    }
+
+    toast.success('Match finished!');
+  };
+
+  const handleSuddenDeathWinner = async (winnerTeam) => {
+    const match = suddenDeathMatch;
+    const finalScoreA = winnerTeam === 'A' ? match.score_a + 1 : match.score_a;
+    const finalScoreB = winnerTeam === 'B' ? match.score_b + 1 : match.score_b;
+    
+    await base44.entities.PuttingKingMatch.update(match.id, {
+      score_a: finalScoreA,
+      score_b: finalScoreB,
+      status: 'finished',
+      winner_team: winnerTeam,
+      finished_at: new Date().toISOString()
+    });
+    
+    await handleMatchEnd(match, winnerTeam, finalScoreA, finalScoreB);
+    setSuddenDeathMatch(null);
+    setActiveScoringMatchId(null);
+    queryClient.invalidateQueries();
+  };
+
   const startNextRoundMutation = useMutation({
     mutationFn: async () => {
       const nextRound = tournament.current_round + 1;

@@ -270,10 +270,10 @@ export default function ManageGames() {
           </div>
         )}
 
-        {/* Games List */}
-        <div>
-          <h2 className="text-lg font-bold text-slate-800 mb-3">My Games</h2>
-          {games.length === 0 ? (
+        {/* Active Games */}
+        <div className="mb-8">
+          <h2 className="text-lg font-bold text-slate-800 mb-3">Active Games</h2>
+          {activeGames.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center text-slate-400">
               <p>No games yet</p>
             </div>

@@ -2,7 +2,8 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy } from 'lucide-react';
+import { ArrowLeft, Trophy, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import ClassicScoreInput from './ClassicScoreInput';
 import BackAndForthInput from './BackAndForthInput';
@@ -22,7 +23,13 @@ import {
 export default function PlayerView({ gameId, playerName, onExit }) {
   const [showLeaderboard, setShowLeaderboard] = React.useState(false);
   const [puttType, setPuttType] = React.useState('regular');
+  const [hasSubmitted, setHasSubmitted] = React.useState(false);
   const queryClient = useQueryClient();
+
+  const { data: user } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: () => base44.auth.me()
+  });
 
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],
@@ -35,6 +42,33 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     onSuccess: (updatedGame) => {
       // Update cache immediately with the response
       queryClient.setQueryData(['game', gameId], updatedGame);
+    }
+  });
+
+  const submitToLeaderboardMutation = useMutation({
+    mutationFn: async () => {
+      const playerPutts = game.player_putts?.[playerName] || [];
+      const madePutts = playerPutts.filter(p => p.result === 'made').length;
+      const totalPutts = playerPutts.length;
+      const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+
+      return await base44.entities.LeaderboardEntry.create({
+        game_id: game.id,
+        player_email: user?.email || 'unknown',
+        player_name: playerName,
+        game_type: game.game_type,
+        score: game.total_points[playerName] || 0,
+        accuracy: Math.round(accuracy * 10) / 10,
+        made_putts: madePutts,
+        total_putts: totalPutts,
+        leaderboard_type: 'general',
+        player_gender: user?.gender || 'M',
+        date: new Date().toISOString()
+      });
+    },
+    onSuccess: () => {
+      setHasSubmitted(true);
+      toast.success('Result submitted to leaderboard!');
     }
   });
 
@@ -245,6 +279,16 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           </motion.div>
 
           <div className="space-y-3">
+            {!hasSubmitted && (
+              <Button
+                onClick={() => submitToLeaderboardMutation.mutate()}
+                disabled={submitToLeaderboardMutation.isPending}
+                className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 rounded-xl"
+              >
+                <Upload className="w-5 h-5 mr-2" />
+                Submit to Leaderboard
+              </Button>
+            )}
             <Button
               onClick={() => setShowLeaderboard(true)}
               className="w-full h-14 bg-slate-600 hover:bg-slate-700 rounded-xl"

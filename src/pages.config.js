@@ -1,3 +1,4 @@
+import AdminUsers from './pages/AdminUsers';
 import GameResult from './pages/GameResult';
 import GroupResult from './pages/GroupResult';
 import Home from './pages/Home';
@@ -7,11 +8,12 @@ import PuttingKing from './pages/PuttingKing';
 import PuttingKingOverview from './pages/PuttingKingOverview';
 import PuttingKingScoring from './pages/PuttingKingScoring';
 import PuttingKingSetup from './pages/PuttingKingSetup';
-import AdminUsers from './pages/AdminUsers';
 import PuttingRecordsPage from './pages/PuttingRecordsPage';
+import SubmitDiscgolf from './pages/SubmitDiscgolf';
 
 
 export const PAGES = {
+    "AdminUsers": AdminUsers,
     "GameResult": GameResult,
     "GroupResult": GroupResult,
     "Home": Home,
@@ -21,8 +23,8 @@ export const PAGES = {
     "PuttingKingOverview": PuttingKingOverview,
     "PuttingKingScoring": PuttingKingScoring,
     "PuttingKingSetup": PuttingKingSetup,
-    "AdminUsers": AdminUsers,
     "PuttingRecordsPage": PuttingRecordsPage,
+    "SubmitDiscgolf": SubmitDiscgolf,
 }
 
 export const pagesConfig = {

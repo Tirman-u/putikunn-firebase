@@ -142,7 +142,7 @@ export default function PuttingRecords() {
                         <th className="text-left py-3 px-2 text-slate-600 font-semibold">#</th>
                         <th className="text-left py-3 px-2 text-slate-600 font-semibold">Player</th>
                         <th className="text-center py-3 px-2 text-slate-600 font-semibold">Score</th>
-                        <th className="text-center py-3 px-2 text-slate-600 font-semibold">Accuracy</th>
+                        <th className="text-center py-3 px-2 text-slate-600 font-semibold">{currentView.gameType === 'streak_challenge' ? 'Distance' : 'Accuracy'}</th>
                         <th className="text-center py-3 px-2 text-slate-600 font-semibold">Putts</th>
                         <th className="text-right py-3 px-2 text-slate-600 font-semibold">Date</th>
                       </tr>
@@ -187,7 +187,10 @@ export default function PuttingRecords() {
                           </td>
                           <td className="py-3 px-2 text-center text-slate-700">
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
-                              {entry.accuracy ? `${entry.accuracy.toFixed(1)}%` : '-'}
+                              {currentView.gameType === 'streak_challenge' 
+                                ? `${entry.streak_distance || 0}m` 
+                                : (entry.accuracy ? `${entry.accuracy.toFixed(1)}%` : '-')
+                              }
                             </Link>
                           </td>
                           <td className="py-3 px-2 text-center text-slate-600">

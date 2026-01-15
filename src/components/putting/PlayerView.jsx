@@ -54,7 +54,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       const totalPutts = playerPutts.length;
       const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
 
-      return await base44.entities.LeaderboardEntry.create({
+      const leaderboardData = {
         game_id: game.id,
         player_email: user?.email || 'unknown',
         player_name: playerName,
@@ -66,7 +66,14 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         leaderboard_type: 'general',
         player_gender: user?.gender || 'M',
         date: new Date().toISOString()
-      });
+      };
+
+      // Add distance for streak challenge
+      if (game.game_type === 'streak_challenge') {
+        leaderboardData.streak_distance = game.player_distances?.[playerName] || 0;
+      }
+
+      return await base44.entities.LeaderboardEntry.create(leaderboardData);
     },
     onSuccess: () => {
       setHasSubmitted(true);

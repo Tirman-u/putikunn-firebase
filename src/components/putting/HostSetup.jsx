@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import GameFormatSelector from './GameFormatSelector';
 import FormatRulesPopup from './FormatRulesPopup';
+import PuttTypeSelector from './PuttTypeSelector';
 
 export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   const [gameName, setGameName] = useState('');

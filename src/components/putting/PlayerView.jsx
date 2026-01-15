@@ -156,17 +156,32 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const newTotalPoints = { ...game.total_points };
     newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) + points;
 
-    // For Streak Challenge, game ends on miss
-    const gameStatus = gameType === 'streak_challenge' && !wasMade ? 'completed' : 'active';
+    // For Streak Challenge, handle streak tracking
+    let nextDistance = currentDistance;
+    let streakUpdate = {};
 
-    // Calculate next distance based on format
-    let nextDistance;
-    if (gameType === 'back_and_forth') {
+    if (gameType === 'streak_challenge') {
+      const currentStreaks = game.player_current_streaks || {};
+      const highestStreaks = game.player_highest_streaks || {};
+      let playerCurrentStreak = currentStreaks[playerName] || 0;
+      let playerHighestStreak = highestStreaks[playerName] || 0;
+
+      if (wasMade) {
+        playerCurrentStreak += 1;
+        playerHighestStreak = Math.max(playerHighestStreak, playerCurrentStreak);
+      } else {
+        playerCurrentStreak = 0; // Reset on miss
+      }
+
+      streakUpdate = {
+        player_current_streaks: { ...currentStreaks, [playerName]: playerCurrentStreak },
+        player_highest_streaks: { ...highestStreaks, [playerName]: playerHighestStreak }
+      };
+
+      // Use highest streak as the points for leaderboard
+      newTotalPoints[playerName] = playerHighestStreak;
+    } else if (gameType === 'back_and_forth') {
       nextDistance = getNextDistanceBackAndForth(currentDistance, wasMade);
-    } else if (gameType === 'streak_challenge') {
-      nextDistance = currentDistance; // Same distance for streak
-    } else {
-      nextDistance = currentDistance;
     }
 
     const newPlayerDistances = { ...game.player_distances };
@@ -178,7 +193,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         player_putts: allPlayerPutts,
         total_points: newTotalPoints,
         player_distances: newPlayerDistances,
-        status: gameStatus
+        ...streakUpdate
       }
     });
   };
@@ -389,12 +404,14 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         </div>
 
         {/* Putt Type Display */}
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
-          <div className="text-xs text-slate-500 mb-1">Putt Style</div>
-          <div className="text-sm font-semibold text-slate-800">
-            {game.putt_type === 'regular' ? 'Regular' : game.putt_type === 'straddle' ? 'Straddle' : 'Turbo'}
+        {gameType !== 'streak_challenge' && (
+          <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
+            <div className="text-xs text-slate-500 mb-1">Putt Style</div>
+            <div className="text-sm font-semibold text-slate-800">
+              {game.putt_type === 'regular' ? 'Regular' : game.putt_type === 'straddle' ? 'Straddle' : 'Turbo'}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Score Input */}
          {gameType === 'streak_challenge' ? (

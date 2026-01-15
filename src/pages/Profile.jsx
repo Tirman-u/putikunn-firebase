@@ -554,16 +554,17 @@ export default function Profile() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="text-left py-3 px-2 text-slate-600 font-semibold">Game</th>
-                    <th className="text-left py-3 px-2 text-slate-600 font-semibold">Date</th>
-                    <th className="text-left py-3 px-2 text-slate-600 font-semibold">Format</th>
-                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Score</th>
-                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">%</th>
-                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Putts</th>
-                    <th className="text-center py-3 px-2 text-slate-600 font-semibold"></th>
-                  </tr>
-                </thead>
+                   <tr className="border-b border-slate-200">
+                     <th className="text-left py-3 px-2 text-slate-600 font-semibold">Game</th>
+                     <th className="text-left py-3 px-2 text-slate-600 font-semibold">Date</th>
+                     <th className="text-left py-3 px-2 text-slate-600 font-semibold">Format</th>
+                     <th className="text-left py-3 px-2 text-slate-600 font-semibold">Style</th>
+                     <th className="text-right py-3 px-2 text-slate-600 font-semibold">Score</th>
+                     <th className="text-right py-3 px-2 text-slate-600 font-semibold">%</th>
+                     <th className="text-right py-3 px-2 text-slate-600 font-semibold">Putts</th>
+                     <th className="text-center py-3 px-2 text-slate-600 font-semibold"></th>
+                   </tr>
+                 </thead>
                 <tbody>
                   {filteredGames.map((game) => {
                     const putts = game.player_putts?.[myName] || [];

@@ -275,11 +275,11 @@ export default function ManageGames() {
           <h2 className="text-lg font-bold text-slate-800 mb-3">Active Games</h2>
           {activeGames.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center text-slate-400">
-              <p>No games yet</p>
+              <p>No active games</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {games.map((game) => (
+              {activeGames.map((game) => (
                 <div
                   key={game.id}
                   className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-slate-300 transition-all group"

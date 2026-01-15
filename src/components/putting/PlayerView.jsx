@@ -394,34 +394,44 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         </div>
 
         {/* Score Input */}
-        {format.singlePuttMode ? (
-          <BackAndForthInput
-            player={playerName}
-            currentDistance={currentDistance}
-            onMade={() => handleBackAndForthPutt(true)}
-            onMissed={() => handleBackAndForthPutt(false)}
-            canUndo={canUndo}
-            onUndo={handleUndo}
-            showStreak={gameType === 'streak_challenge'}
-            currentStreak={gameType === 'streak_challenge' ? playerPutts.filter((p, i) => {
-              const streak = [];
-              for (let j = playerPutts.length - 1; j >= 0; j--) {
-                if (playerPutts[j].result === 'made') streak.push(playerPutts[j]);
-                else break;
-              }
-              return streak.length;
-            }).length : 0}
-          />
-        ) : (
-          <ClassicScoreInput
-            player={playerName}
-            currentDistance={currentDistance}
-            onSubmit={handleClassicSubmit}
-            canUndo={canUndo}
-            onUndo={handleUndo}
-            distanceMap={format.distanceMap}
-          />
-        )}
+         {gameType === 'streak_challenge' ? (
+           <StreakChallengeInput
+             player={playerName}
+             currentDistance={currentDistance}
+             onMade={() => handleBackAndForthPutt(true)}
+             onMissed={() => handleBackAndForthPutt(false)}
+             canUndo={canUndo}
+             onUndo={handleUndo}
+             currentStreak={playerPutts.filter((p) => {
+               const streak = [];
+               for (let j = playerPutts.length - 1; j >= 0; j--) {
+                 if (playerPutts[j].result === 'made') streak.push(playerPutts[j]);
+                 else break;
+               }
+               return streak.length;
+             }).length}
+             showDistanceSelector={!streakDistanceSelected && playerPutts.length === 0}
+             onDistanceSelect={handleStreakDistanceSelect}
+           />
+         ) : format.singlePuttMode ? (
+           <BackAndForthInput
+             player={playerName}
+             currentDistance={currentDistance}
+             onMade={() => handleBackAndForthPutt(true)}
+             onMissed={() => handleBackAndForthPutt(false)}
+             canUndo={canUndo}
+             onUndo={handleUndo}
+           />
+         ) : (
+           <ClassicScoreInput
+             player={playerName}
+             currentDistance={currentDistance}
+             onSubmit={handleClassicSubmit}
+             canUndo={canUndo}
+             onUndo={handleUndo}
+             distanceMap={format.distanceMap}
+           />
+         )}
       </div>
 
       {/* Mobile Leaderboard */}

@@ -78,7 +78,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const handleClassicSubmit = (madeCount) => {
     const gameType = game.game_type || 'classic';
     const format = GAME_FORMATS[gameType];
-    const currentDistance = game.player_distances[playerName];
+    const playerDist = game.player_distances || {};
+    const currentDistance = playerDist[playerName] || format.startDistance;
     
     // Create 5 putt records
     const newPutts = [];

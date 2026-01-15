@@ -34,8 +34,8 @@ const GAME_FORMATS = [
   {
     id: 'streak_challenge',
     name: 'Streak',
-    distance: '7m',
-    description: 'How many in a row?',
+    distance: '3-15m',
+    description: 'Select distance, ends on miss',
     color: 'red'
   },
   {

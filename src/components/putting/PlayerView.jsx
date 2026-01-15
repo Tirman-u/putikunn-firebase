@@ -365,8 +365,13 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           </div>
         </div>
 
-        {/* Putt Type Selector */}
-        <PuttTypeSelector selectedType={puttType} onSelect={setPuttType} />
+        {/* Putt Type Display */}
+        <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
+          <div className="text-xs text-slate-500 mb-1">Putt Style</div>
+          <div className="text-sm font-semibold text-slate-800">
+            {game.putt_type === 'regular' ? 'Regular' : game.putt_type === 'straddle' ? 'Straddle' : 'Turbo'}
+          </div>
+        </div>
 
         {/* Score Input */}
         {format.singlePuttMode ? (

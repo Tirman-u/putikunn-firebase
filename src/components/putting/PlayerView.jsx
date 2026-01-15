@@ -402,14 +402,14 @@ export default function PlayerView({ gameId, playerName, onExit }) {
              onMissed={() => handleBackAndForthPutt(false)}
              canUndo={canUndo}
              onUndo={handleUndo}
-             currentStreak={playerPutts.filter((p) => {
+             currentStreak={(() => {
                const streak = [];
                for (let j = playerPutts.length - 1; j >= 0; j--) {
                  if (playerPutts[j].result === 'made') streak.push(playerPutts[j]);
                  else break;
                }
                return streak.length;
-             }).length}
+             })()}
              showDistanceSelector={!streakDistanceSelected && playerPutts.length === 0}
              onDistanceSelect={handleStreakDistanceSelect}
            />

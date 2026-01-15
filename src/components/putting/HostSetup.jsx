@@ -46,10 +46,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
           </button>
         </div>
 
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-emerald-200">
-            <span className="text-3xl">🥏</span>
-          </div>
+        <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-800 mb-1">{isSolo ? 'Solo Practice' : 'Host Game'}</h1>
           <p className="text-sm text-slate-500">{isSolo ? 'Practice alone at your own pace' : 'Create a session'}</p>
         </div>

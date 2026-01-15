@@ -510,32 +510,43 @@ export default function Profile() {
         {/* Game History with Filters */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-slate-800">Game History</h3>
-            <div className="flex gap-2">
-              <Select value={filterFormat} onValueChange={setFilterFormat}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Formats</SelectItem>
-                  <SelectItem value="classic">Classic</SelectItem>
-                  <SelectItem value="short">Short</SelectItem>
-                  <SelectItem value="long">Long</SelectItem>
-                  <SelectItem value="back_and_forth">Back & Forth</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="score">Score</SelectItem>
-                  <SelectItem value="format">Format</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+             <h3 className="text-lg font-bold text-slate-800">Game History</h3>
+             <div className="flex flex-wrap gap-2">
+               <Select value={filterFormat} onValueChange={setFilterFormat}>
+                 <SelectTrigger className="w-32">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="all">All Formats</SelectItem>
+                   <SelectItem value="classic">Classic</SelectItem>
+                   <SelectItem value="short">Short</SelectItem>
+                   <SelectItem value="long">Long</SelectItem>
+                   <SelectItem value="back_and_forth">Back & Forth</SelectItem>
+                 </SelectContent>
+               </Select>
+               <Select value={filterPuttType} onValueChange={setFilterPuttType}>
+                 <SelectTrigger className="w-32">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="all">All Styles</SelectItem>
+                   <SelectItem value="regular">Regular</SelectItem>
+                   <SelectItem value="straddle">Straddle</SelectItem>
+                   <SelectItem value="turbo">Turbo</SelectItem>
+                 </SelectContent>
+               </Select>
+               <Select value={sortBy} onValueChange={setSortBy}>
+                 <SelectTrigger className="w-32">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="date">Date</SelectItem>
+                   <SelectItem value="score">Score</SelectItem>
+                   <SelectItem value="format">Format</SelectItem>
+                 </SelectContent>
+               </Select>
+             </div>
+           </div>
 
           {filteredGames.length === 0 ? (
             <div className="text-center py-8 text-slate-400">No games found</div>

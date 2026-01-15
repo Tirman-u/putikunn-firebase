@@ -23,7 +23,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   const handleStart = () => {
     onStartGame({
       name: gameName || `Game ${new Date().toLocaleDateString()}`,
-      pin,
+      pin: isSolo ? null : pin,
       gameType,
       puttType
     });

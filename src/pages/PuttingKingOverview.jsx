@@ -110,18 +110,25 @@ export default function PuttingKingOverview() {
         const finalScoreA = scoreData.finalScoreA;
         const finalScoreB = scoreData.finalScoreB;
         
-        // Check if someone reached target score
-        const hasWinner = finalScoreA >= tournament.target_score || finalScoreB >= tournament.target_score;
+        // Check if match is finished: someone has exactly 21
+        const teamAWon = finalScoreA === tournament.target_score && finalScoreB < tournament.target_score;
+        const teamBWon = finalScoreB === tournament.target_score && finalScoreA < tournament.target_score;
+        const isTie = finalScoreA === tournament.target_score && finalScoreB === tournament.target_score;
         
-        if (hasWinner) {
-          // Check if it's a tie at target score
-          if (finalScoreA === finalScoreB && finalScoreA === tournament.target_score) {
-            setSuddenDeathMatch({ ...match, score_a: finalScoreA, score_b: finalScoreB });
-            return;
-          }
-          
+        if (isTie) {
+          // Sudden death for tie at 21-21
+          await base44.entities.PuttingKingMatch.update(matchId, {
+            score_a: finalScoreA,
+            score_b: finalScoreB,
+            status: 'playing'
+          });
+          setSuddenDeathMatch({ ...match, score_a: finalScoreA, score_b: finalScoreB });
+          return;
+        }
+        
+        if (teamAWon || teamBWon) {
           // Someone won
-          const winnerTeam = finalScoreA > finalScoreB ? 'A' : 'B';
+          const winnerTeam = teamAWon ? 'A' : 'B';
           await base44.entities.PuttingKingMatch.update(matchId, {
             score_a: finalScoreA,
             score_b: finalScoreB,

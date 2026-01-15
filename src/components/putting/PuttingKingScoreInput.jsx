@@ -59,7 +59,7 @@ export default function PuttingKingScoreInput({
         className="w-full bg-purple-600 hover:bg-purple-700"
         disabled={!manualScoreA || !manualScoreB}
       >
-        Submit Final Score
+        Submit Score
       </Button>
     </div>
   );

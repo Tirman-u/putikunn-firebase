@@ -13,6 +13,7 @@ export default function ManageGames() {
   const [selectedGames, setSelectedGames] = useState([]);
   const [newGroupName, setNewGroupName] = useState('');
   const [showGroupDialog, setShowGroupDialog] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState('all');
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({

@@ -81,14 +81,14 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     // Create 5 putt records
     const newPutts = [];
     for (let i = 0; i < 5; i++) {
-      const result = i < madeCount ? 'made' : 'missed';
-      newPutts.push({
-        distance: currentDistance,
-        result,
-        points: 0, // Individual putts don't score in classic formats
-        timestamp: new Date().toISOString(),
-        putt_type: puttType
-      });
+    const result = i < madeCount ? 'made' : 'missed';
+    newPutts.push({
+      distance: currentDistance,
+      result,
+      points: 0, // Individual putts don't score in classic formats
+      timestamp: new Date().toISOString(),
+      putt_type: game.putt_type || 'regular'
+    });
     }
 
     const allPlayerPutts = { ...game.player_putts };

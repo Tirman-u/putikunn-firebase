@@ -31,11 +31,12 @@ export default function Home() {
 
   const handleHostGame = async (gameData) => {
     const user = await base44.auth.me();
-    
+
     const game = await base44.entities.Game.create({
       name: gameData.name,
       pin: gameData.pin,
       game_type: gameData.gameType || 'classic',
+      putt_type: gameData.puttType || 'regular',
       host_user: user.email,
       players: [],
       player_distances: {},

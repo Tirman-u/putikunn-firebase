@@ -308,8 +308,18 @@ export default function PuttingKingOverview() {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
+  const distances = tournament.distances.filter(d => d.enabled).sort((a, b) => a.order - b.order);
+  const activeScoringMatch = activeScoringMatchId ? matches.find(m => m.id === activeScoringMatchId) : null;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
+      {suddenDeathMatch && (
+        <SuddenDeathDialog
+          match={suddenDeathMatch}
+          onSelectWinner={handleSuddenDeathWinner}
+          getPlayerName={getPlayerName}
+        />
+      )}
       <div className="max-w-7xl mx-auto pt-8">
         <button
           onClick={() => navigate(-1)}
@@ -354,24 +364,98 @@ export default function PuttingKingOverview() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Match History and Statistics */}
-          <div className="lg:col-span-2">
+          {/* Stations and Scoring */}
+          <div className="lg:col-span-2 space-y-4">
+            <h2 className="text-xl font-bold text-slate-800">Stations</h2>
+            {stations.map(station => {
+              const match = getStationMatch(station.id);
+              const isActiveScoring = activeScoringMatchId === match?.id;
+              return (
+                <div key={station.id} className="bg-white rounded-2xl p-4 shadow-sm border-2 border-purple-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-slate-800">{station.name}</h3>
+                    {match && (
+                      <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                        match.status === 'playing' ? 'bg-green-100 text-green-700' :
+                        match.status === 'ready' ? 'bg-blue-100 text-blue-700' :
+                        match.status === 'finished' ? 'bg-amber-100 text-amber-700' :
+                        'bg-slate-100 text-slate-600'
+                      }`}>
+                        {match.status === 'finished' ? 'Finished' : match.status}
+                      </div>
+                    )}
+                  </div>
+
+                  {match ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div className="p-3 bg-purple-50 rounded-xl">
+                          <div className="text-xs text-purple-600 font-semibold mb-1">Team A</div>
+                          {match.team_a_players.map(email => (
+                            <div key={email} className="text-sm text-slate-800">{getPlayerName(email)}</div>
+                          ))}
+                          <div className="text-2xl font-bold text-purple-600 mt-2">{match.score_a}</div>
+                        </div>
+                        <div className="p-3 bg-blue-50 rounded-xl">
+                          <div className="text-xs text-blue-600 font-semibold mb-1">Team B</div>
+                          {match.team_b_players.map(email => (
+                            <div key={email} className="text-sm text-slate-800">{getPlayerName(email)}</div>
+                          ))}
+                          <div className="text-2xl font-bold text-blue-600 mt-2">{match.score_b}</div>
+                        </div>
+                      </div>
+
+                      {match.status !== 'finished' && (
+                        isActiveScoring ? (
+                          <PuttingKingScoreInput
+                            match={match}
+                            tournament={tournament}
+                            distances={distances}
+                            onScore={(scoreData) => scoreMutation.mutate({ matchId: match.id, scoreData })}
+                            getPlayerName={getPlayerName}
+                          />
+                        ) : (
+                          <Button
+                            onClick={() => setActiveScoringMatchId(match.id)}
+                            className="w-full bg-purple-600 hover:bg-purple-700"
+                          >
+                            Score This Match
+                          </Button>
+                        )
+                      )}
+
+                      {match.status === 'finished' && (
+                        <div className="text-center py-2 text-sm text-slate-500">
+                          Winner: Team {match.winner_team}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-slate-400">
+                      Waiting for players...
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
             {/* Match History */}
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-800 mb-3">Match History</h2>
-              <div className="space-y-3">
+            <div className="mt-6">
+              <h2 className="text-xl font-bold text-slate-800 mb-3">All Matches</h2>
+              <div className="space-y-2">
                 {matches
                   .filter(m => m.tournament_id === tournament.id)
-                  .sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))
-                  .slice(0, 5)
+                  .sort((a, b) => b.round_number - a.round_number || new Date(b.created_date || 0) - new Date(a.created_date || 0))
                   .map(match => {
                     const station = stations.find(s => s.id === match.station_id);
                     const isWinner = match.winner_team;
                     return (
-                      <div key={match.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+                      <div key={match.id} className="bg-white rounded-lg p-3 shadow-sm border border-slate-200">
                         <div className="flex items-center justify-between mb-2">
-                          <div className="font-semibold text-slate-700">{station?.name} - Round {match.round_number}</div>
-                          <div className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                          <div className="text-sm font-semibold text-slate-700">
+                            {station?.name} - Round {match.round_number}
+                          </div>
+                          <div className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                             match.status === 'finished' ? 'bg-amber-100 text-amber-700' :
                             match.status === 'playing' ? 'bg-green-100 text-green-700' :
                             'bg-blue-100 text-blue-700'
@@ -379,32 +463,32 @@ export default function PuttingKingOverview() {
                             {match.status}
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className={`p-2 rounded ${isWinner === 'A' ? 'bg-purple-100' : 'bg-slate-50'}`}>
-                            <div className="text-xs text-slate-600 mb-1">Team A</div>
-                            <div className="text-sm font-semibold text-slate-700">
+                            <div className="text-slate-600 mb-0.5">Team A</div>
+                            <div className="font-semibold text-slate-700">
                               {match.team_a_players.map(e => getPlayerName(e)).join(', ')}
                             </div>
-                            <div className={`text-lg font-bold ${isWinner === 'A' ? 'text-purple-600' : 'text-slate-600'}`}>
+                            <div className={`text-base font-bold ${isWinner === 'A' ? 'text-purple-600' : 'text-slate-600'}`}>
                               {match.score_a}
                             </div>
                           </div>
                           <div className={`p-2 rounded ${isWinner === 'B' ? 'bg-blue-100' : 'bg-slate-50'}`}>
-                            <div className="text-xs text-slate-600 mb-1">Team B</div>
-                            <div className="text-sm font-semibold text-slate-700">
+                            <div className="text-slate-600 mb-0.5">Team B</div>
+                            <div className="font-semibold text-slate-700">
                               {match.team_b_players.map(e => getPlayerName(e)).join(', ')}
                             </div>
-                            <div className={`text-lg font-bold ${isWinner === 'B' ? 'text-blue-600' : 'text-slate-600'}`}>
+                            <div className={`text-base font-bold ${isWinner === 'B' ? 'text-blue-600' : 'text-slate-600'}`}>
                               {match.score_b}
                             </div>
-                            </div>
-                            </div>
-                            </div>
-                            );
-                            })}
-                            </div>
-                            </div>
-                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          </div>
 
                             {/* Stations Column */}
                             <div className="space-y-4">

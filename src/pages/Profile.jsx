@@ -22,6 +22,8 @@ export default function Profile() {
   const [sortBy, setSortBy] = useState('date'); // date, score, format
   const [filterFormat, setFilterFormat] = useState('all');
   const [filterPuttType, setFilterPuttType] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const GAMES_PER_PAGE = 10;
 
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ['user'],

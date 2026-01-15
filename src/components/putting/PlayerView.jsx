@@ -202,7 +202,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const handleStreakDistanceSelect = (distance) => {
     const newPlayerDistances = { ...game.player_distances };
     newPlayerDistances[playerName] = distance;
-    
+
     updateGameMutation.mutate({
       id: game.id,
       data: {
@@ -210,6 +210,16 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       }
     });
     setStreakDistanceSelected(true);
+  };
+
+  // Handle Finish Training for Streak Challenge
+  const handleFinishTraining = () => {
+    updateGameMutation.mutate({
+      id: game.id,
+      data: {
+        status: 'completed'
+      }
+    });
   };
 
   const handleUndo = () => {
@@ -427,6 +437,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
                currentStreak={currentStreak}
                showDistanceSelector={!streakDistanceSelected && playerPutts.length === 0}
                onDistanceSelect={handleStreakDistanceSelect}
+               onFinishTraining={handleFinishTraining}
              />
          ) : format.singlePuttMode ? (
            <BackAndForthInput

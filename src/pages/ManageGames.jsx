@@ -351,6 +351,77 @@ export default function ManageGames() {
           )}
         </div>
 
+        {/* Completed Games Table */}
+        {completedGames.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-800">Completed Games</h2>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium bg-white hover:border-emerald-300"
+              >
+                <option value="all">All Months</option>
+                {sortedMonths.map((month) => {
+                  const [year, monthNum] = month.split('-');
+                  const monthName = new Date(year, parseInt(monthNum) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                  return <option key={month} value={month}>{monthName}</option>;
+                })}
+              </select>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">Game</th>
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">Date</th>
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">Format</th>
+                    <th className="text-center py-3 px-4 text-slate-600 font-semibold">Players</th>
+                    <th className="text-right py-3 px-4 text-slate-600 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCompletedGames.map((game) => (
+                    <tr key={game.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-3 px-4">
+                        <Link to={`${createPageUrl('GameResult')}?id=${game.id}`} className="text-emerald-600 hover:text-emerald-700 font-medium">
+                          {game.name}
+                        </Link>
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">
+                        {game.date ? format(new Date(game.date), 'MMM d, yyyy') : '-'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">
+                          {getGameTypeName(game.game_type)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center text-slate-700">
+                        {game.players?.length || 0}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <Button
+                          onClick={() => {
+                            if (confirm('Delete this game?')) {
+                              deleteGameMutation.mutate(game.id);
+                            }
+                          }}
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Group Creation Dialog */}
         {showGroupDialog && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">

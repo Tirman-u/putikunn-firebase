@@ -5,6 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trophy, Target, Award } from 'lucide-react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 
 export default function PuttingRecords() {
   const [selectedGameType, setSelectedGameType] = useState('classic');
@@ -137,44 +139,56 @@ export default function PuttingRecords() {
                     </thead>
                     <tbody>
                       {sortedEntries.map((entry, idx) => (
-                        <tr key={entry.id} className={`border-b border-slate-100 ${idx < 3 ? 'bg-amber-50' : 'hover:bg-slate-50'}`}>
+                        <tr key={entry.id} className={`border-b border-slate-100 ${idx < 3 ? 'bg-amber-50' : 'hover:bg-slate-50'} cursor-pointer transition-colors`}>
                           <td className="py-3 px-2">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                              idx === 0 ? 'bg-yellow-400 text-yellow-900' :
-                              idx === 1 ? 'bg-slate-300 text-slate-700' :
-                              idx === 2 ? 'bg-orange-300 text-orange-800' :
-                              'bg-slate-100 text-slate-600'
-                            }`}>
-                              {idx + 1}
-                            </div>
+                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                                idx === 0 ? 'bg-yellow-400 text-yellow-900' :
+                                idx === 1 ? 'bg-slate-300 text-slate-700' :
+                                idx === 2 ? 'bg-orange-300 text-orange-800' :
+                                'bg-slate-100 text-slate-600'
+                              }`}>
+                                {idx + 1}
+                              </div>
+                            </Link>
                           </td>
                           <td className="py-3 px-2 font-medium text-slate-700">
-                            <div className="flex items-center gap-2">
-                              <span>{entry.player_name}</span>
-                              {entry.player_gender && (
-                                <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-                                  {entry.player_gender}
-                                </span>
-                              )}
-                              {(entry.leaderboard_type === 'discgolf_ee' || hasDiscgolfEntry(entry)) && (
-                                <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
-                                  <Award className="w-3 h-3" />
-                                  DG.ee
-                                </span>
-                              )}
-                            </div>
+                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                              <div className="flex items-center gap-2">
+                                <span>{entry.player_name}</span>
+                                {entry.player_gender && (
+                                  <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
+                                    {entry.player_gender}
+                                  </span>
+                                )}
+                                {(entry.leaderboard_type === 'discgolf_ee' || hasDiscgolfEntry(entry)) && (
+                                  <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
+                                    <Award className="w-3 h-3" />
+                                    DG.ee
+                                  </span>
+                                )}
+                              </div>
+                            </Link>
                           </td>
                           <td className="py-3 px-2 text-center">
-                            <span className="text-lg font-bold text-emerald-600">{entry.score}</span>
+                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                              <span className="text-lg font-bold text-emerald-600">{entry.score}</span>
+                            </Link>
                           </td>
                           <td className="py-3 px-2 text-center text-slate-700">
-                            {entry.accuracy ? `${entry.accuracy.toFixed(1)}%` : '-'}
+                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                              {entry.accuracy ? `${entry.accuracy.toFixed(1)}%` : '-'}
+                            </Link>
                           </td>
                           <td className="py-3 px-2 text-center text-slate-600">
-                            {entry.made_putts}/{entry.total_putts}
+                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                              {entry.made_putts}/{entry.total_putts}
+                            </Link>
                           </td>
                           <td className="py-3 px-2 text-right text-slate-500 text-xs">
-                            {entry.date ? format(new Date(entry.date), 'MMM d, yyyy') : '-'}
+                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                              {entry.date ? format(new Date(entry.date), 'MMM d, yyyy') : '-'}
+                            </Link>
                           </td>
                         </tr>
                       ))}

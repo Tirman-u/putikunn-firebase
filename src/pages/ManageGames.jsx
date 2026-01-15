@@ -44,6 +44,14 @@ export default function ManageGames() {
     queryFn: () => base44.entities.LeaderboardEntry.list()
   });
 
+  const completeGameMutation = useMutation({
+    mutationFn: (gameId) => base44.entities.Game.update(gameId, { status: 'completed' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-games'] });
+      toast.success('Game marked as completed');
+    }
+  });
+
   const deleteGameMutation = useMutation({
     mutationFn: (gameId) => base44.entities.Game.delete(gameId),
     onSuccess: () => {

@@ -134,7 +134,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const handleBackAndForthPutt = (wasMade) => {
     const gameType = game.game_type || 'classic';
     const format = GAME_FORMATS[gameType];
-    const currentDistance = game.player_distances[playerName];
+    const playerDist = game.player_distances || {};
+    const currentDistance = playerDist[playerName] || format.startDistance;
     const result = wasMade ? 'made' : 'missed';
     const points = wasMade ? currentDistance : 0;
 

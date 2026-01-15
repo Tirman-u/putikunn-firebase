@@ -23,7 +23,6 @@ import {
 
 export default function PlayerView({ gameId, playerName, onExit }) {
   const [showLeaderboard, setShowLeaderboard] = React.useState(false);
-  const [puttType, setPuttType] = React.useState('regular');
   const [hasSubmitted, setHasSubmitted] = React.useState(false);
   const queryClient = useQueryClient();
 

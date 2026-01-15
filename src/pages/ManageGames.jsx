@@ -273,10 +273,9 @@ export default function ManageGames() {
                         }}
                         disabled={submitToDiscgolfMutation.isPending}
                         size="sm"
-                        className="bg-blue-600 hover:bg-blue-700 whitespace-nowrap"
+                        className="bg-blue-600 hover:bg-blue-700 whitespace-nowrap text-xs"
                       >
-                        <Upload className="w-4 h-4 mr-1" />
-                        dg.ee
+                        Submit to dg.ee
                       </Button>
                       <Button
                         onClick={(e) => {

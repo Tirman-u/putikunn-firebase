@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { createPageUrl } from '@/utils';
 import ClassicScoreInput from './ClassicScoreInput';
 import BackAndForthInput from './BackAndForthInput';
+import StreakChallengeInput from './StreakChallengeInput';
 import JylyScoreTable from './JylyScoreTable';
 import ProgressBar from './ProgressBar';
 import MobileLeaderboard from './MobileLeaderboard';
@@ -24,6 +25,7 @@ import {
 export default function PlayerView({ gameId, playerName, onExit }) {
   const [showLeaderboard, setShowLeaderboard] = React.useState(false);
   const [hasSubmitted, setHasSubmitted] = React.useState(false);
+  const [streakDistanceSelected, setStreakDistanceSelected] = React.useState(false);
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -152,12 +154,15 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const newTotalPoints = { ...game.total_points };
     newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) + points;
 
+    // For Streak Challenge, game ends on miss
+    const gameStatus = gameType === 'streak_challenge' && !wasMade ? 'completed' : 'active';
+
     // Calculate next distance based on format
     let nextDistance;
     if (gameType === 'back_and_forth') {
       nextDistance = getNextDistanceBackAndForth(currentDistance, wasMade);
     } else if (gameType === 'streak_challenge') {
-      nextDistance = format.startDistance; // Always same distance for streak
+      nextDistance = currentDistance; // Same distance for streak
     } else {
       nextDistance = currentDistance;
     }
@@ -170,9 +175,24 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       data: {
         player_putts: allPlayerPutts,
         total_points: newTotalPoints,
+        player_distances: newPlayerDistances,
+        status: gameStatus
+      }
+    });
+  };
+
+  // Handle Streak Challenge distance selection
+  const handleStreakDistanceSelect = (distance) => {
+    const newPlayerDistances = { ...game.player_distances };
+    newPlayerDistances[playerName] = distance;
+    
+    updateGameMutation.mutate({
+      id: game.id,
+      data: {
         player_distances: newPlayerDistances
       }
     });
+    setStreakDistanceSelected(true);
   };
 
   const handleUndo = () => {

@@ -556,7 +556,7 @@ export default function Profile() {
           <div className="flex items-center justify-between mb-4">
              <h3 className="text-lg font-bold text-slate-800">Game History</h3>
              <div className="flex flex-wrap gap-2">
-               <Select value={filterFormat} onValueChange={setFilterFormat}>
+               <Select value={filterFormat} onValueChange={() => { setFilterFormat(arguments[0]); setCurrentPage(1); }}>
                  <SelectTrigger className="w-32">
                    <SelectValue />
                  </SelectTrigger>
@@ -566,9 +566,11 @@ export default function Profile() {
                    <SelectItem value="short">Short</SelectItem>
                    <SelectItem value="long">Long</SelectItem>
                    <SelectItem value="back_and_forth">Back & Forth</SelectItem>
+                   <SelectItem value="streak_challenge">Streak</SelectItem>
+                   <SelectItem value="random_distance">Random</SelectItem>
                  </SelectContent>
                </Select>
-               <Select value={filterPuttType} onValueChange={setFilterPuttType}>
+               <Select value={filterPuttType} onValueChange={() => { setFilterPuttType(arguments[0]); setCurrentPage(1); }}>
                  <SelectTrigger className="w-32">
                    <SelectValue />
                  </SelectTrigger>
@@ -595,67 +597,107 @@ export default function Profile() {
           {filteredGames.length === 0 ? (
             <div className="text-center py-8 text-slate-400">No games found</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                   <tr className="border-b border-slate-200">
-                     <th className="text-left py-3 px-2 text-slate-600 font-semibold">Game</th>
-                     <th className="text-left py-3 px-2 text-slate-600 font-semibold">Date</th>
-                     <th className="text-left py-3 px-2 text-slate-600 font-semibold">Format</th>
-                     <th className="text-left py-3 px-2 text-slate-600 font-semibold">Style</th>
-                     <th className="text-right py-3 px-2 text-slate-600 font-semibold">Score</th>
-                     <th className="text-right py-3 px-2 text-slate-600 font-semibold">%</th>
-                     <th className="text-right py-3 px-2 text-slate-600 font-semibold">Putts</th>
-                     <th className="text-center py-3 px-2 text-slate-600 font-semibold"></th>
-                   </tr>
-                 </thead>
-                <tbody>
-                  {filteredGames.map((game) => {
-                    const putts = game.player_putts?.[myName] || [];
-                    const made = putts.filter(p => p.result === 'made').length;
-                    const percentage = putts.length > 0 ? ((made / putts.length) * 100).toFixed(0) : 0;
-                    const score = game.total_points?.[myName] || 0;
-                    const gameFormat = GAME_FORMATS[game.game_type || 'classic'];
-                    
-                    return (
-                      <tr key={game.id} className="border-b border-slate-100 hover:bg-slate-50">
-                         <td className="py-3 px-2 font-medium text-slate-700">{game.name}</td>
-                         <td className="py-3 px-2 text-slate-700">
-                           {game.date ? format(new Date(game.date), 'MMM d, yyyy') : '-'}
-                         </td>
-                         <td className="py-3 px-2">
-                           <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">
-                             {gameFormat.name}
-                           </span>
-                         </td>
-                         <td className="py-3 px-2">
-                           <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                             {game.putt_type === 'regular' ? 'Regular' : game.putt_type === 'straddle' ? 'Straddle' : 'Turbo'}
-                           </span>
-                         </td>
-                         <td className="py-3 px-2 text-right font-bold text-emerald-600">
-                           {score}
-                         </td>
-                         <td className="py-3 px-2 text-right text-slate-700">
-                           {percentage}%
-                         </td>
-                         <td className="py-3 px-2 text-right text-slate-500">
-                           {made}/{putts.length}
-                         </td>
-                         <td className="py-3 px-2 text-center">
-                           <Link
-                             to={`${createPageUrl('GameResult')}?id=${game.id}`}
-                             className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
-                           >
-                             <ExternalLink className="w-4 h-4" />
-                           </Link>
-                         </td>
-                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                     <tr className="border-b border-slate-200">
+                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Game</th>
+                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Date</th>
+                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Format</th>
+                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Style</th>
+                       <th className="text-right py-3 px-2 text-slate-600 font-semibold">Score</th>
+                       <th className="text-right py-3 px-2 text-slate-600 font-semibold">%</th>
+                       <th className="text-right py-3 px-2 text-slate-600 font-semibold">Putts</th>
+                       <th className="text-center py-3 px-2 text-slate-600 font-semibold"></th>
+                     </tr>
+                   </thead>
+                  <tbody>
+                    {filteredGames.slice((currentPage - 1) * GAMES_PER_PAGE, currentPage * GAMES_PER_PAGE).map((game) => {
+                      const putts = game.player_putts?.[myName] || [];
+                      const made = putts.filter(p => p.result === 'made').length;
+                      const percentage = putts.length > 0 ? ((made / putts.length) * 100).toFixed(0) : 0;
+                      const score = game.total_points?.[myName] || 0;
+                      const gameFormat = GAME_FORMATS[game.game_type || 'classic'];
+
+                      return (
+                        <tr key={game.id} className="border-b border-slate-100 hover:bg-slate-50">
+                           <td className="py-3 px-2 font-medium text-slate-700">{game.name}</td>
+                           <td className="py-3 px-2 text-slate-700">
+                             {game.date ? format(new Date(game.date), 'MMM d, yyyy') : '-'}
+                           </td>
+                           <td className="py-3 px-2">
+                             <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">
+                               {gameFormat.name}
+                             </span>
+                           </td>
+                           <td className="py-3 px-2">
+                             <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                               {game.putt_type === 'regular' ? 'Regular' : game.putt_type === 'straddle' ? 'Straddle' : 'Turbo'}
+                             </span>
+                           </td>
+                           <td className="py-3 px-2 text-right font-bold text-emerald-600">
+                             {score}
+                           </td>
+                           <td className="py-3 px-2 text-right text-slate-700">
+                             {percentage}%
+                           </td>
+                           <td className="py-3 px-2 text-right text-slate-500">
+                             {made}/{putts.length}
+                           </td>
+                           <td className="py-3 px-2 text-center">
+                             <Link
+                               to={`${createPageUrl('GameResult')}?id=${game.id}`}
+                               className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
+                             >
+                               <ExternalLink className="w-4 h-4" />
+                             </Link>
+                           </td>
+                         </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
+                <div className="text-sm text-slate-500">
+                  Showing {Math.min((currentPage - 1) * GAMES_PER_PAGE + 1, filteredGames.length)} - {Math.min(currentPage * GAMES_PER_PAGE, filteredGames.length)} of {filteredGames.length} games
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.ceil(filteredGames.length / GAMES_PER_PAGE) }).map((_, i) => (
+                      <Button
+                        key={i + 1}
+                        onClick={() => setCurrentPage(i + 1)}
+                        variant={currentPage === i + 1 ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                      >
+                        {i + 1}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    onClick={() => setCurrentPage(Math.min(Math.ceil(filteredGames.length / GAMES_PER_PAGE), currentPage + 1))}
+                    disabled={currentPage === Math.ceil(filteredGames.length / GAMES_PER_PAGE)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </div>
 

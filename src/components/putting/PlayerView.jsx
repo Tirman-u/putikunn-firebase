@@ -432,7 +432,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
              onSubmit={handleClassicSubmit}
              canUndo={canUndo}
              onUndo={handleUndo}
-             distanceMap={format.distanceMap}
+             distanceMap={format.distanceMap || {}}
            />
          )}
       </div>

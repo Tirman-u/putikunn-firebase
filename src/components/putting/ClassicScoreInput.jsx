@@ -69,7 +69,7 @@ export default function ClassicScoreInput({
                 {potentialPoints} pts
               </div>
               <div className="text-[10px] text-slate-400">
-                → {nextDistance}m
+                → {nextDistance ? `${nextDistance}m` : '?m'}
               </div>
             </button>
           );

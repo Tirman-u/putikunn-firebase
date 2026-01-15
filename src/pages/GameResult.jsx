@@ -7,18 +7,15 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format as formatDate } from 'date-fns';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import { toast } from 'sonner';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+
 
 export default function GameResult() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const gameId = searchParams.get('id');
   const queryClient = useQueryClient();
-  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-  const [showDiscgolfDialog, setShowDiscgolfDialog] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState('');
-  const [selectedGender, setSelectedGender] = useState('M');
+
 
   const { data: user } = useQuery({
     queryKey: ['current-user'],
@@ -48,58 +45,151 @@ export default function GameResult() {
   });
 
   const submitToLeaderboardMutation = useMutation({
-    mutationFn: async (playerName) => {
+    mutationFn: async () => {
+      // Find current user's name in the game
+      const playerName = user?.full_name;
       const playerPutts = game.player_putts?.[playerName] || [];
       const madePutts = playerPutts.filter(p => p.result === 'made').length;
       const totalPutts = playerPutts.length;
       const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+      const score = game.total_points[playerName] || 0;
 
-      return await base44.entities.LeaderboardEntry.create({
-        game_id: game.id,
-        player_email: user?.email || 'unknown',
-        player_name: playerName,
+      // Check if player already has an entry for this game type
+      const existingEntries = await base44.entities.LeaderboardEntry.filter({
+        player_email: user?.email,
         game_type: game.game_type,
-        score: game.total_points[playerName] || 0,
-        accuracy: Math.round(accuracy * 10) / 10,
-        made_putts: madePutts,
-        total_putts: totalPutts,
-        leaderboard_type: 'general',
-        player_gender: user?.gender || 'M',
-        date: new Date(game.date).toISOString()
+        leaderboard_type: 'general'
       });
+
+      const existingEntry = existingEntries.length > 0 ? existingEntries[0] : null;
+
+      if (existingEntry) {
+        // Only update if new score is better
+        if (score > existingEntry.score) {
+          await base44.entities.LeaderboardEntry.update(existingEntry.id, {
+            game_id: game.id,
+            score: score,
+            accuracy: Math.round(accuracy * 10) / 10,
+            made_putts: madePutts,
+            total_putts: totalPutts,
+            date: new Date(game.date).toISOString()
+          });
+          return { updated: true };
+        } else {
+          return { updated: false, existing: existingEntry.score };
+        }
+      } else {
+        // Create new entry
+        await base44.entities.LeaderboardEntry.create({
+          game_id: game.id,
+          player_email: user?.email || 'unknown',
+          player_name: playerName,
+          game_type: game.game_type,
+          score: score,
+          accuracy: Math.round(accuracy * 10) / 10,
+          made_putts: madePutts,
+          total_putts: totalPutts,
+          leaderboard_type: 'general',
+          player_gender: user?.gender || 'M',
+          date: new Date(game.date).toISOString()
+        });
+        return { updated: true };
+      }
     },
-    onSuccess: () => {
-      toast.success('Result submitted to leaderboard!');
+    onSuccess: (result) => {
+      if (result.updated) {
+        toast.success('Result submitted to leaderboard!');
+      } else {
+        toast.info(`Your best score (${result.existing}) is higher than this game`);
+      }
       setShowSubmitDialog(false);
     }
   });
 
   const submitToDiscgolfMutation = useMutation({
-    mutationFn: async ({ playerName, gender }) => {
-      const playerPutts = game.player_putts?.[playerName] || [];
-      const madePutts = playerPutts.filter(p => p.result === 'made').length;
-      const totalPutts = playerPutts.length;
-      const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+    mutationFn: async () => {
+      const results = [];
+      
+      for (const playerName of game.players || []) {
+        const playerPutts = game.player_putts?.[playerName] || [];
+        const madePutts = playerPutts.filter(p => p.result === 'made').length;
+        const totalPutts = playerPutts.length;
+        const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+        const score = game.total_points?.[playerName] || 0;
 
-      return await base44.entities.LeaderboardEntry.create({
-        game_id: game.id,
-        player_email: user?.email,
-        player_name: playerName,
-        game_type: game.game_type,
-        score: game.total_points[playerName] || 0,
-        accuracy: Math.round(accuracy * 10) / 10,
-        made_putts: madePutts,
-        total_putts: totalPutts,
-        leaderboard_type: 'discgolf_ee',
-        submitted_by: user?.email,
-        player_gender: gender,
-        date: new Date(game.date).toISOString()
-      });
+        // Check if player already has an entry
+        const existingEntries = await base44.entities.LeaderboardEntry.filter({
+          player_name: playerName,
+          game_type: game.game_type,
+          leaderboard_type: 'discgolf_ee'
+        });
+
+        const existingEntry = existingEntries.length > 0 ? existingEntries[0] : null;
+
+        if (existingEntry) {
+          // Update only if new score is better
+          if (score > existingEntry.score) {
+            await base44.entities.LeaderboardEntry.update(existingEntry.id, {
+              game_id: game.id,
+              score: score,
+              accuracy: Math.round(accuracy * 10) / 10,
+              made_putts: madePutts,
+              total_putts: totalPutts,
+              submitted_by: user?.email,
+              date: new Date(game.date).toISOString()
+            });
+            results.push({ player: playerName, action: 'updated' });
+          } else {
+            results.push({ player: playerName, action: 'skipped' });
+          }
+        } else {
+          // Create new entry
+          await base44.entities.LeaderboardEntry.create({
+            game_id: game.id,
+            player_email: user?.email,
+            player_name: playerName,
+            game_type: game.game_type,
+            score: score,
+            accuracy: Math.round(accuracy * 10) / 10,
+            made_putts: madePutts,
+            total_putts: totalPutts,
+            leaderboard_type: 'discgolf_ee',
+            submitted_by: user?.email,
+            player_gender: 'M',
+            date: new Date(game.date).toISOString()
+          });
+          results.push({ player: playerName, action: 'created' });
+        }
+
+        // Also submit to general leaderboard (always create new)
+        await base44.entities.LeaderboardEntry.create({
+          game_id: game.id,
+          player_email: user?.email,
+          player_name: playerName,
+          game_type: game.game_type,
+          score: score,
+          accuracy: Math.round(accuracy * 10) / 10,
+          made_putts: madePutts,
+          total_putts: totalPutts,
+          leaderboard_type: 'general',
+          player_gender: 'M',
+          date: new Date(game.date).toISOString()
+        });
+      }
+
+      return results;
     },
-    onSuccess: () => {
-      toast.success('Result submitted to Discgolf.ee table!');
+    onSuccess: (results) => {
+      const updated = results.filter(r => r.action === 'updated').length;
+      const created = results.filter(r => r.action === 'created').length;
+      const skipped = results.filter(r => r.action === 'skipped').length;
+      
+      let message = 'Submitted to Discgolf.ee & General leaderboards';
+      if (updated > 0 || skipped > 0) {
+        message += ` (${created} new, ${updated} updated, ${skipped} skipped)`;
+      }
+      toast.success(message);
       setShowDiscgolfDialog(false);
-      setSelectedPlayer('');
     }
   });
 
@@ -230,12 +320,20 @@ export default function GameResult() {
               </Button>
             </div>
             <div className="flex gap-3">
-              <Button onClick={() => setShowSubmitDialog(true)} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+              <Button 
+                onClick={() => submitToLeaderboardMutation.mutate()}
+                disabled={submitToLeaderboardMutation.isPending}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              >
                 <Upload className="w-4 h-4 mr-2" />
                 Submit to Leaderboard
               </Button>
               {canSubmitDiscgolf && (
-                <Button onClick={() => setShowDiscgolfDialog(true)} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                <Button 
+                  onClick={() => submitToDiscgolfMutation.mutate()}
+                  disabled={submitToDiscgolfMutation.isPending}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                >
                   <Upload className="w-4 h-4 mr-2" />
                   Submit to Discgolf.ee
                 </Button>
@@ -381,86 +479,7 @@ export default function GameResult() {
           </div>
         )}
 
-        {/* Submit to Leaderboard Dialog */}
-        <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Submit to Leaderboard</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">Select a player to submit their result to the public leaderboard:</p>
-              <Select value={selectedPlayer} onValueChange={setSelectedPlayer}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select player" />
-                </SelectTrigger>
-                <SelectContent>
-                  {playerStats.map(player => (
-                    <SelectItem key={player.name} value={player.name}>
-                      {player.name} - {player.totalPoints} pts ({player.puttingPercentage}%)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex gap-3">
-                <Button 
-                  onClick={() => submitToLeaderboardMutation.mutate(selectedPlayer)}
-                  disabled={!selectedPlayer || submitToLeaderboardMutation.isPending}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                >
-                  Submit
-                </Button>
-                <Button onClick={() => setShowSubmitDialog(false)} variant="outline" className="flex-1">
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
 
-        {/* Submit to Discgolf.ee Dialog */}
-        <Dialog open={showDiscgolfDialog} onOpenChange={setShowDiscgolfDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Submit to Discgolf.ee</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">Select a player to submit their result to the Discgolf.ee training table:</p>
-              <Select value={selectedPlayer} onValueChange={setSelectedPlayer}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select player" />
-                </SelectTrigger>
-                <SelectContent>
-                  {playerStats.map(player => (
-                    <SelectItem key={player.name} value={player.name}>
-                      {player.name} - {player.totalPoints} pts ({player.puttingPercentage}%)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedGender} onValueChange={setSelectedGender}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="M">Male</SelectItem>
-                  <SelectItem value="N">Female</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="flex gap-3">
-                <Button 
-                  onClick={() => submitToDiscgolfMutation.mutate({ playerName: selectedPlayer, gender: selectedGender })}
-                  disabled={!selectedPlayer || submitToDiscgolfMutation.isPending}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                >
-                  Submit
-                </Button>
-                <Button onClick={() => setShowDiscgolfDialog(false)} variant="outline" className="flex-1">
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </div>
   );

@@ -18,9 +18,10 @@ export default function PuttingKingSetup() {
   const [bustReset, setBustReset] = useState(11);
   const [totalRounds, setTotalRounds] = useState(6);
   const [distances, setDistances] = useState([
-    { id: 'd1', label: '5m', points: 1, enabled: true, order: 1 },
-    { id: 'd2', label: '7m', points: 2, enabled: true, order: 2 },
-    { id: 'd3', label: '9m', points: 3, enabled: true, order: 3 }
+    { id: 'd1', label: '5m', points_for_made: 1, points_for_missed: 0, enabled: true, order: 1 },
+    { id: 'd2', label: '7m', points_for_made: 2, points_for_missed: -1, enabled: true, order: 2 },
+    { id: 'd3', label: '9m', points_for_made: 3, points_for_missed: -2, enabled: true, order: 3 },
+    { id: 'd4', label: '11m', points_for_made: 5, points_for_missed: -3, enabled: true, order: 4 }
   ]);
   const [stations, setStations] = useState([
     { name: 'Basket 1', order: 1 },
@@ -157,8 +158,9 @@ export default function PuttingKingSetup() {
   const addDistance = () => {
     setDistances([...distances, {
       id: `d${Date.now()}`,
-      label: `${distances.length + 3}m`,
-      points: distances.length + 1,
+      label: `${distances.length + 5}m`,
+      points_for_made: distances.length + 1,
+      points_for_missed: 0,
       enabled: true,
       order: distances.length + 1
     }]);
@@ -248,7 +250,7 @@ export default function PuttingKingSetup() {
             </div>
             <div className="space-y-3">
               {distances.map((dist, idx) => (
-                <div key={dist.id} className="flex items-center gap-3">
+                <div key={dist.id} className="flex items-center gap-2">
                   <Input
                     value={dist.label}
                     onChange={(e) => {
@@ -259,17 +261,32 @@ export default function PuttingKingSetup() {
                     placeholder="Distance"
                     className="flex-1"
                   />
-                  <Input
-                    type="number"
-                    value={dist.points}
-                    onChange={(e) => {
-                      const newDist = [...distances];
-                      newDist[idx].points = Number(e.target.value);
-                      setDistances(newDist);
-                    }}
-                    placeholder="Points"
-                    className="w-24"
-                  />
+                  <div className="flex flex-col gap-1">
+                    <Input
+                      type="number"
+                      value={dist.points_for_made || dist.points || 0}
+                      onChange={(e) => {
+                        const newDist = [...distances];
+                        newDist[idx].points_for_made = Number(e.target.value);
+                        setDistances(newDist);
+                      }}
+                      placeholder="Made"
+                      className="w-16 text-xs h-7"
+                      title="Points for made putt"
+                    />
+                    <Input
+                      type="number"
+                      value={dist.points_for_missed !== undefined ? dist.points_for_missed : 0}
+                      onChange={(e) => {
+                        const newDist = [...distances];
+                        newDist[idx].points_for_missed = Number(e.target.value);
+                        setDistances(newDist);
+                      }}
+                      placeholder="Miss"
+                      className="w-16 text-xs h-7"
+                      title="Points for missed putt"
+                    />
+                  </div>
                   <Button
                     onClick={() => setDistances(distances.filter((_, i) => i !== idx))}
                     size="sm"

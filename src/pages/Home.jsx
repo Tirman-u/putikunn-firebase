@@ -24,7 +24,7 @@ export default function Home() {
 
   const userRole = user?.app_role || 'user';
   const canHostGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
-  const canManageGames = ['admin', 'super_admin'].includes(userRole);
+  const canManageGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
   const canAccessPuttingKing = ['admin', 'super_admin'].includes(userRole);
 
 

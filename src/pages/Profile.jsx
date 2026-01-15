@@ -383,16 +383,19 @@ export default function Profile() {
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
-                { key: 'classic', label: 'Classic' },
-                { key: 'short', label: 'Short' },
-                { key: 'long', label: 'Long' },
-                { key: 'back_and_forth', label: 'Back & Forth' },
-                { key: 'streak_challenge', label: 'Streak' },
-                { key: 'random_distance', label: 'Random' }
+                { key: 'classic', label: 'Classic', unit: 'pts' },
+                { key: 'short', label: 'Short', unit: 'pts' },
+                { key: 'long', label: 'Long', unit: 'pts' },
+                { key: 'back_and_forth', label: 'Back & Forth', unit: 'pts' },
+                { key: 'streak_challenge', label: 'Streak', unit: 'putts' },
+                { key: 'random_distance', label: 'Random', unit: 'pts' }
               ].map((format) => (
                 <div key={format.key} className="p-3 bg-gradient-to-br from-amber-50 to-emerald-50 rounded-xl border border-amber-100">
                   <div className="text-xs font-semibold text-slate-600 mb-1">{format.label}</div>
-                  <div className="text-2xl font-bold text-emerald-600">{gameFormatStats[format.key]}</div>
+                  <div className="text-2xl font-bold text-emerald-600">
+                    {gameFormatStats[format.key]}
+                    <span className="text-xs ml-1 text-slate-500">{format.unit}</span>
+                  </div>
                 </div>
               ))}
             </div>

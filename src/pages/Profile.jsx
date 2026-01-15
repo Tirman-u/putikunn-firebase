@@ -328,36 +328,61 @@ export default function Profile() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-2">
-              <Trophy className="w-5 h-5 text-emerald-600" />
-              <span className="text-sm text-slate-500">Games</span>
-            </div>
-            <div className="text-2xl font-bold text-slate-800">{totalGames}</div>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-2">
-              <Target className="w-5 h-5 text-emerald-600" />
-              <span className="text-sm text-slate-500">Accuracy</span>
-            </div>
-            <div className="text-2xl font-bold text-slate-800">{puttingPercentage}%</div>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
-              <span className="text-sm text-slate-500">Avg Score</span>
-            </div>
-            <div className="text-2xl font-bold text-slate-800">{avgScore}</div>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-2">
-              <Trophy className="w-5 h-5 text-amber-500" />
-              <span className="text-sm text-slate-500">Best Score</span>
-            </div>
-            <div className="text-2xl font-bold text-slate-800">{bestScore}</div>
-          </div>
-        </div>
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+           <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+             <div className="flex items-center gap-2 mb-2">
+               <Trophy className="w-5 h-5 text-emerald-600" />
+               <span className="text-sm text-slate-500">Games</span>
+             </div>
+             <div className="text-2xl font-bold text-slate-800">{totalGames}</div>
+           </div>
+           <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+             <div className="flex items-center gap-2 mb-2">
+               <Target className="w-5 h-5 text-emerald-600" />
+               <span className="text-sm text-slate-500">Accuracy</span>
+             </div>
+             <div className="text-2xl font-bold text-slate-800">{puttingPercentage}%</div>
+           </div>
+           <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+             <div className="flex items-center gap-2 mb-2">
+               <TrendingUp className="w-5 h-5 text-emerald-600" />
+               <span className="text-sm text-slate-500">Avg Score</span>
+             </div>
+             <div className="text-2xl font-bold text-slate-800">{avgScore}</div>
+           </div>
+           <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+             <div className="flex items-center gap-2 mb-2">
+               <Trophy className="w-5 h-5 text-amber-500" />
+               <span className="text-sm text-slate-500">Best Score</span>
+             </div>
+             <div className="text-2xl font-bold text-slate-800">{bestScore}</div>
+           </div>
+         </div>
+
+         {/* Putt Style Performance */}
+         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+           <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+             <Target className="w-5 h-5" />
+             Putt Style Performance
+           </h2>
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             {['regular', 'straddle', 'turbo'].map((style) => {
+               const stats = puttTypeStats[style];
+               const accuracy = stats.total > 0 ? ((stats.made / stats.total) * 100).toFixed(1) : 0;
+               const styleName = style === 'regular' ? 'Regular' : style === 'straddle' ? 'Straddle' : 'Turbo';
+               return (
+                 <div key={style} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                   <div className="text-sm font-semibold text-slate-700 mb-2">{styleName}</div>
+                   <div className="text-2xl font-bold text-emerald-600 mb-1">{stats.score}</div>
+                   <div className="text-xs text-slate-500 mb-2">Best: {stats.count} games</div>
+                   <div className="text-xs text-slate-600">
+                     {stats.total > 0 ? `${accuracy}% (${stats.made}/${stats.total})` : 'No games'}
+                   </div>
+                 </div>
+               );
+             })}
+           </div>
+         </div>
 
         {/* Performance Analysis */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">

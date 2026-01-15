@@ -291,7 +291,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
               </Button>
             )}
             <Button
-              onClick={() => setShowLeaderboard(true)}
+              onClick={() => window.location.href = createPageUrl('PuttingRecordsPage')}
               className="w-full h-14 bg-slate-600 hover:bg-slate-700 rounded-xl"
             >
               <Trophy className="w-5 h-5 mr-2" />

@@ -181,6 +181,27 @@ export default function ManageGames() {
     );
   };
 
+  const completedGames = games.filter(g => g.status === 'completed');
+  const activeGames = games.filter(g => g.status !== 'completed');
+
+  const getMonthKey = (date) => {
+    const d = new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const groupedByMonth = completedGames.reduce((acc, game) => {
+    const monthKey = getMonthKey(game.date);
+    if (!acc[monthKey]) acc[monthKey] = [];
+    acc[monthKey].push(game);
+    return acc;
+  }, {});
+
+  const sortedMonths = Object.keys(groupedByMonth).sort().reverse();
+  
+  const filteredCompletedGames = selectedMonth === 'all' 
+    ? completedGames 
+    : groupedByMonth[selectedMonth] || [];
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <div className="max-w-4xl mx-auto p-4">

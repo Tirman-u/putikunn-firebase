@@ -50,6 +50,13 @@ export default function ManageGames() {
     }
   });
 
+  const deleteGroupMutation = useMutation({
+    mutationFn: (groupId) => base44.entities.GameGroup.delete(groupId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['game-groups'] });
+    }
+  });
+
   const createGroupMutation = useMutation({
     mutationFn: (groupData) => base44.entities.GameGroup.create(groupData),
     onSuccess: () => {

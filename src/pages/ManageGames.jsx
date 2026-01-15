@@ -277,17 +277,19 @@ export default function ManageGames() {
                       </div>
                     </Link>
                     <div className="flex flex-col gap-2">
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          submitToDiscgolfMutation.mutate(game);
-                        }}
-                        disabled={submitToDiscgolfMutation.isPending || isGameSubmittedToDgEe(game.id)}
-                        size="sm"
-                        className={isGameSubmittedToDgEe(game.id) ? "bg-slate-400 whitespace-nowrap text-xs" : "bg-blue-600 hover:bg-blue-700 whitespace-nowrap text-xs"}
-                      >
-                        {isGameSubmittedToDgEe(game.id) ? 'Submitted' : 'Submit to dg.ee'}
-                      </Button>
+                      {game.pin !== '0000' && (
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            submitToDiscgolfMutation.mutate(game);
+                          }}
+                          disabled={submitToDiscgolfMutation.isPending || isGameSubmittedToDgEe(game.id)}
+                          size="sm"
+                          className={isGameSubmittedToDgEe(game.id) ? "bg-slate-400 whitespace-nowrap text-xs" : "bg-blue-600 hover:bg-blue-700 whitespace-nowrap text-xs"}
+                        >
+                          {isGameSubmittedToDgEe(game.id) ? 'Submitted' : 'Submit to dg.ee'}
+                        </Button>
+                      )}
                       <Button
                         onClick={(e) => {
                           e.stopPropagation();

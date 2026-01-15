@@ -13,7 +13,8 @@ export default function StreakChallengeInput({
   onUndo,
   currentStreak = 0,
   showDistanceSelector = false,
-  onDistanceSelect
+  onDistanceSelect,
+  onFinishTraining
 }) {
   const [selectedDistance, setSelectedDistance] = useState(currentDistance || 8);
   const [confirmed, setConfirmed] = useState(!showDistanceSelector);
@@ -98,6 +99,16 @@ export default function StreakChallengeInput({
           Undo Last Putt
         </Button>
       )}
-    </div>
-  );
-}
+
+      {/* Finish Training Button */}
+      {canUndo && (
+        <Button
+          onClick={onFinishTraining}
+          className="w-full h-12 bg-slate-600 hover:bg-slate-700 rounded-xl font-semibold"
+        >
+          Finish Training
+        </Button>
+      )}
+      </div>
+      );
+      }

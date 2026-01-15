@@ -354,10 +354,10 @@ export default function AchievementsList({ achievements }) {
             </div>
             <div>
               <div className="font-bold text-slate-800">
-                {achievement.unlocked ? achievement.name : '???'}
+                {achievement.name}
               </div>
               <div className="text-sm text-slate-600">
-                {achievement.unlocked ? achievement.description : 'Locked'}
+                {achievement.description}
               </div>
             </div>
           </div>

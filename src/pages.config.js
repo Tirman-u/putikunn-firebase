@@ -8,6 +8,7 @@ import PuttingKingOverview from './pages/PuttingKingOverview';
 import PuttingKingScoring from './pages/PuttingKingScoring';
 import PuttingKingSetup from './pages/PuttingKingSetup';
 import AdminUsers from './pages/AdminUsers';
+import PuttingRecordsPage from './pages/PuttingRecordsPage';
 
 
 export const PAGES = {
@@ -21,6 +22,7 @@ export const PAGES = {
     "PuttingKingScoring": PuttingKingScoring,
     "PuttingKingSetup": PuttingKingSetup,
     "AdminUsers": AdminUsers,
+    "PuttingRecordsPage": PuttingRecordsPage,
 }
 
 export const pagesConfig = {

@@ -11,7 +11,6 @@ import JoinGame from '@/components/putting/JoinGame';
 import HostView from '@/components/putting/HostView';
 import PlayerView from '@/components/putting/PlayerView';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
-import PuttingRecords from '@/components/leaderboard/PuttingRecords';
 
 export default function Home() {
   const [mode, setMode] = useState(null); // null, 'host', 'player'
@@ -61,16 +60,11 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
         <div className="max-w-lg mx-auto pt-16">
-          <div className="text-center mb-8">
+          <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-slate-800 mb-2">
               Welcome {user?.full_name || 'Guest'}!
             </h1>
-            <p className="text-slate-600 text-xl mb-6">Ready to make some putts?</p>
-          </div>
-
-          {/* Putting Records Section */}
-          <div className="mb-8">
-            <PuttingRecords />
+            <p className="text-slate-600 text-xl mb-8">Ready to make some putts?</p>
           </div>
 
           <div className="space-y-4">
@@ -117,6 +111,21 @@ export default function Home() {
                 <div className="text-left flex-1">
                   <h3 className="text-lg font-bold text-slate-800">Solo Practice</h3>
                   <p className="text-sm text-slate-500">Practice alone without hosting</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => window.location.href = createPageUrl('PuttingRecordsPage')}
+              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-amber-400 hover:shadow-lg transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center group-hover:bg-amber-200 transition-colors">
+                  <Trophy className="w-7 h-7 text-amber-600" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-lg font-bold text-slate-800">Putting Records</h3>
+                  <p className="text-sm text-slate-500">View leaderboards and top scores</p>
                 </div>
               </div>
             </button>

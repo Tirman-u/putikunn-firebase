@@ -375,30 +375,53 @@ export default function Profile() {
            </div>
          </div>
 
+         {/* Game Format Best Scores */}
+         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500" />
+              Best Scores by Format
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {[
+                { key: 'classic', label: 'Classic' },
+                { key: 'short', label: 'Short' },
+                { key: 'long', label: 'Long' },
+                { key: 'back_and_forth', label: 'Back & Forth' },
+                { key: 'streak_challenge', label: 'Streak' },
+                { key: 'random_distance', label: 'Random' }
+              ].map((format) => (
+                <div key={format.key} className="p-3 bg-gradient-to-br from-amber-50 to-emerald-50 rounded-xl border border-amber-100">
+                  <div className="text-xs font-semibold text-slate-600 mb-1">{format.label}</div>
+                  <div className="text-2xl font-bold text-emerald-600">{gameFormatStats[format.key]}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
          {/* Putt Style Performance */}
          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
-           <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-             <Target className="w-5 h-5" />
-             Putt Style Performance
-           </h2>
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-             {['regular', 'straddle', 'turbo'].map((style) => {
-               const stats = puttTypeStats[style];
-               const accuracy = stats.total > 0 ? ((stats.made / stats.total) * 100).toFixed(1) : 0;
-               const styleName = style === 'regular' ? 'Regular' : style === 'straddle' ? 'Straddle' : 'Turbo';
-               return (
-                 <div key={style} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                   <div className="text-sm font-semibold text-slate-700 mb-2">{styleName}</div>
-                   <div className="text-2xl font-bold text-emerald-600 mb-1">{stats.score}</div>
-                   <div className="text-xs text-slate-500 mb-2">Best: {stats.count} games</div>
-                   <div className="text-xs text-slate-600">
-                     {stats.total > 0 ? `${accuracy}% (${stats.made}/${stats.total})` : 'No games'}
-                   </div>
-                 </div>
-               );
-             })}
-           </div>
-         </div>
+            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <Target className="w-5 h-5" />
+              Putt Style Performance
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {['regular', 'straddle', 'turbo'].map((style) => {
+                const stats = puttTypeStats[style];
+                const accuracy = stats.total > 0 ? ((stats.made / stats.total) * 100).toFixed(1) : 0;
+                const styleName = style === 'regular' ? 'Regular' : style === 'straddle' ? 'Straddle' : 'Turbo';
+                return (
+                  <div key={style} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="text-sm font-semibold text-slate-700 mb-2">{styleName}</div>
+                    <div className="text-2xl font-bold text-emerald-600 mb-1">{stats.score}</div>
+                    <div className="text-xs text-slate-500 mb-2">Best: {stats.count} games</div>
+                    <div className="text-xs text-slate-600">
+                      {stats.total > 0 ? `${accuracy}% (${stats.made}/${stats.total})` : 'No games'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
         {/* Performance Analysis */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">

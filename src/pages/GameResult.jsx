@@ -1,17 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trash2, Share2, Calendar, Users, Target } from 'lucide-react';
+import { ArrowLeft, Trash2, Share2, Calendar, Users, Target, Upload } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format as formatDate } from 'date-fns';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
+import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function GameResult() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const gameId = searchParams.get('id');
   const queryClient = useQueryClient();
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+  const [showDiscgolfDialog, setShowDiscgolfDialog] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState('');
+  const [selectedGender, setSelectedGender] = useState('M');
+
+  const { data: user } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: () => base44.auth.me()
+  });
+
+  const userRole = user?.app_role || 'user';
+  const canSubmitDiscgolf = ['trainer', 'admin', 'super_admin'].includes(userRole);
 
   const { data: game, isLoading, error } = useQuery({
     queryKey: ['game', gameId],
@@ -29,6 +44,62 @@ export default function GameResult() {
     mutationFn: (id) => base44.entities.Game.delete(id),
     onSuccess: () => {
       navigate(-1);
+    }
+  });
+
+  const submitToLeaderboardMutation = useMutation({
+    mutationFn: async (playerName) => {
+      const playerPutts = game.player_putts?.[playerName] || [];
+      const madePutts = playerPutts.filter(p => p.result === 'made').length;
+      const totalPutts = playerPutts.length;
+      const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+
+      return await base44.entities.LeaderboardEntry.create({
+        game_id: game.id,
+        player_email: user?.email || 'unknown',
+        player_name: playerName,
+        game_type: game.game_type,
+        score: game.total_points[playerName] || 0,
+        accuracy: Math.round(accuracy * 10) / 10,
+        made_putts: madePutts,
+        total_putts: totalPutts,
+        leaderboard_type: 'general',
+        player_gender: user?.gender || 'M',
+        date: new Date(game.date).toISOString()
+      });
+    },
+    onSuccess: () => {
+      toast.success('Result submitted to leaderboard!');
+      setShowSubmitDialog(false);
+    }
+  });
+
+  const submitToDiscgolfMutation = useMutation({
+    mutationFn: async ({ playerName, gender }) => {
+      const playerPutts = game.player_putts?.[playerName] || [];
+      const madePutts = playerPutts.filter(p => p.result === 'made').length;
+      const totalPutts = playerPutts.length;
+      const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+
+      return await base44.entities.LeaderboardEntry.create({
+        game_id: game.id,
+        player_email: user?.email,
+        player_name: playerName,
+        game_type: game.game_type,
+        score: game.total_points[playerName] || 0,
+        accuracy: Math.round(accuracy * 10) / 10,
+        made_putts: madePutts,
+        total_putts: totalPutts,
+        leaderboard_type: 'discgolf_ee',
+        submitted_by: user?.email,
+        player_gender: gender,
+        date: new Date(game.date).toISOString()
+      });
+    },
+    onSuccess: () => {
+      toast.success('Result submitted to Discgolf.ee table!');
+      setShowDiscgolfDialog(false);
+      setSelectedPlayer('');
     }
   });
 
@@ -147,15 +218,29 @@ export default function GameResult() {
               </div>
             </div>
           </div>
-          <div className="flex gap-3">
-            <Button onClick={handleShare} variant="outline" className="flex-1">
-              <Share2 className="w-4 h-4 mr-2" />
-              Share Results
-            </Button>
-            <Button onClick={handleDelete} variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete
-            </Button>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-3">
+              <Button onClick={handleShare} variant="outline" className="flex-1">
+                <Share2 className="w-4 h-4 mr-2" />
+                Share Results
+              </Button>
+              <Button onClick={handleDelete} variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={() => setShowSubmitDialog(true)} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+                <Upload className="w-4 h-4 mr-2" />
+                Submit to Leaderboard
+              </Button>
+              {canSubmitDiscgolf && (
+                <Button onClick={() => setShowDiscgolfDialog(true)} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Submit to Discgolf.ee
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -295,6 +380,87 @@ export default function GameResult() {
             </div>
           </div>
         )}
+
+        {/* Submit to Leaderboard Dialog */}
+        <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Submit to Leaderboard</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">Select a player to submit their result to the public leaderboard:</p>
+              <Select value={selectedPlayer} onValueChange={setSelectedPlayer}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select player" />
+                </SelectTrigger>
+                <SelectContent>
+                  {playerStats.map(player => (
+                    <SelectItem key={player.name} value={player.name}>
+                      {player.name} - {player.totalPoints} pts ({player.puttingPercentage}%)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-3">
+                <Button 
+                  onClick={() => submitToLeaderboardMutation.mutate(selectedPlayer)}
+                  disabled={!selectedPlayer || submitToLeaderboardMutation.isPending}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                >
+                  Submit
+                </Button>
+                <Button onClick={() => setShowSubmitDialog(false)} variant="outline" className="flex-1">
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Submit to Discgolf.ee Dialog */}
+        <Dialog open={showDiscgolfDialog} onOpenChange={setShowDiscgolfDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Submit to Discgolf.ee</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">Select a player to submit their result to the Discgolf.ee training table:</p>
+              <Select value={selectedPlayer} onValueChange={setSelectedPlayer}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select player" />
+                </SelectTrigger>
+                <SelectContent>
+                  {playerStats.map(player => (
+                    <SelectItem key={player.name} value={player.name}>
+                      {player.name} - {player.totalPoints} pts ({player.puttingPercentage}%)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedGender} onValueChange={setSelectedGender}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="M">Male</SelectItem>
+                  <SelectItem value="N">Female</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex gap-3">
+                <Button 
+                  onClick={() => submitToDiscgolfMutation.mutate({ playerName: selectedPlayer, gender: selectedGender })}
+                  disabled={!selectedPlayer || submitToDiscgolfMutation.isPending}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                >
+                  Submit
+                </Button>
+                <Button onClick={() => setShowDiscgolfDialog(false)} variant="outline" className="flex-1">
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -154,7 +154,7 @@ export default function Profile() {
     : 0;
 
   // Achievements
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = ['admin', 'super_admin'].includes(user?.app_role);
   const achievements = getAchievements({
     totalGames,
     puttingPercentage,

@@ -22,7 +22,7 @@ export default function Home() {
     queryFn: () => base44.auth.me()
   });
 
-  const userRole = user?.role || 'user';
+  const userRole = user?.app_role || 'user';
   const canHostGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
   const canManageGames = ['admin', 'super_admin'].includes(userRole);
   const canAccessPuttingKing = ['admin', 'super_admin'].includes(userRole);

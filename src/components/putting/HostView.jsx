@@ -1,19 +1,117 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Copy, Check, Users } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Users, Upload } from 'lucide-react';
 import JylyScoreTable from './JylyScoreTable';
+import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 
 const MAX_ROUNDS = 20;
 
 export default function HostView({ gameId, onExit }) {
   const [copied, setCopied] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: user } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: () => base44.auth.me()
+  });
 
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],
     queryFn: () => base44.entities.Game.list().then(games => games.find(g => g.id === gameId)),
     refetchInterval: 2000 // Poll every 2 seconds for updates
+  });
+
+  const userRole = user?.app_role || 'user';
+  const canSubmitDiscgolf = ['trainer', 'admin', 'super_admin'].includes(userRole);
+
+  const submitToDiscgolfMutation = useMutation({
+    mutationFn: async () => {
+      const results = [];
+      
+      for (const playerName of game.players || []) {
+        const playerPutts = game.player_putts?.[playerName] || [];
+        const madePutts = playerPutts.filter(p => p.result === 'made').length;
+        const totalPutts = playerPutts.length;
+        const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+        const score = game.total_points?.[playerName] || 0;
+
+        // Check if player already has an entry
+        const existingEntries = await base44.entities.LeaderboardEntry.filter({
+          player_name: playerName,
+          game_type: game.game_type,
+          leaderboard_type: 'discgolf_ee'
+        });
+
+        const existingEntry = existingEntries.length > 0 ? existingEntries[0] : null;
+
+        if (existingEntry) {
+          // Update only if new score is better
+          if (score > existingEntry.score) {
+            await base44.entities.LeaderboardEntry.update(existingEntry.id, {
+              game_id: game.id,
+              score: score,
+              accuracy: Math.round(accuracy * 10) / 10,
+              made_putts: madePutts,
+              total_putts: totalPutts,
+              submitted_by: user?.email,
+              date: new Date(game.date).toISOString()
+            });
+            results.push({ player: playerName, action: 'updated' });
+          } else {
+            results.push({ player: playerName, action: 'skipped' });
+          }
+        } else {
+          // Create new entry
+          await base44.entities.LeaderboardEntry.create({
+            game_id: game.id,
+            player_email: user?.email,
+            player_name: playerName,
+            game_type: game.game_type,
+            score: score,
+            accuracy: Math.round(accuracy * 10) / 10,
+            made_putts: madePutts,
+            total_putts: totalPutts,
+            leaderboard_type: 'discgolf_ee',
+            submitted_by: user?.email,
+            player_gender: 'M',
+            date: new Date(game.date).toISOString()
+          });
+          results.push({ player: playerName, action: 'created' });
+        }
+
+        // Also submit to general leaderboard (always create new)
+        await base44.entities.LeaderboardEntry.create({
+          game_id: game.id,
+          player_email: user?.email,
+          player_name: playerName,
+          game_type: game.game_type,
+          score: score,
+          accuracy: Math.round(accuracy * 10) / 10,
+          made_putts: madePutts,
+          total_putts: totalPutts,
+          leaderboard_type: 'general',
+          player_gender: 'M',
+          date: new Date(game.date).toISOString()
+        });
+      }
+
+      return results;
+    },
+    onSuccess: (results) => {
+      const updated = results.filter(r => r.action === 'updated').length;
+      const created = results.filter(r => r.action === 'created').length;
+      const skipped = results.filter(r => r.action === 'skipped').length;
+      
+      let message = 'Submitted to Discgolf.ee & General leaderboards';
+      if (updated > 0 || skipped > 0) {
+        message += ` (${created} new, ${updated} updated, ${skipped} skipped)`;
+      }
+      toast.success(message);
+    }
   });
 
   const copyPin = () => {
@@ -89,6 +187,23 @@ export default function HostView({ gameId, onExit }) {
           {maxRoundReached && (
             <div className="mt-3 p-3 bg-amber-50 rounded-xl text-center text-amber-700 text-sm font-medium">
               🏁 At least one player has completed all 20 rounds!
+            </div>
+          )}
+          {canSubmitDiscgolf && maxRoundReached && (
+            <div className="mt-3 flex flex-col gap-2">
+              <Button 
+                onClick={() => submitToDiscgolfMutation.mutate()}
+                disabled={submitToDiscgolfMutation.isPending}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Submit to Discgolf.ee
+              </Button>
+              <Link to={`${createPageUrl('GameResult')}?id=${game.id}`}>
+                <Button variant="outline" className="w-full">
+                  View Full Results
+                </Button>
+              </Link>
             </div>
           )}
         </div>

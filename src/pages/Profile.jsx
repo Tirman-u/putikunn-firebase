@@ -32,7 +32,8 @@ export default function Profile() {
     queryFn: async () => {
       const allGames = await base44.entities.Game.list();
       return allGames.filter(g => 
-        g.players?.includes(user?.full_name) || g.host_user === user?.email
+        (g.players?.includes(user?.full_name) || g.host_user === user?.email) &&
+        g.status === 'completed'
       );
     },
     enabled: !!user

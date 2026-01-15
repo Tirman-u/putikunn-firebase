@@ -15,7 +15,7 @@ export default function StreakChallengeInput({
   showDistanceSelector = false,
   onDistanceSelect
 }) {
-  const [selectedDistance, setSelectedDistance] = useState(currentDistance);
+  const [selectedDistance, setSelectedDistance] = useState(currentDistance || 8);
   const [confirmed, setConfirmed] = useState(!showDistanceSelector);
 
   const handleSelectDistance = () => {
@@ -34,8 +34,8 @@ export default function StreakChallengeInput({
           <span className="text-3xl font-bold text-emerald-600">{selectedDistance}m</span>
         </div>
         <Slider
-          value={[selectedDistance]}
-          onValueChange={(value) => setSelectedDistance(value[0])}
+          value={[selectedDistance || 8]}
+          onValueChange={(value) => value && setSelectedDistance(value[0])}
           min={3}
           max={15}
           step={1}

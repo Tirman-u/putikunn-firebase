@@ -575,33 +575,38 @@ export default function Profile() {
                     
                     return (
                       <tr key={game.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="py-3 px-2 font-medium text-slate-700">{game.name}</td>
-                        <td className="py-3 px-2 text-slate-700">
-                          {game.date ? format(new Date(game.date), 'MMM d, yyyy') : '-'}
-                        </td>
-                        <td className="py-3 px-2">
-                          <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">
-                            {gameFormat.name}
-                          </span>
-                        </td>
-                        <td className="py-3 px-2 text-right font-bold text-emerald-600">
-                          {score}
-                        </td>
-                        <td className="py-3 px-2 text-right text-slate-700">
-                          {percentage}%
-                        </td>
-                        <td className="py-3 px-2 text-right text-slate-500">
-                          {made}/{putts.length}
-                        </td>
-                        <td className="py-3 px-2 text-center">
-                          <Link
-                            to={`${createPageUrl('GameResult')}?id=${game.id}`}
-                            className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </Link>
-                        </td>
-                      </tr>
+                         <td className="py-3 px-2 font-medium text-slate-700">{game.name}</td>
+                         <td className="py-3 px-2 text-slate-700">
+                           {game.date ? format(new Date(game.date), 'MMM d, yyyy') : '-'}
+                         </td>
+                         <td className="py-3 px-2">
+                           <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">
+                             {gameFormat.name}
+                           </span>
+                         </td>
+                         <td className="py-3 px-2">
+                           <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                             {game.putt_type === 'regular' ? 'Regular' : game.putt_type === 'straddle' ? 'Straddle' : 'Turbo'}
+                           </span>
+                         </td>
+                         <td className="py-3 px-2 text-right font-bold text-emerald-600">
+                           {score}
+                         </td>
+                         <td className="py-3 px-2 text-right text-slate-700">
+                           {percentage}%
+                         </td>
+                         <td className="py-3 px-2 text-right text-slate-500">
+                           {made}/{putts.length}
+                         </td>
+                         <td className="py-3 px-2 text-center">
+                           <Link
+                             to={`${createPageUrl('GameResult')}?id=${game.id}`}
+                             className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
+                           >
+                             <ExternalLink className="w-4 h-4" />
+                           </Link>
+                         </td>
+                       </tr>
                     );
                   })}
                 </tbody>

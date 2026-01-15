@@ -107,12 +107,9 @@ export default function JoinGame({ onJoin, onBack }) {
           </button>
         </div>
 
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-emerald-200">
-            <span className="text-4xl">🥏</span>
-          </div>
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Join Jyly Game</h1>
-          <p className="text-slate-500">Enter PIN to join the session</p>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">Join Jyly Game</h1>
+          <p className="text-sm text-slate-500">Enter PIN to join the session</p>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">

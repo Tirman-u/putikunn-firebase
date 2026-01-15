@@ -23,7 +23,7 @@ export default function JoinGame({ onJoin, onBack }) {
     queryFn: async () => {
       const allGames = await base44.entities.Game.list();
       const activeGames = allGames
-        .filter(g => g.status !== 'completed')
+        .filter(g => g.status !== 'completed' && g.pin !== null)
         .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
         .slice(0, 10);
       return activeGames;

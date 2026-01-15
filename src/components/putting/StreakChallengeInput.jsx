@@ -79,12 +79,12 @@ export default function StreakChallengeInput({
           Made
         </Button>
         <Button
-          onClick={onMissed}
-          className="w-full h-16 bg-red-600 hover:bg-red-700 rounded-xl flex items-center justify-center gap-3 text-lg font-bold text-white"
-        >
-          <X className="w-6 h-6" />
-          Missed (Game Ends)
-        </Button>
+            onClick={onMissed}
+            className="w-full h-16 bg-red-600 hover:bg-red-700 rounded-xl flex items-center justify-center gap-3 text-lg font-bold text-white"
+          >
+            <X className="w-6 h-6" />
+            Missed
+          </Button>
       </div>
 
       {/* Undo Button */}

@@ -54,6 +54,9 @@ export const GAME_FORMATS = {
 
 export const MAX_ROUNDS = 20;
 
+// Streak challenge has no round limit
+export const STREAK_UNLIMITED = true;
+
 // Calculate next distance for Classic/Short/Long formats
 export function getNextDistanceFromMade(gameType, madeCount) {
   const format = GAME_FORMATS[gameType];
@@ -102,6 +105,10 @@ export function calculateRoundScore(distance, madeCount) {
 
 // Check if player completed all rounds
 export function isGameComplete(gameType, puttCount) {
+  // Streak challenge never auto-completes
+  if (gameType === 'streak_challenge') {
+    return false;
+  }
   const format = GAME_FORMATS[gameType];
   const totalPutts = MAX_ROUNDS * format.puttsPerRound;
   return puttCount >= totalPutts;

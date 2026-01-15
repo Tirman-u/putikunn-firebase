@@ -9,8 +9,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
 export default function PuttingRecords() {
-  const [selectedGameType, setSelectedGameType] = useState('classic');
-  const [leaderboardType, setLeaderboardType] = useState('general');
+  const [selectedView, setSelectedView] = useState('general_classic');
   const [selectedGender, setSelectedGender] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
 
@@ -20,12 +19,13 @@ export default function PuttingRecords() {
     refetchInterval: 10000
   });
 
-  const gameTypes = [
-    { id: 'classic', label: 'Classic' },
-    { id: 'back_and_forth', label: 'Back & Forth' },
-    { id: 'short', label: 'Short' },
-    { id: 'streak_challenge', label: 'Streak' },
-    { id: 'random_distance', label: 'Random' }
+  const viewTypes = [
+    { id: 'general_classic', label: 'Classic', leaderboardType: 'general', gameType: 'classic' },
+    { id: 'general_back_and_forth', label: 'Back & Forth', leaderboardType: 'general', gameType: 'back_and_forth' },
+    { id: 'general_short', label: 'Short', leaderboardType: 'general', gameType: 'short' },
+    { id: 'general_streak_challenge', label: 'Streak', leaderboardType: 'general', gameType: 'streak_challenge' },
+    { id: 'general_random_distance', label: 'Random', leaderboardType: 'general', gameType: 'random_distance' },
+    { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'discgolf_ee', gameType: null }
   ];
 
   // Generate last 6 months for filter
@@ -39,9 +39,17 @@ export default function PuttingRecords() {
     });
   }
 
+  const currentView = viewTypes.find(v => v.id === selectedView);
+  
   const filteredEntries = leaderboardEntries.filter(entry => {
-    if (entry.game_type !== selectedGameType) return false;
-    if (entry.leaderboard_type !== leaderboardType) return false;
+    if (entry.leaderboard_type !== currentView.leaderboardType) return false;
+    
+    // For DG.ee view, show all game types
+    if (currentView.leaderboardType === 'discgolf_ee') {
+      // No game type filter
+    } else {
+      if (entry.game_type !== currentView.gameType) return false;
+    }
     
     if (selectedGender !== 'all' && entry.player_gender !== selectedGender) return false;
     
@@ -84,23 +92,16 @@ export default function PuttingRecords() {
         <h2 className="text-2xl font-bold text-slate-800">Putting Records</h2>
       </div>
 
-      <Tabs value={leaderboardType} onValueChange={setLeaderboardType} className="mb-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="discgolf_ee">Discgolf.ee</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <Tabs value={selectedGameType} onValueChange={setSelectedGameType}>
+      <Tabs value={selectedView} onValueChange={setSelectedView}>
         <TabsList className="grid grid-cols-3 w-full mb-6 h-auto gap-1">
-          {gameTypes.map(type => (
+          {viewTypes.map(type => (
             <TabsTrigger key={type.id} value={type.id}>
               {type.label}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {gameTypes.map(type => (
+        {viewTypes.map(type => (
           <TabsContent key={type.id} value={type.id}>
             <div className="space-y-4">
               <div className="flex gap-3 flex-wrap">
@@ -170,7 +171,7 @@ export default function PuttingRecords() {
                                     {entry.player_gender}
                                   </span>
                                 )}
-                                {(entry.leaderboard_type === 'discgolf_ee' || hasDiscgolfEntry(entry)) && (
+                                {hasDiscgolfEntry(entry) && (
                                   <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
                                     <Award className="w-3 h-3" />
                                     DG.ee

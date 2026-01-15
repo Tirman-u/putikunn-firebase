@@ -110,24 +110,36 @@ export default function PuttingKingOverview() {
         const finalScoreA = scoreData.finalScoreA;
         const finalScoreB = scoreData.finalScoreB;
         
-        // Check if tie
-        if (finalScoreA === finalScoreB) {
-          setSuddenDeathMatch({ ...match, score_a: finalScoreA, score_b: finalScoreB });
-          return;
+        // Check if someone reached target score
+        const hasWinner = finalScoreA >= tournament.target_score || finalScoreB >= tournament.target_score;
+        
+        if (hasWinner) {
+          // Check if it's a tie at target score
+          if (finalScoreA === finalScoreB && finalScoreA === tournament.target_score) {
+            setSuddenDeathMatch({ ...match, score_a: finalScoreA, score_b: finalScoreB });
+            return;
+          }
+          
+          // Someone won
+          const winnerTeam = finalScoreA > finalScoreB ? 'A' : 'B';
+          await base44.entities.PuttingKingMatch.update(matchId, {
+            score_a: finalScoreA,
+            score_b: finalScoreB,
+            status: 'finished',
+            winner_team: winnerTeam,
+            finished_at: new Date().toISOString()
+          });
+          
+          await handleMatchEnd({ ...match, score_a: finalScoreA, score_b: finalScoreB }, winnerTeam, finalScoreA, finalScoreB);
+          setActiveScoringMatchId(null);
+        } else {
+          // Game still in progress
+          await base44.entities.PuttingKingMatch.update(matchId, {
+            score_a: finalScoreA,
+            score_b: finalScoreB,
+            status: 'playing'
+          });
         }
-        
-        // Update match with final scores
-        const winnerTeam = finalScoreA > finalScoreB ? 'A' : 'B';
-        await base44.entities.PuttingKingMatch.update(matchId, {
-          score_a: finalScoreA,
-          score_b: finalScoreB,
-          status: 'finished',
-          winner_team: winnerTeam,
-          finished_at: new Date().toISOString()
-        });
-        
-        await handleMatchEnd({ ...match, score_a: finalScoreA, score_b: finalScoreB }, winnerTeam, finalScoreA, finalScoreB);
-        setActiveScoringMatchId(null);
         return;
       }
       

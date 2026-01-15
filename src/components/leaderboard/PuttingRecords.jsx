@@ -3,13 +3,14 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trophy, Target } from 'lucide-react';
-import { format } from 'date-fns';
+import { Trophy, Target, Award } from 'lucide-react';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 
 export default function PuttingRecords() {
   const [selectedGameType, setSelectedGameType] = useState('classic');
-  const [selectedFilter, setSelectedFilter] = useState('general');
+  const [leaderboardType, setLeaderboardType] = useState('general');
   const [selectedGender, setSelectedGender] = useState('all');
+  const [selectedMonth, setSelectedMonth] = useState('all');
 
   const { data: leaderboardEntries = [] } = useQuery({
     queryKey: ['leaderboard-entries'],
@@ -25,16 +26,29 @@ export default function PuttingRecords() {
     { id: 'random_distance', label: 'Random' }
   ];
 
+  // Generate last 6 months for filter
+  const monthOptions = [];
+  for (let i = 0; i < 6; i++) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    monthOptions.push({
+      value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+      label: format(date, 'MMMM yyyy')
+    });
+  }
+
   const filteredEntries = leaderboardEntries.filter(entry => {
     if (entry.game_type !== selectedGameType) return false;
+    if (entry.leaderboard_type !== leaderboardType) return false;
     
-    if (selectedFilter === 'discgolf_ee') {
-      if (entry.leaderboard_type !== 'discgolf_ee') return false;
-      if (selectedGender !== 'all' && entry.player_gender !== selectedGender) return false;
-    } else {
-      if (entry.leaderboard_type !== 'general') return false;
-      if (selectedFilter === 'mehed' && entry.player_gender !== 'M') return false;
-      if (selectedFilter === 'naised' && entry.player_gender !== 'N') return false;
+    if (selectedGender !== 'all' && entry.player_gender !== selectedGender) return false;
+    
+    if (selectedMonth !== 'all' && entry.date) {
+      const entryDate = new Date(entry.date);
+      const [year, month] = selectedMonth.split('-');
+      const monthStart = startOfMonth(new Date(parseInt(year), parseInt(month) - 1));
+      const monthEnd = endOfMonth(new Date(parseInt(year), parseInt(month) - 1));
+      if (entryDate < monthStart || entryDate > monthEnd) return false;
     }
     
     return true;
@@ -49,6 +63,13 @@ export default function PuttingRecords() {
         <h2 className="text-2xl font-bold text-slate-800">Putting Records</h2>
       </div>
 
+      <Tabs value={leaderboardType} onValueChange={setLeaderboardType} className="mb-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="discgolf_ee">Discgolf.ee</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <Tabs value={selectedGameType} onValueChange={setSelectedGameType}>
         <TabsList className="grid w-full grid-cols-5 mb-6">
           {gameTypes.map(type => (
@@ -61,34 +82,29 @@ export default function PuttingRecords() {
         {gameTypes.map(type => (
           <TabsContent key={type.id} value={type.id}>
             <div className="space-y-4">
-              <div className="flex gap-3">
-                <Select value={selectedFilter} onValueChange={(val) => {
-                  setSelectedFilter(val);
-                  if (val !== 'discgolf_ee') setSelectedGender('all');
-                }}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
+              <div className="flex gap-3 flex-wrap">
+                <Select value={selectedGender} onValueChange={setSelectedGender}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Gender" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="general">General</SelectItem>
-                    <SelectItem value="mehed">Mehed</SelectItem>
-                    <SelectItem value="naised">Naised</SelectItem>
-                    <SelectItem value="discgolf_ee">Discgolf.ee</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="M">Mehed</SelectItem>
+                    <SelectItem value="N">Naised</SelectItem>
                   </SelectContent>
                 </Select>
 
-                {selectedFilter === 'discgolf_ee' && (
-                  <Select value={selectedGender} onValueChange={setSelectedGender}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      <SelectItem value="M">Mehed</SelectItem>
-                      <SelectItem value="N">Naised</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    {monthOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {sortedEntries.length === 0 ? (
@@ -123,12 +139,20 @@ export default function PuttingRecords() {
                             </div>
                           </td>
                           <td className="py-3 px-2 font-medium text-slate-700">
-                            {entry.player_name}
-                            {entry.player_gender && (
-                              <span className="ml-2 text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-                                {entry.player_gender}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <span>{entry.player_name}</span>
+                              {entry.player_gender && (
+                                <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
+                                  {entry.player_gender}
+                                </span>
+                              )}
+                              {entry.leaderboard_type === 'discgolf_ee' && (
+                                <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
+                                  <Award className="w-3 h-3" />
+                                  DG.ee
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3 px-2 text-center">
                             <span className="text-lg font-bold text-emerald-600">{entry.score}</span>

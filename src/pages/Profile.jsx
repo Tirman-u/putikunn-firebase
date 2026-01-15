@@ -21,6 +21,7 @@ export default function Profile() {
   const [uploading, setUploading] = useState(false);
   const [sortBy, setSortBy] = useState('date'); // date, score, format
   const [filterFormat, setFilterFormat] = useState('all');
+  const [filterPuttType, setFilterPuttType] = useState('all');
 
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ['user'],

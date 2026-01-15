@@ -83,15 +83,13 @@ export default function PuttingRecords() {
       </Tabs>
 
       <Tabs value={selectedGameType} onValueChange={setSelectedGameType}>
-        <div className="overflow-x-auto mb-6">
-          <TabsList className="inline-flex w-auto min-w-full">
-            {gameTypes.map(type => (
-              <TabsTrigger key={type.id} value={type.id} className="flex-shrink-0">
-                {type.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </div>
+        <TabsList className="grid grid-cols-3 w-full mb-6 h-auto gap-1">
+          {gameTypes.map(type => (
+            <TabsTrigger key={type.id} value={type.id}>
+              {type.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
         {gameTypes.map(type => (
           <TabsContent key={type.id} value={type.id}>

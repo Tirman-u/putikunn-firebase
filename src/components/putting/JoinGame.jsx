@@ -5,6 +5,7 @@ import { ArrowRight, LogIn, ArrowLeft, Clock } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { GAME_FORMATS } from './gameRules';
 
 export default function JoinGame({ onJoin, onBack }) {
   const [pin, setPin] = useState('');
@@ -70,8 +71,8 @@ export default function JoinGame({ onJoin, onBack }) {
       } else {
         // Add player to game
         const gameType = game.game_type || 'classic';
-        const startDistances = { classic: 10, short: 8, long: 15, back_and_forth: 5 };
-        const startDistance = startDistances[gameType] || 10;
+        const format = GAME_FORMATS[gameType];
+        const startDistance = format.startDistance;
 
         const updatedPlayers = [...game.players, playerName.trim()];
         const updatedDistances = { ...game.player_distances, [playerName.trim()]: startDistance };

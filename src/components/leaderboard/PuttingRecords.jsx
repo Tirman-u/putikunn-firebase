@@ -56,6 +56,16 @@ export default function PuttingRecords() {
 
   const sortedEntries = [...filteredEntries].sort((a, b) => b.score - a.score).slice(0, 50);
 
+  // Helper to check if a general entry has a corresponding DG.ee entry
+  const hasDiscgolfEntry = (entry) => {
+    if (entry.leaderboard_type !== 'general') return false;
+    return leaderboardEntries.some(e => 
+      e.leaderboard_type === 'discgolf_ee' && 
+      e.game_id === entry.game_id &&
+      e.player_name === entry.player_name
+    );
+  };
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
       <div className="flex items-center gap-3 mb-6">
@@ -146,7 +156,7 @@ export default function PuttingRecords() {
                                   {entry.player_gender}
                                 </span>
                               )}
-                              {entry.leaderboard_type === 'discgolf_ee' && (
+                              {(entry.leaderboard_type === 'discgolf_ee' || hasDiscgolfEntry(entry)) && (
                                 <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
                                   <Award className="w-3 h-3" />
                                   DG.ee

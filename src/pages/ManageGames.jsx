@@ -325,19 +325,18 @@ export default function ManageGames() {
                       </div>
                     </Link>
                     <div className="flex flex-col gap-2">
-                      {game.pin !== '0000' && (
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            submitToDiscgolfMutation.mutate(game);
-                          }}
-                          disabled={submitToDiscgolfMutation.isPending || isGameSubmittedToDgEe(game.id)}
-                          size="sm"
-                          className={isGameSubmittedToDgEe(game.id) ? "bg-slate-400 whitespace-nowrap text-xs" : "bg-blue-600 hover:bg-blue-700 whitespace-nowrap text-xs"}
-                        >
-                          {isGameSubmittedToDgEe(game.id) ? 'Submitted' : 'Submit to dg.ee'}
-                        </Button>
-                      )}
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          completeGameMutation.mutate(game.id);
+                        }}
+                        disabled={completeGameMutation.isPending}
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 whitespace-nowrap text-xs"
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Close Game
+                      </Button>
                       <Button
                         onClick={(e) => {
                           e.stopPropagation();

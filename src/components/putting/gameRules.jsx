@@ -34,17 +34,18 @@ export const GAME_FORMATS = {
   },
   streak_challenge: {
     name: 'Streak Challenge',
-    minDistance: 7,
-    maxDistance: 7,
-    startDistance: 7,
+    minDistance: 3,
+    maxDistance: 15,
+    startDistance: 8,
     puttsPerRound: 1,
     singlePuttMode: true,
-    streakMode: true
+    streakMode: true,
+    manualDistance: true
   },
   random_distance: {
     name: 'Random Distance',
     minDistance: 3,
-    maxDistance: 15,
+    maxDistance: 10,
     startDistance: 7,
     puttsPerRound: 5,
     randomMode: true

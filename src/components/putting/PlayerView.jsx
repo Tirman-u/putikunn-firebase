@@ -140,7 +140,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       result,
       points,
       timestamp: new Date().toISOString(),
-      putt_type: puttType
+      putt_type: game.putt_type || 'regular'
     };
 
     const allPlayerPutts = { ...game.player_putts };

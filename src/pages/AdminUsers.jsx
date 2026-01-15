@@ -44,22 +44,22 @@ export default function AdminUsers() {
   const isSuperAdmin = currentUser?.app_role === 'super_admin';
 
   if (!isSuperAdmin) {
-    const isFirstTimeSetup = users.length > 0 && users.every(u => !u.app_role || u.app_role === 'user');
+    const hasSuperAdmin = users.some(u => u.app_role === 'super_admin');
     
     return (
       <div className="min-h-screen bg-gradient-to-b from-red-50 to-white flex items-center justify-center p-4">
         <div className="text-center max-w-md">
           <Shield className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-slate-800 mb-2">
-            {isFirstTimeSetup ? 'Initial Setup' : 'Access Denied'}
+            {hasSuperAdmin ? 'Access Denied' : 'Initial Setup'}
           </h1>
           <p className="text-slate-600 mb-6">
-            {isFirstTimeSetup 
-              ? 'No super admin exists yet. Click below to become the first super admin.'
-              : 'You need super admin privileges to access this page.'
+            {hasSuperAdmin 
+              ? 'You need super admin privileges to access this page.'
+              : 'No super admin exists yet. Click below to become the first super admin.'
             }
           </p>
-          {isFirstTimeSetup ? (
+          {!hasSuperAdmin ? (
             <div className="space-y-3">
               <Button 
                 onClick={() => makeCurrentUserSuperAdmin.mutate()}

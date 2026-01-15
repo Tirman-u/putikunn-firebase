@@ -167,10 +167,34 @@ export default function Profile() {
 
   const unlockedAchievements = achievements.filter(a => a.unlocked);
 
+  // Calculate stats by putt type
+  const puttTypeStats = {
+    regular: { made: 0, total: 0, score: 0, count: 0 },
+    straddle: { made: 0, total: 0, score: 0, count: 0 },
+    turbo: { made: 0, total: 0, score: 0, count: 0 }
+  };
+  
+  myGames.forEach(game => {
+    const puttType = game.putt_type || 'regular';
+    const putts = game.player_putts?.[myName] || [];
+    const made = putts.filter(p => p.result === 'made').length;
+    const score = game.total_points?.[myName] || 0;
+    
+    puttTypeStats[puttType].made += made;
+    puttTypeStats[puttType].total += putts.length;
+    puttTypeStats[puttType].score = Math.max(puttTypeStats[puttType].score, score);
+    if (score > 0) puttTypeStats[puttType].count += 1;
+  });
+
   // Filter and sort games
   let filteredGames = myGames.filter(game => {
     if (filterFormat === 'all') return true;
     return game.game_type === filterFormat;
+  });
+  
+  filteredGames = filteredGames.filter(game => {
+    if (filterPuttType === 'all') return true;
+    return (game.putt_type || 'regular') === filterPuttType;
   });
 
   filteredGames = filteredGames.sort((a, b) => {

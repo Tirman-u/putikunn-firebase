@@ -186,6 +186,22 @@ export default function Profile() {
     if (score > 0) puttTypeStats[puttType].count += 1;
   });
 
+  // Calculate best scores by game format
+  const gameFormatStats = {
+    classic: 0,
+    short: 0,
+    long: 0,
+    back_and_forth: 0,
+    streak_challenge: 0,
+    random_distance: 0
+  };
+
+  myGames.forEach(game => {
+    const gameType = game.game_type || 'classic';
+    const score = game.total_points?.[myName] || 0;
+    gameFormatStats[gameType] = Math.max(gameFormatStats[gameType], score);
+  });
+
   // Filter and sort games
   let filteredGames = myGames.filter(game => {
     if (filterFormat === 'all') return true;

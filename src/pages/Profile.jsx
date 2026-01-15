@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Camera, Trophy, Target, TrendingUp, Edit2, Save, X, Award, ExternalLink, Filter, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Camera, Trophy, Target, TrendingUp, Edit2, Save, X, Award, ExternalLink, Filter } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
@@ -21,7 +21,6 @@ export default function Profile() {
   const [uploading, setUploading] = useState(false);
   const [sortBy, setSortBy] = useState('date'); // date, score, format
   const [filterFormat, setFilterFormat] = useState('all');
-  const [showAllAchievements, setShowAllAchievements] = useState(false);
 
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ['user'],
@@ -154,7 +153,7 @@ export default function Profile() {
     : 0;
 
   // Achievements
-  const isAdmin = ['admin', 'super_admin'].includes(user?.app_role);
+  const isSuperAdmin = user?.app_role === 'super_admin';
   const achievements = getAchievements({
     totalGames,
     puttingPercentage,
@@ -163,7 +162,7 @@ export default function Profile() {
     allPutts,
     myGames,
     myName
-  }, showAllAchievements && isAdmin);
+  }, isSuperAdmin);
 
   const unlockedAchievements = achievements.filter(a => a.unlocked);
 
@@ -458,35 +457,6 @@ export default function Profile() {
         {/* AI Insights */}
         <AIInsights games={myGames} userName={myName} />
 
-        {/* Achievements */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-slate-800">
-              Achievements ({unlockedAchievements.length}/{showAllAchievements && isAdmin ? achievements.length : unlockedAchievements.length})
-            </h3>
-            {isAdmin && (
-              <Button
-                onClick={() => setShowAllAchievements(!showAllAchievements)}
-                variant="outline"
-                size="sm"
-              >
-                {showAllAchievements ? (
-                  <>
-                    <EyeOff className="w-4 h-4 mr-2" />
-                    Hide Locked
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-4 h-4 mr-2" />
-                    Show All
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-          <AchievementsList achievements={achievements} />
-        </div>
-
         {/* Game History with Filters */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-4">
@@ -576,6 +546,16 @@ export default function Profile() {
               </table>
             </div>
           )}
+        </div>
+
+        {/* Achievements */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-slate-800">
+              Achievements ({unlockedAchievements.length}/{achievements.length})
+            </h3>
+          </div>
+          <AchievementsList achievements={achievements} />
         </div>
       </div>
     </div>

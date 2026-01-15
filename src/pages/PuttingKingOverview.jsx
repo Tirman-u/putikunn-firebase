@@ -490,126 +490,34 @@ export default function PuttingKingOverview() {
             </div>
           </div>
 
-                            {/* Stations Column */}
-                            <div className="space-y-4">
-                            <h2 className="text-xl font-bold text-slate-800">Stations</h2>
-                            {stations.map(station => {
-              const match = getStationMatch(station.id);
-              return (
-                <div key={station.id} className="bg-white rounded-2xl p-6 shadow-sm border-2 border-purple-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-slate-800">{station.name}</h3>
-                    {match && (
-                      <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                        match.status === 'playing' ? 'bg-green-100 text-green-700' :
-                        match.status === 'ready' ? 'bg-blue-100 text-blue-700' :
-                        match.status === 'finished' ? 'bg-amber-100 text-amber-700' :
-                        'bg-slate-100 text-slate-600'
-                      }`}>
-                        {match.status === 'finished' ? 'Finished' : match.status}
-                      </div>
-                    )}
-                  </div>
-
-                  {match ? (
-                    <>
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="p-4 bg-purple-50 rounded-xl">
-                          <div className="text-sm text-purple-600 font-semibold mb-2">Team A</div>
-                          {match.team_a_players.map(email => (
-                            <div key={email} className="text-slate-800">{getPlayerName(email)}</div>
-                          ))}
-                          <div className="text-3xl font-bold text-purple-600 mt-2">{match.score_a}</div>
-                        </div>
-                        <div className="p-4 bg-blue-50 rounded-xl">
-                          <div className="text-sm text-blue-600 font-semibold mb-2">Team B</div>
-                          {match.team_b_players.map(email => (
-                            <div key={email} className="text-slate-800">{getPlayerName(email)}</div>
-                          ))}
-                          <div className="text-3xl font-bold text-blue-600 mt-2">{match.score_b}</div>
-                        </div>
-                      </div>
-                      {match.status === 'finished' ? (
-                        <div className="text-center py-2 text-sm text-slate-500">
-                          Winner: Team {match.winner_team} • Rotating players...
-                        </div>
-                      ) : (
-                        <Link to={`${createPageUrl('PuttingKingScoring')}?match=${match.id}`}>
-                          <button className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold">
-                            Score Match
-                          </button>
-                        </Link>
-                      )}
-                    </>
-                  ) : (
-                    <div className="text-center py-8 text-slate-400">
-                      Waiting for players...
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            </div>
-
-            {/* Leaderboard Column */}
-            <div className="space-y-6">
-            {/* Head-to-Head Matchups */}
-            {leaderboard.length >= 2 && (
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Head-to-Head Records</h3>
-                <div className="space-y-3">
-                  {leaderboard.slice(0, 3).map((player1, idx) =>
-                    leaderboard.slice(idx + 1, idx + 2).map(player2 => {
-                      const h2h = getHeadToHeadStats(player1.user_email, player2.user_email);
-                      return (
-                        <div key={`${player1.id}-${player2.id}`} className="p-3 bg-slate-50 rounded-xl">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="text-sm font-semibold text-slate-700">{player1.user_name}</div>
-                            </div>
-                            <div className="text-center px-4">
-                              <div className="text-lg font-bold text-slate-800">
-                                {h2h.player1Wins} - {h2h.player2Wins}
+                            {/* Leaderboard Column */}
+                            <div className="space-y-6">
+                            {/* Leaderboard */}
+                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                              <h2 className="text-xl font-bold text-slate-800 mb-4">Leaderboard</h2>
+                              <div className="space-y-2">
+                                {leaderboard.map((player, idx) => (
+                                  <div key={player.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors rounded-lg">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                                      idx === 0 ? 'bg-yellow-400 text-yellow-900' :
+                                      idx === 1 ? 'bg-slate-300 text-slate-700' :
+                                      idx === 2 ? 'bg-orange-300 text-orange-800' :
+                                      'bg-slate-100 text-slate-600'
+                                    }`}>
+                                      {idx + 1}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-semibold text-slate-800 truncate">{player.user_name}</div>
+                                      <div className="text-xs text-slate-500">
+                                        {player.wins}W-{player.losses}L • {player.total_attempts > 0 ? ((player.total_made_putts / player.total_attempts) * 100).toFixed(0) : 0}%
+                                      </div>
+                                    </div>
+                                    <div className="text-lg font-bold text-purple-600 flex-shrink-0">{player.tournament_points}</div>
+                                  </div>
+                                ))}
                               </div>
-                            </div>
-                            <div className="flex-1 text-right">
-                              <div className="text-sm font-semibold text-slate-700">{player2.user_name}</div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Leaderboard */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-              <h2 className="text-xl font-bold text-slate-800 mb-4">Final Rankings</h2>
-              <div className="space-y-2">
-                {leaderboard.map((player, idx) => (
-                  <div key={player.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors rounded-lg">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
-                      idx === 0 ? 'bg-yellow-400 text-yellow-900' :
-                      idx === 1 ? 'bg-slate-300 text-slate-700' :
-                      idx === 2 ? 'bg-orange-300 text-orange-800' :
-                      'bg-slate-100 text-slate-600'
-                    }`}>
-                      {idx + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-slate-800 truncate">{player.user_name}</div>
-                      <div className="text-xs text-slate-500">
-                        {player.wins}W-{player.losses}L • {player.total_attempts > 0 ? ((player.total_made_putts / player.total_attempts) * 100).toFixed(0) : 0}%
-                      </div>
-                    </div>
-                    <div className="text-lg font-bold text-purple-600 flex-shrink-0">{player.tournament_points}</div>
-                  </div>
-                ))}
-              </div>
-              </div>
-              </div>
+                              </div>
+                              </div>
               </div>
               </div>
               </div>

@@ -7,7 +7,7 @@ const GAME_FORMATS = [
     id: 'classic',
     name: 'Classic',
     distance: '5-10m',
-    description: 'Standard Jyly format',
+    description: 'Standard format',
     color: 'emerald'
   },
   {

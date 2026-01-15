@@ -56,7 +56,16 @@ export default function PuttingRecords() {
     return true;
   });
 
-  const sortedEntries = [...filteredEntries].sort((a, b) => b.score - a.score).slice(0, 50);
+  // Group by player and keep only the best score for each
+  const bestScoresByPlayer = {};
+  filteredEntries.forEach(entry => {
+    const key = entry.player_name;
+    if (!bestScoresByPlayer[key] || entry.score > bestScoresByPlayer[key].score) {
+      bestScoresByPlayer[key] = entry;
+    }
+  });
+
+  const sortedEntries = Object.values(bestScoresByPlayer).sort((a, b) => b.score - a.score).slice(0, 50);
 
   // Helper to check if a general entry has a corresponding DG.ee entry
   const hasDiscgolfEntry = (entry) => {

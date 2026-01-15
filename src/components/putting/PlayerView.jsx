@@ -390,16 +390,16 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
           <div className="flex items-center justify-around text-center">
             <div>
-              <div className="text-xs text-slate-500">Points</div>
+              <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Best Streak' : 'Points'}</div>
               <div className="text-2xl font-bold text-emerald-600">
-                {game.total_points[playerName] || 0}
+                {gameType === 'streak_challenge' ? (game.player_highest_streaks?.[playerName] || 0) : (game.total_points[playerName] || 0)}
               </div>
             </div>
             <div className="h-10 w-px bg-slate-200" />
             <div>
-              <div className="text-xs text-slate-500">Round</div>
+              <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Putts' : 'Round'}</div>
               <div className="text-2xl font-bold text-slate-600">
-                {currentRound}/{totalRounds}
+                {gameType === 'streak_challenge' ? playerPutts.length : `${currentRound}/${totalRounds}`}
               </div>
             </div>
           </div>

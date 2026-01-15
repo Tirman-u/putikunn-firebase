@@ -15,14 +15,7 @@ export default function PuttingKingSetup() {
 
   const [tournamentName, setTournamentName] = useState('');
   const [targetScore, setTargetScore] = useState(21);
-  const [bustReset, setBustReset] = useState(11);
   const [totalRounds, setTotalRounds] = useState(6);
-  const [distances, setDistances] = useState([
-    { id: 'd1', label: '5m', points_for_made: 1, points_for_missed: 0, enabled: true, order: 1 },
-    { id: 'd2', label: '7m', points_for_made: 2, points_for_missed: -1, enabled: true, order: 2 },
-    { id: 'd3', label: '9m', points_for_made: 3, points_for_missed: -2, enabled: true, order: 3 },
-    { id: 'd4', label: '11m', points_for_made: 5, points_for_missed: -3, enabled: true, order: 4 }
-  ]);
   const [stations, setStations] = useState([
     { name: 'Basket 1', order: 1 },
     { name: 'Basket 2', order: 2 }
@@ -41,10 +34,15 @@ export default function PuttingKingSetup() {
         name: data.name,
         status: 'setup',
         target_score: data.targetScore,
-        bust_reset_score: data.bustReset,
+        bust_reset_score: 11,
         total_rounds: data.totalRounds,
         current_round: 1,
-        distances: data.distances,
+        distances: [
+          { id: 'd1', label: '5m', points_for_made: 1, points_for_missed: 0, enabled: true, order: 1 },
+          { id: 'd2', label: '7m', points_for_made: 2, points_for_missed: -1, enabled: true, order: 2 },
+          { id: 'd3', label: '9m', points_for_made: 3, points_for_missed: -2, enabled: true, order: 3 },
+          { id: 'd4', label: '11m', points_for_made: 5, points_for_missed: -3, enabled: true, order: 4 }
+        ],
         host_user: user.email
       });
 
@@ -147,24 +145,13 @@ export default function PuttingKingSetup() {
     createTournamentMutation.mutate({
       name: tournamentName,
       targetScore,
-      bustReset,
       totalRounds,
-      distances,
       stations,
       players: validPlayers
     });
   };
 
-  const addDistance = () => {
-    setDistances([...distances, {
-      id: `d${Date.now()}`,
-      label: `${distances.length + 5}m`,
-      points_for_made: distances.length + 1,
-      points_for_missed: 0,
-      enabled: true,
-      order: distances.length + 1
-    }]);
-  };
+
 
   const addStation = () => {
     setStations([...stations, {
@@ -207,23 +194,13 @@ export default function PuttingKingSetup() {
                   placeholder="e.g., Friday Night Battles"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Target Score</label>
-                  <Input
-                    type="number"
-                    value={targetScore}
-                    onChange={(e) => setTargetScore(Number(e.target.value))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Bust Reset</label>
-                  <Input
-                    type="number"
-                    value={bustReset}
-                    onChange={(e) => setBustReset(Number(e.target.value))}
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Target Score</label>
+                <Input
+                  type="number"
+                  value={targetScore}
+                  onChange={(e) => setTargetScore(Number(e.target.value))}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Total Rounds</label>
@@ -236,66 +213,6 @@ export default function PuttingKingSetup() {
                 />
                 <p className="text-xs text-slate-500 mt-1">How many rounds to play (default: 6)</p>
               </div>
-            </div>
-          </div>
-
-          {/* Distances */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-slate-800">Distances</h3>
-              <Button onClick={addDistance} size="sm" variant="outline">
-                <Plus className="w-4 h-4 mr-1" />
-                Add
-              </Button>
-            </div>
-            <div className="space-y-3">
-              {distances.map((dist, idx) => (
-                <div key={dist.id} className="flex items-center gap-2">
-                  <Input
-                    value={dist.label}
-                    onChange={(e) => {
-                      const newDist = [...distances];
-                      newDist[idx].label = e.target.value;
-                      setDistances(newDist);
-                    }}
-                    placeholder="Distance"
-                    className="flex-1"
-                  />
-                  <div className="flex flex-col gap-1">
-                    <Input
-                      type="number"
-                      value={dist.points_for_made || dist.points || 0}
-                      onChange={(e) => {
-                        const newDist = [...distances];
-                        newDist[idx].points_for_made = Number(e.target.value);
-                        setDistances(newDist);
-                      }}
-                      placeholder="Made"
-                      className="w-16 text-xs h-7"
-                      title="Points for made putt"
-                    />
-                    <Input
-                      type="number"
-                      value={dist.points_for_missed !== undefined ? dist.points_for_missed : 0}
-                      onChange={(e) => {
-                        const newDist = [...distances];
-                        newDist[idx].points_for_missed = Number(e.target.value);
-                        setDistances(newDist);
-                      }}
-                      placeholder="Miss"
-                      className="w-16 text-xs h-7"
-                      title="Points for missed putt"
-                    />
-                  </div>
-                  <Button
-                    onClick={() => setDistances(distances.filter((_, i) => i !== idx))}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
             </div>
           </div>
 

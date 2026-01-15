@@ -18,6 +18,8 @@ export default function JoinGame({ onJoin, onBack }) {
     queryFn: () => base44.auth.me()
   });
 
+  const queryClient = useQueryClient();
+
   const { data: recentGames = [] } = useQuery({
     queryKey: ['recent-games'],
     queryFn: async () => {
@@ -28,8 +30,16 @@ export default function JoinGame({ onJoin, onBack }) {
         .slice(0, 10);
       return activeGames;
     },
-    enabled: !!user
+    enabled: !!user,
+    refetchInterval: 2000
   });
+
+  React.useEffect(() => {
+    const unsubscribe = base44.entities.Game.subscribe((event) => {
+      queryClient.invalidateQueries({ queryKey: ['recent-games'] });
+    });
+    return unsubscribe;
+  }, [queryClient]);
 
   const getGameTypeName = (type) => {
     const names = {

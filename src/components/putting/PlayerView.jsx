@@ -296,6 +296,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const playerDistances = game.player_distances || {};
   const currentDistance = playerDistances[playerName] || format.startDistance;
   const canUndo = playerPutts.length > 0;
+  const currentStreaks = game.player_current_streaks || {};
+  const currentStreak = currentStreaks[playerName] || 0;
   const isComplete = isGameComplete(gameType, playerPutts.length) || (gameType === 'streak_challenge' && game.status === 'completed');
 
   // Completed View
@@ -353,8 +355,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   }
 
   // Scoring View
-  const currentRound = Math.floor(playerPutts.length / format.puttsPerRound) + 1;
-  const totalRounds = 20;
+  const currentRound = gameType === 'streak_challenge' ? 1 : Math.floor(playerPutts.length / format.puttsPerRound) + 1;
+  const totalRounds = gameType === 'streak_challenge' ? 1 : 20;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -382,7 +384,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         </div>
 
         {/* Progress Bar */}
-        <ProgressBar putts={playerPutts} gameType={gameType} />
+        {gameType !== 'streak_challenge' && <ProgressBar putts={playerPutts} gameType={gameType} />}
 
         {/* Your Stats */}
         <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
@@ -416,23 +418,16 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         {/* Score Input */}
          {gameType === 'streak_challenge' ? (
            <StreakChallengeInput
-             player={playerName}
-             currentDistance={currentDistance}
-             onMade={() => handleBackAndForthPutt(true)}
-             onMissed={() => handleBackAndForthPutt(false)}
-             canUndo={canUndo}
-             onUndo={handleUndo}
-             currentStreak={(() => {
-               const streak = [];
-               for (let j = playerPutts.length - 1; j >= 0; j--) {
-                 if (playerPutts[j].result === 'made') streak.push(playerPutts[j]);
-                 else break;
-               }
-               return streak.length;
-             })()}
-             showDistanceSelector={!streakDistanceSelected && playerPutts.length === 0}
-             onDistanceSelect={handleStreakDistanceSelect}
-           />
+               player={playerName}
+               currentDistance={currentDistance}
+               onMade={() => handleBackAndForthPutt(true)}
+               onMissed={() => handleBackAndForthPutt(false)}
+               canUndo={canUndo}
+               onUndo={handleUndo}
+               currentStreak={currentStreak}
+               showDistanceSelector={!streakDistanceSelected && playerPutts.length === 0}
+               onDistanceSelect={handleStreakDistanceSelect}
+             />
          ) : format.singlePuttMode ? (
            <BackAndForthInput
              player={playerName}

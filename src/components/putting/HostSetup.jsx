@@ -76,6 +76,13 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
           <GameFormatSelector selected={gameType} onSelect={setGameType} />
         </div>
 
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-4">
+          <label className="block text-sm font-semibold text-slate-700 mb-3">
+            Putt Style
+          </label>
+          <PuttTypeSelector selectedType={puttType} onSelect={setPuttType} />
+        </div>
+
         {!isSolo && (
           <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg mb-6 text-white">
             <div className="text-center mb-4">

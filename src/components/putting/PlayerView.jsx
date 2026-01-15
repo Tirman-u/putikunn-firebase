@@ -278,7 +278,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const playerPutts = game.player_putts?.[playerName] || [];
   const currentDistance = game.player_distances?.[playerName] || format.startDistance;
   const canUndo = playerPutts.length > 0;
-  const isComplete = isGameComplete(gameType, playerPutts.length);
+  const isComplete = isGameComplete(gameType, playerPutts.length) || (gameType === 'streak_challenge' && game.status === 'completed');
 
   // Completed View
   if (isComplete) {

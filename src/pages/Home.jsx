@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Users, UserPlus, Settings, User, Target, Trophy, Upload } from 'lucide-react';
+import { Users, UserPlus, Settings, User, Target, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
@@ -26,7 +26,6 @@ export default function Home() {
   const canHostGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
   const canManageGames = ['admin', 'super_admin'].includes(userRole);
   const canAccessPuttingKing = ['admin', 'super_admin'].includes(userRole);
-  const canSubmitDiscgolf = ['trainer', 'admin', 'super_admin'].includes(userRole);
 
 
 
@@ -130,23 +129,6 @@ export default function Home() {
                 </div>
               </div>
             </button>
-
-            {canSubmitDiscgolf && (
-              <button
-                onClick={() => window.location.href = createPageUrl('SubmitDiscgolf')}
-                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-blue-400 hover:shadow-lg transition-all group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                    <Upload className="w-7 h-7 text-blue-600" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <h3 className="text-lg font-bold text-slate-800">Submit to Discgolf.ee</h3>
-                    <p className="text-sm text-slate-500">Submit player results to training table</p>
-                  </div>
-                </div>
-              </button>
-            )}
 
             {canAccessPuttingKing && (
               <button

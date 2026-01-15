@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { createPageUrl } from '@/utils';
 import ClassicScoreInput from './ClassicScoreInput';
 import BackAndForthInput from './BackAndForthInput';
 import JylyScoreTable from './JylyScoreTable';

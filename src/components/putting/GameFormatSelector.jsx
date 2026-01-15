@@ -41,7 +41,7 @@ const GAME_FORMATS = [
   {
     id: 'random_distance',
     name: 'Random',
-    distance: '3-15m',
+    distance: '3-10m',
     description: 'Random distances each round',
     color: 'indigo'
   }

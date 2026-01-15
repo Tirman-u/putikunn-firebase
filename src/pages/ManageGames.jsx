@@ -38,6 +38,11 @@ export default function ManageGames() {
     enabled: !!user
   });
 
+  const { data: leaderboardEntries = [] } = useQuery({
+    queryKey: ['leaderboard-entries'],
+    queryFn: () => base44.entities.LeaderboardEntry.list()
+  });
+
   const deleteGameMutation = useMutation({
     mutationFn: (gameId) => base44.entities.Game.delete(gameId),
     onSuccess: () => {
@@ -162,6 +167,12 @@ export default function ManageGames() {
     return names[type] || type;
   };
 
+  const isGameSubmittedToDgEe = (gameId) => {
+    return leaderboardEntries.some(entry => 
+      entry.game_id === gameId && entry.leaderboard_type === 'discgolf_ee'
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <div className="max-w-4xl mx-auto p-4">
@@ -271,11 +282,11 @@ export default function ManageGames() {
                           e.stopPropagation();
                           submitToDiscgolfMutation.mutate(game);
                         }}
-                        disabled={submitToDiscgolfMutation.isPending}
+                        disabled={submitToDiscgolfMutation.isPending || isGameSubmittedToDgEe(game.id)}
                         size="sm"
-                        className="bg-blue-600 hover:bg-blue-700 whitespace-nowrap text-xs"
+                        className={isGameSubmittedToDgEe(game.id) ? "bg-slate-400 whitespace-nowrap text-xs" : "bg-blue-600 hover:bg-blue-700 whitespace-nowrap text-xs"}
                       >
-                        Submit to dg.ee
+                        {isGameSubmittedToDgEe(game.id) ? 'Submitted' : 'Submit to dg.ee'}
                       </Button>
                       <Button
                         onClick={(e) => {

@@ -37,6 +37,11 @@ export default function GameResult() {
     retry: false
   });
 
+  const { data: leaderboardEntries = [] } = useQuery({
+    queryKey: ['leaderboard-entries'],
+    queryFn: () => base44.entities.LeaderboardEntry.list()
+  });
+
   const deleteGameMutation = useMutation({
     mutationFn: (id) => base44.entities.Game.delete(id),
     onSuccess: () => {
@@ -274,6 +279,17 @@ export default function GameResult() {
     }
   };
 
+  const isSubmittedToLeaderboard = leaderboardEntries.some(entry => 
+    entry.game_id === gameId && 
+    entry.player_email === user?.email && 
+    entry.leaderboard_type === 'general'
+  );
+
+  const isSubmittedToDgEe = leaderboardEntries.some(entry => 
+    entry.game_id === gameId && 
+    entry.leaderboard_type === 'discgolf_ee'
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <div className="max-w-4xl mx-auto p-4">
@@ -322,20 +338,20 @@ export default function GameResult() {
             <div className="flex gap-3">
               <Button 
                 onClick={() => submitToLeaderboardMutation.mutate()}
-                disabled={submitToLeaderboardMutation.isPending}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                disabled={submitToLeaderboardMutation.isPending || isSubmittedToLeaderboard}
+                className={isSubmittedToLeaderboard ? "flex-1 bg-slate-400" : "flex-1 bg-emerald-600 hover:bg-emerald-700"}
               >
                 <Upload className="w-4 h-4 mr-2" />
-                Submit to Leaderboard
+                {isSubmittedToLeaderboard ? 'Submitted' : 'Submit to Leaderboard'}
               </Button>
               {canSubmitDiscgolf && (
                 <Button 
                   onClick={() => submitToDiscgolfMutation.mutate()}
-                  disabled={submitToDiscgolfMutation.isPending}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  disabled={submitToDiscgolfMutation.isPending || isSubmittedToDgEe}
+                  className={isSubmittedToDgEe ? "flex-1 bg-slate-400" : "flex-1 bg-blue-600 hover:bg-blue-700"}
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  Submit to Discgolf.ee
+                  {isSubmittedToDgEe ? 'Submitted' : 'Submit to Discgolf.ee'}
                 </Button>
               )}
             </div>

@@ -93,24 +93,24 @@ export function getAchievements(stats, isAdmin = false) {
     { 
       id: 'century', 
       name: 'Century', 
-      description: 'Score 100+ points in a game',
-      unlocked: bestScore >= 100,
+      description: 'Score 300+ points in a game',
+      unlocked: bestScore >= 300,
       icon: '💯',
       tier: 'bronze'
     },
     { 
       id: 'high_scorer', 
       name: 'High Scorer', 
-      description: 'Score 300+ points in a game',
-      unlocked: bestScore >= 300,
+      description: 'Score 500+ points in a game',
+      unlocked: bestScore >= 500,
       icon: '🏆',
       tier: 'silver'
     },
     { 
       id: 'point_machine', 
       name: 'Point Machine', 
-      description: 'Score 500+ points in a game',
-      unlocked: bestScore >= 500,
+      description: 'Score 600+ points in a game',
+      unlocked: bestScore >= 600,
       icon: '🔴',
       tier: 'gold'
     },
@@ -127,35 +127,52 @@ export function getAchievements(stats, isAdmin = false) {
     { 
       id: 'consistent', 
       name: 'Consistent', 
-      description: 'Average 200+ points per game',
-      unlocked: avgScore >= 200,
+      description: 'Average 350+ points per game',
+      unlocked: avgScore >= 350,
       icon: '📊',
       tier: 'silver'
     },
     { 
       id: 'reliable', 
       name: 'Reliable', 
-      description: 'Average 300+ points per game',
-      unlocked: avgScore >= 300,
+      description: 'Average 450+ points per game',
+      unlocked: avgScore >= 450,
       icon: '⚖️',
       tier: 'gold'
     },
 
-    // Special Achievements
+    // Special Achievements - Perfect Rounds
     { 
-      id: 'perfect_round', 
+      id: 'perfect_round_5', 
       name: 'Perfect Round', 
-      description: 'Make all 5 putts in a round',
-      unlocked: myGames?.some(g => {
-        const putts = g.player_putts?.[myName] || [];
-        for (let i = 0; i < putts.length - 4; i += 5) {
-          const round = putts.slice(i, i + 5);
-          if (round.length === 5 && round.every(p => p.result === 'made')) return true;
-        }
-        return false;
-      }),
+      description: 'Make 5 consecutive putts',
+      unlocked: checkStreak(allPutts, 5),
       icon: '⭐',
+      tier: 'bronze'
+    },
+    { 
+      id: 'perfect_round_10', 
+      name: 'Perfect Streak x2', 
+      description: 'Make 10 consecutive putts',
+      unlocked: checkStreak(allPutts, 10),
+      icon: '⭐⭐',
+      tier: 'silver'
+    },
+    { 
+      id: 'perfect_round_15', 
+      name: 'Perfect Streak x3', 
+      description: 'Make 15 consecutive putts',
+      unlocked: checkStreak(allPutts, 15),
+      icon: '⭐⭐⭐',
       tier: 'gold'
+    },
+    { 
+      id: 'perfect_round_20', 
+      name: 'Perfect Streak Master', 
+      description: 'Make 20 consecutive putts',
+      unlocked: checkStreak(allPutts, 20),
+      icon: '✨',
+      tier: 'platinum'
     },
     { 
       id: 'long_distance', 
@@ -174,18 +191,18 @@ export function getAchievements(stats, isAdmin = false) {
       tier: 'platinum'
     },
     { 
-      id: 'hundred_makes', 
+      id: 'five_hundred_makes', 
       name: 'Century Club', 
-      description: 'Make 100 putts total',
-      unlocked: allPutts?.filter(p => p.result === 'made').length >= 100,
+      description: 'Make 500 putts total',
+      unlocked: allPutts?.filter(p => p.result === 'made').length >= 500,
       icon: '🎊',
       tier: 'silver'
     },
     { 
-      id: 'five_hundred_makes', 
-      name: 'Elite 500', 
-      description: 'Make 500 putts total',
-      unlocked: allPutts?.filter(p => p.result === 'made').length >= 500,
+      id: 'thousand_makes', 
+      name: 'Elite 1000', 
+      description: 'Make 1000 putts total',
+      unlocked: allPutts?.filter(p => p.result === 'made').length >= 1000,
       icon: '🏅',
       tier: 'gold'
     },
@@ -210,28 +227,12 @@ export function getAchievements(stats, isAdmin = false) {
 
     // Streak Achievements
     { 
-      id: 'three_streak', 
-      name: 'Three in a Row', 
-      description: 'Make 3 consecutive putts',
-      unlocked: checkStreak(allPutts, 3),
-      icon: '🔸',
-      tier: 'bronze'
-    },
-    { 
-      id: 'five_streak', 
-      name: 'Five Streak', 
-      description: 'Make 5 consecutive putts',
-      unlocked: checkStreak(allPutts, 5),
-      icon: '🔶',
-      tier: 'silver'
-    },
-    { 
       id: 'ten_streak', 
       name: 'Hot Streak', 
       description: 'Make 10 consecutive putts',
       unlocked: checkStreak(allPutts, 10),
       icon: '🔥',
-      tier: 'gold'
+      tier: 'bronze'
     },
     { 
       id: 'twenty_streak', 
@@ -239,6 +240,22 @@ export function getAchievements(stats, isAdmin = false) {
       description: 'Make 20 consecutive putts',
       unlocked: checkStreak(allPutts, 20),
       icon: '💥',
+      tier: 'silver'
+    },
+    { 
+      id: 'thirty_streak', 
+      name: 'Legendary Streak', 
+      description: 'Make 30 consecutive putts',
+      unlocked: checkStreak(allPutts, 30),
+      icon: '⚡',
+      tier: 'gold'
+    },
+    { 
+      id: 'fifty_streak', 
+      name: 'Godlike Streak', 
+      description: 'Make 50 consecutive putts',
+      unlocked: checkStreak(allPutts, 50),
+      icon: '👑',
       tier: 'platinum'
     },
 

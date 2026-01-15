@@ -10,6 +10,7 @@ import FormatRulesPopup from './FormatRulesPopup';
 export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   const [gameName, setGameName] = useState('');
   const [gameType, setGameType] = useState('classic');
+  const [puttType, setPuttType] = useState('regular');
   const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
   

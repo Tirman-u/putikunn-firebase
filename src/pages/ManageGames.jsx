@@ -133,7 +133,7 @@ export default function ManageGames() {
       const created = results.filter(r => r.action === 'created').length;
       const skipped = results.filter(r => r.action === 'skipped').length;
       
-      let message = 'Submitted to Discgolf.ee & General leaderboards';
+      let message = 'Submitted to dg.ee & General leaderboards';
       if (updated > 0 || skipped > 0) {
         message += ` (${created} new, ${updated} updated, ${skipped} skipped)`;
       }
@@ -249,47 +249,49 @@ export default function ManageGames() {
                     />
                     <Link
                       to={`${createPageUrl('GameResult')}?id=${game.id}`}
-                      className="flex-1"
+                      className="flex-1 min-w-0"
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-slate-800 group-hover:text-emerald-600 transition-colors">{game.name}</span>
-                        <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">
-                          {getGameTypeName(game.game_type)}
-                        </span>
+                      <div className="font-bold text-slate-800 group-hover:text-emerald-600 transition-colors truncate">
+                        {game.name}
                       </div>
-                      <div className="text-sm text-slate-500 flex items-center gap-2">
+                      <div className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded inline-block mt-1">
+                        {getGameTypeName(game.game_type)}
+                      </div>
+                      <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
                         <Calendar className="w-3 h-3" />
                         {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'No date'}
                       </div>
-                      <div className="text-sm text-slate-600 mt-1">
+                      <div className="text-xs text-slate-600 mt-1">
                         {game.players?.length || 0} players • PIN: {game.pin}
                       </div>
                     </Link>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        submitToDiscgolfMutation.mutate(game);
-                      }}
-                      disabled={submitToDiscgolfMutation.isPending}
-                      size="sm"
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      <Upload className="w-4 h-4 mr-1" />
-                      Submit to Discgolf.ee
-                    </Button>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm('Delete this game?')) {
-                          deleteGameMutation.mutate(game.id);
-                        }
-                      }}
-                      variant="ghost"
-                      size="icon"
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          submitToDiscgolfMutation.mutate(game);
+                        }}
+                        disabled={submitToDiscgolfMutation.isPending}
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 whitespace-nowrap"
+                      >
+                        <Upload className="w-4 h-4 mr-1" />
+                        dg.ee
+                      </Button>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Delete this game?')) {
+                            deleteGameMutation.mutate(game.id);
+                          }
+                        }}
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}

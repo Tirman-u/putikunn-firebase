@@ -551,23 +551,25 @@ export default function PuttingKingOverview() {
           {/* Stations and Scoring */}
           <div className="lg:col-span-2 space-y-4">
             {tournament.status === 'setup' ? (
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                <h2 className="text-xl font-bold text-slate-800 mb-4">Tournament Setup</h2>
-                <p className="text-slate-600 mb-4">
-                  Share the PIN with players to join, or add them manually below. 
-                  You need at least {minPlayersRequired} players ({stations.length} station{stations.length > 1 ? 's' : ''} × 4 players) to start the tournament.
-                </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Users className="w-5 h-5 text-blue-600" />
-                    <span className="font-semibold text-blue-800">Players: {players.length}</span>
-                  </div>
-                  <div className="text-sm text-blue-600">
-                    {players.length < minPlayersRequired ? `Need ${minPlayersRequired - players.length} more player${minPlayersRequired - players.length > 1 ? 's' : ''}` : 'Ready to start!'}
+              <>
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                  <h2 className="text-xl font-bold text-slate-800 mb-4">Tournament Setup</h2>
+                  <p className="text-slate-600 mb-4">
+                    Share the PIN with players to join, or add them manually below. 
+                    You need at least {minPlayersRequired} players ({stations.length} station{stations.length > 1 ? 's' : ''} × 4 players) to start the tournament.
+                  </p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-5 h-5 text-blue-600" />
+                      <span className="font-semibold text-blue-800">Players: {players.length}</span>
+                    </div>
+                    <div className="text-sm text-blue-600">
+                      {players.length < minPlayersRequired ? `Need ${minPlayersRequired - players.length} more player${minPlayersRequired - players.length > 1 ? 's' : ''}` : 'Ready to start!'}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <PuttingKingRules tournament={tournament} />
+                <PuttingKingRules tournament={tournament} />
+              </>
             ) : (
               <>
                 <h2 className="text-xl font-bold text-slate-800">Stations</h2>

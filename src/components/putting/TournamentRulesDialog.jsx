@@ -95,12 +95,12 @@ export default function TournamentRulesDialog({ onClose }) {
           {isLoading ? (
             <div className="text-center text-slate-400">Loading...</div>
           ) : isEditing ? (
-            <div className="bg-white">
+            <div style={{ height: '500px' }}>
               <ReactQuill
                 value={editedRules}
                 onChange={setEditedRules}
                 theme="snow"
-                className="h-96"
+                style={{ height: '450px' }}
                 modules={{
                   toolbar: [
                     [{ 'header': [1, 2, 3, false] }],
@@ -112,7 +112,7 @@ export default function TournamentRulesDialog({ onClose }) {
               />
             </div>
           ) : (
-            <div className="prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: displayRules }} />
+            <div className="prose prose-slate max-w-none text-sm" dangerouslySetInnerHTML={{ __html: displayRules }} />
           )}
         </div>
 

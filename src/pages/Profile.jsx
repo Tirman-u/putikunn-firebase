@@ -66,7 +66,6 @@ export default function Profile() {
 
   const handleEdit = () => {
     setEditData({
-      full_name: user.full_name,
       bio: user.bio || '',
       profile_picture: user.profile_picture || '',
       gender: user.gender || ''
@@ -298,13 +297,6 @@ export default function Profile() {
                   </label>
                 </div>
                 <div className="flex-1 space-y-3">
-                  <div>
-                    <label className="text-sm text-slate-600 mb-1 block">Name</label>
-                    <Input 
-                      value={editData.full_name}
-                      onChange={(e) => setEditData({ ...editData, full_name: e.target.value })}
-                    />
-                  </div>
                   <div>
                     <label className="text-sm text-slate-600 mb-1 block">Gender</label>
                     <Select 

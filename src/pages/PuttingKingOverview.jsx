@@ -287,6 +287,8 @@ export default function PuttingKingOverview() {
     }
   });
 
+  const minPlayersRequired = stations.length * 4;
+
   const startTournamentMutation = useMutation({
     mutationFn: async () => {
       // Get all stations
@@ -300,8 +302,9 @@ export default function PuttingKingOverview() {
         .filter(p => p.tournament_id === tournament.id && p.active)
         .sort(() => Math.random() - 0.5); // Shuffle
 
-      if (tournamentPlayers.length < 4) {
-        throw new Error('Need at least 4 players');
+      const minRequired = tournamentStations.length * 4;
+      if (tournamentPlayers.length < minRequired) {
+        throw new Error(`Need at least ${minRequired} players (${tournamentStations.length} stations × 4 players)`);
       }
 
       const playersPerStation = 4;
@@ -483,11 +486,11 @@ export default function PuttingKingOverview() {
               {canManage && (
                 <Button
                   onClick={() => startTournamentMutation.mutate()}
-                  disabled={startTournamentMutation.isPending || players.length < 4}
+                  disabled={startTournamentMutation.isPending || players.length < minPlayersRequired}
                   className="bg-purple-600 hover:bg-purple-700"
                 >
                   <Play className="w-4 h-4 mr-2" />
-                  {players.length < 4 ? `Start Tournament (${players.length}/4 players)` : 'Start Tournament'}
+                  {players.length < minPlayersRequired ? `Start Tournament (${players.length}/${minPlayersRequired} players)` : 'Start Tournament'}
                 </Button>
               )}
             </div>
@@ -537,7 +540,7 @@ export default function PuttingKingOverview() {
                 <h2 className="text-xl font-bold text-slate-800 mb-4">Tournament Setup</h2>
                 <p className="text-slate-600 mb-4">
                   Share the PIN with players to join, or add them manually below. 
-                  You need at least 4 players to start the tournament.
+                  You need at least {minPlayersRequired} players ({stations.length} station{stations.length > 1 ? 's' : ''} × 4 players) to start the tournament.
                 </p>
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -545,7 +548,7 @@ export default function PuttingKingOverview() {
                     <span className="font-semibold text-blue-800">Players: {players.length}</span>
                   </div>
                   <div className="text-sm text-blue-600">
-                    {players.length < 4 ? `Need ${4 - players.length} more player${4 - players.length > 1 ? 's' : ''}` : 'Ready to start!'}
+                    {players.length < minPlayersRequired ? `Need ${minPlayersRequired - players.length} more player${minPlayersRequired - players.length > 1 ? 's' : ''}` : 'Ready to start!'}
                   </div>
                 </div>
               </div>

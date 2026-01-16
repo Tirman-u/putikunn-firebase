@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, Play } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ArrowLeft, Trophy, Play, Plus, Trash2, Users } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import PuttingKingScoreInput from '@/components/putting/PuttingKingScoreInput';
@@ -15,6 +16,7 @@ export default function PuttingKingOverview() {
   const queryClient = useQueryClient();
   const [activeScoringMatchId, setActiveScoringMatchId] = useState(null);
   const [suddenDeathMatch, setSuddenDeathMatch] = useState(null);
+  const [newPlayerEmail, setNewPlayerEmail] = useState('');
 
   const { data: tournament } = useQuery({
     queryKey: ['tournament', tournamentId],
@@ -245,6 +247,114 @@ export default function PuttingKingOverview() {
     queryClient.invalidateQueries();
   };
 
+  const addPlayerMutation = useMutation({
+    mutationFn: async (emailOrName) => {
+      const trimmed = emailOrName.trim();
+      let email = trimmed;
+      let name = trimmed;
+
+      if (trimmed.includes('@')) {
+        name = trimmed.split('@')[0];
+      } else {
+        email = `${trimmed}@temp.local`;
+      }
+
+      return await base44.entities.PuttingKingPlayer.create({
+        tournament_id: tournament.id,
+        user_email: email,
+        user_name: name,
+        active: true,
+        tournament_points: 0,
+        wins: 0,
+        losses: 0,
+        total_made_putts: 0,
+        total_attempts: 0,
+        stats_by_distance: {}
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setNewPlayerEmail('');
+      toast.success('Player added!');
+    }
+  });
+
+  const removePlayerMutation = useMutation({
+    mutationFn: (playerId) => base44.entities.PuttingKingPlayer.delete(playerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success('Player removed');
+    }
+  });
+
+  const startTournamentMutation = useMutation({
+    mutationFn: async () => {
+      // Get all stations
+      const allStations = await base44.entities.PuttingKingStation.list();
+      const tournamentStations = allStations.filter(s => s.tournament_id === tournament.id && s.enabled)
+        .sort((a, b) => a.order_index - b.order_index);
+
+      // Get all players
+      const allPlayers = await base44.entities.PuttingKingPlayer.list();
+      const tournamentPlayers = allPlayers
+        .filter(p => p.tournament_id === tournament.id && p.active)
+        .sort(() => Math.random() - 0.5); // Shuffle
+
+      if (tournamentPlayers.length < 4) {
+        throw new Error('Need at least 4 players');
+      }
+
+      const playersPerStation = 4;
+      
+      // Create first round matches
+      for (let i = 0; i < tournamentStations.length && i * playersPerStation < tournamentPlayers.length; i++) {
+        const station = tournamentStations[i];
+        const stationPlayers = tournamentPlayers.slice(i * playersPerStation, (i + 1) * playersPerStation);
+
+        if (stationPlayers.length === 4) {
+          const [p1, p2, p3, p4] = stationPlayers;
+          const teamA = [p1.user_email, p2.user_email];
+          const teamB = [p3.user_email, p4.user_email];
+
+          const match = await base44.entities.PuttingKingMatch.create({
+            tournament_id: tournament.id,
+            station_id: station.id,
+            round_number: 1,
+            status: 'ready',
+            team_a_players: teamA,
+            team_b_players: teamB,
+            score_a: 0,
+            score_b: 0
+          });
+
+          for (const player of stationPlayers) {
+            const partner = teamA.includes(player.user_email)
+              ? teamA.find(e => e !== player.user_email)
+              : teamB.find(e => e !== player.user_email);
+              
+            await base44.entities.PuttingKingPlayer.update(player.id, {
+              current_status: 'ready',
+              current_station_id: station.id,
+              current_match_id: match.id,
+              last_partner_email: partner
+            });
+          }
+        }
+      }
+
+      await base44.entities.PuttingKingTournament.update(tournament.id, { 
+        status: 'active'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success('Tournament started!');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to start tournament');
+    }
+  });
+
   const startNextRoundMutation = useMutation({
     mutationFn: async () => {
       const nextRound = tournament.current_round + 1;
@@ -364,8 +474,24 @@ export default function PuttingKingOverview() {
             </div>
           </div>
 
-          {/* Start Next Round Button (Host Only) */}
-          {canManage && allMatchesFinished && (
+          {/* Tournament Status Actions */}
+          {tournament.status === 'setup' ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
+                Setup Mode - Add players to start
+              </div>
+              {canManage && (
+                <Button
+                  onClick={() => startTournamentMutation.mutate()}
+                  disabled={startTournamentMutation.isPending || players.length < 4}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  {players.length < 4 ? `Start Tournament (${players.length}/4 players)` : 'Start Tournament'}
+                </Button>
+              )}
+            </div>
+          ) : canManage && allMatchesFinished && (
             <div className="flex flex-col items-center gap-2">
               {canStartNextRound ? (
                 <Button
@@ -406,7 +532,26 @@ export default function PuttingKingOverview() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Stations and Scoring */}
           <div className="lg:col-span-2 space-y-4">
-            <h2 className="text-xl font-bold text-slate-800">Stations</h2>
+            {tournament.status === 'setup' ? (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <h2 className="text-xl font-bold text-slate-800 mb-4">Tournament Setup</h2>
+                <p className="text-slate-600 mb-4">
+                  Share the PIN with players to join, or add them manually below. 
+                  You need at least 4 players to start the tournament.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="w-5 h-5 text-blue-600" />
+                    <span className="font-semibold text-blue-800">Players: {players.length}</span>
+                  </div>
+                  <div className="text-sm text-blue-600">
+                    {players.length < 4 ? `Need ${4 - players.length} more player${4 - players.length > 1 ? 's' : ''}` : 'Ready to start!'}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold text-slate-800">Stations</h2>
             {stations.map(station => {
               const match = getStationMatch(station.id);
               const isActiveScoring = activeScoringMatchId === match?.id;
@@ -501,8 +646,9 @@ export default function PuttingKingOverview() {
             })}
 
             {/* Match History */}
-            <div className="mt-6">
-              <h2 className="text-xl font-bold text-slate-800 mb-3">All Matches</h2>
+            {tournament.status !== 'setup' && (
+              <div className="mt-6">
+                <h2 className="text-xl font-bold text-slate-800 mb-3">All Matches</h2>
               <div className="space-y-2">
                 {matches
                   .filter(m => m.tournament_id === tournament.id)
@@ -548,14 +694,82 @@ export default function PuttingKingOverview() {
                     );
                   })}
               </div>
-            </div>
+              </div>
+            )}
+              </>
+            )}
           </div>
 
-                            {/* Leaderboard Column */}
-                            <div className="space-y-6">
-                            {/* Leaderboard */}
-                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                              <h2 className="text-xl font-bold text-slate-800 mb-4">Leaderboard</h2>
+          {/* Players Column */}
+          <div className="space-y-6">
+            {/* Add Player (Host Only) */}
+            {canManage && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <h2 className="text-xl font-bold text-slate-800 mb-4">Add Player</h2>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    value={newPlayerEmail}
+                    onChange={(e) => setNewPlayerEmail(e.target.value)}
+                    placeholder="Email or name"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && newPlayerEmail.trim()) {
+                        addPlayerMutation.mutate(newPlayerEmail);
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={() => addPlayerMutation.mutate(newPlayerEmail)}
+                    disabled={!newPlayerEmail.trim() || addPlayerMutation.isPending}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500">Add players by email or name</p>
+              </div>
+            )}
+
+            {/* Players List */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+              <h2 className="text-xl font-bold text-slate-800 mb-4">
+                Players ({players.length})
+              </h2>
+              <div className="space-y-2">
+                {players.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400">
+                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No players yet</p>
+                  </div>
+                ) : (
+                  players.map((player) => (
+                    <div key={player.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg">
+                      <div className="flex-1">
+                        <div className="font-semibold text-slate-800">{player.user_name}</div>
+                        {tournament.status !== 'setup' && (
+                          <div className="text-xs text-slate-500">
+                            {player.wins}W-{player.losses}L • {player.tournament_points} pts
+                          </div>
+                        )}
+                      </div>
+                      {canManage && tournament.status === 'setup' && (
+                        <Button
+                          onClick={() => removePlayerMutation.mutate(player.id)}
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Leaderboard (Active Tournament) */}
+            {tournament.status !== 'setup' && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <h2 className="text-xl font-bold text-slate-800 mb-4">Leaderboard</h2>
                               <div className="space-y-2">
                                 {leaderboard.map((player, idx) => (
                                   <div key={player.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors rounded-lg">
@@ -576,11 +790,12 @@ export default function PuttingKingOverview() {
                                     <div className="text-lg font-bold text-purple-600 flex-shrink-0">{player.tournament_points}</div>
                                   </div>
                                 ))}
-                              </div>
-                              </div>
-                              </div>
-              </div>
-              </div>
+                                </div>
+                                </div>
+                                )}
+                                </div>
+                                </div>
+                                </div>
               </div>
               );
               }

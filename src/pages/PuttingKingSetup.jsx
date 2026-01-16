@@ -21,7 +21,6 @@ export default function PuttingKingSetup() {
     { name: 'Basket 1', order: 1 },
     { name: 'Basket 2', order: 2 }
   ]);
-  const [playerEmails, setPlayerEmails] = useState(['']);
 
   const { data: user } = useQuery({
     queryKey: ['user'],

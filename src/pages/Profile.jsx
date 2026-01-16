@@ -66,6 +66,7 @@ export default function Profile() {
 
   const handleEdit = () => {
     setEditData({
+      display_name: user.display_name || '',
       bio: user.bio || '',
       profile_picture: user.profile_picture || '',
       gender: user.gender || ''
@@ -262,7 +263,10 @@ export default function Profile() {
                 )}
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-slate-800">{user.full_name}</h2>
+                <h2 className="text-2xl font-bold text-slate-800">{user.display_name || user.full_name}</h2>
+                {user.display_name && (
+                  <p className="text-sm text-slate-500">{user.full_name}</p>
+                )}
                 <p className="text-slate-500">{user.email}</p>
                 {user.gender && (
                   <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-semibold mt-1">
@@ -287,16 +291,24 @@ export default function Profile() {
                       className="w-20 h-20 rounded-full object-cover border-2 border-emerald-100"
                     />
                   ) : (
-                    <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-3xl font-bold text-emerald-600">
-                      {editData.full_name?.charAt(0) || 'U'}
-                    </div>
+                   <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-3xl font-bold text-emerald-600">
+                     {editData.display_name?.charAt(0) || user?.full_name?.charAt(0) || 'U'}
+                   </div>
                   )}
                   <label className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-emerald-700">
-                    <Camera className="w-4 h-4 text-white" />
-                    <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} disabled={uploading} />
+                   <Camera className="w-4 h-4 text-white" />
+                   <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} disabled={uploading} />
                   </label>
-                </div>
-                <div className="flex-1 space-y-3">
+                  </div>
+                  <div className="flex-1 space-y-3">
+                  <div>
+                   <label className="text-sm text-slate-600 mb-1 block">Display Name</label>
+                   <Input 
+                     value={editData.display_name}
+                     onChange={(e) => setEditData({ ...editData, display_name: e.target.value })}
+                     placeholder={user?.full_name}
+                   />
+                  </div>
                   <div>
                     <label className="text-sm text-slate-600 mb-1 block">Gender</label>
                     <Select 

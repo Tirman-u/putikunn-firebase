@@ -3,16 +3,19 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { toast } from 'sonner';
 
 export default function PuttingKingSetup() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tournamentId = searchParams.get('id');
   const queryClient = useQueryClient();
 
   const [tournamentName, setTournamentName] = useState('');
-  const [pin] = useState(() => Math.floor(1000 + Math.random() * 9000).toString());
+  const [pin, setPin] = useState(() => Math.floor(1000 + Math.random() * 9000).toString());
   const [targetScore, setTargetScore] = useState(21);
   const [totalRounds, setTotalRounds] = useState(6);
   const [stations, setStations] = useState([
@@ -24,6 +27,40 @@ export default function PuttingKingSetup() {
     queryKey: ['user'],
     queryFn: () => base44.auth.me()
   });
+
+  const { data: tournament, isLoading: tournamentLoading } = useQuery({
+    queryKey: ['tournament-edit', tournamentId],
+    queryFn: async () => {
+      const tournaments = await base44.entities.PuttingKingTournament.list();
+      return tournaments.find(t => t.id === tournamentId);
+    },
+    enabled: !!tournamentId
+  });
+
+  const { data: existingStations = [] } = useQuery({
+    queryKey: ['tournament-stations-edit', tournamentId],
+    queryFn: async () => {
+      const allStations = await base44.entities.PuttingKingStation.list();
+      return allStations.filter(s => s.tournament_id === tournamentId)
+        .sort((a, b) => a.order_index - b.order_index);
+    },
+    enabled: !!tournamentId
+  });
+
+  React.useEffect(() => {
+    if (tournament) {
+      setTournamentName(tournament.name);
+      setPin(tournament.pin);
+      setTargetScore(tournament.target_score);
+      setTotalRounds(tournament.total_rounds);
+    }
+  }, [tournament]);
+
+  React.useEffect(() => {
+    if (existingStations.length > 0) {
+      setStations(existingStations.map(s => ({ name: s.name, order: s.order_index, id: s.id })));
+    }
+  }, [existingStations]);
 
   const createTournamentMutation = useMutation({
     mutationFn: async (data) => {
@@ -59,11 +96,59 @@ export default function PuttingKingSetup() {
     },
     onSuccess: (tournament) => {
       queryClient.invalidateQueries({ queryKey: ['putting-king-tournaments'] });
+      toast.success('Tournament created!');
       navigate(`${createPageUrl('PuttingKingOverview')}?id=${tournament.id}`);
     }
   });
 
-  const handleCreateTournament = () => {
+  const updateTournamentMutation = useMutation({
+    mutationFn: async (data) => {
+      // Update tournament
+      await base44.entities.PuttingKingTournament.update(tournamentId, {
+        name: data.name,
+        target_score: data.targetScore,
+        total_rounds: data.totalRounds
+      });
+
+      // Update/create/delete stations
+      const currentStationIds = new Set(existingStations.map(s => s.id));
+      
+      // Update existing or create new stations
+      for (let i = 0; i < data.stations.length; i++) {
+        const station = data.stations[i];
+        if (station.id && currentStationIds.has(station.id)) {
+          // Update existing
+          await base44.entities.PuttingKingStation.update(station.id, {
+            name: station.name,
+            order_index: i + 1
+          });
+        } else {
+          // Create new
+          await base44.entities.PuttingKingStation.create({
+            tournament_id: tournamentId,
+            name: station.name,
+            order_index: i + 1,
+            enabled: true
+          });
+        }
+      }
+
+      // Delete removed stations
+      const newStationIds = new Set(data.stations.filter(s => s.id).map(s => s.id));
+      for (const existing of existingStations) {
+        if (!newStationIds.has(existing.id)) {
+          await base44.entities.PuttingKingStation.delete(existing.id);
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success('Tournament updated!');
+      navigate(`${createPageUrl('PuttingKingOverview')}?id=${tournamentId}`);
+    }
+  });
+
+  const handleSave = () => {
     if (!tournamentName.trim()) {
       alert('Please enter tournament name');
       return;
@@ -74,13 +159,19 @@ export default function PuttingKingSetup() {
       return;
     }
 
-    createTournamentMutation.mutate({
+    const data = {
       name: tournamentName,
       pin,
       targetScore,
       totalRounds,
       stations
-    });
+    };
+
+    if (tournamentId) {
+      updateTournamentMutation.mutate(data);
+    } else {
+      createTournamentMutation.mutate(data);
+    }
   };
 
   const addStation = () => {
@@ -102,8 +193,12 @@ export default function PuttingKingSetup() {
         </button>
 
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Setup Tournament</h1>
-          <p className="text-slate-600">Create tournament and add players afterwards</p>
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">
+            {tournamentId ? 'Manage Tournament' : 'Setup Tournament'}
+          </h1>
+          <p className="text-slate-600">
+            {tournamentId ? 'Edit tournament settings' : 'Create tournament and add players afterwards'}
+          </p>
         </div>
 
         <div className="space-y-6">
@@ -126,13 +221,18 @@ export default function PuttingKingSetup() {
                     <div className="text-3xl font-bold text-purple-600 tracking-wider">{pin}</div>
                   </div>
                   <Button
-                    onClick={() => navigator.clipboard.writeText(pin)}
+                    onClick={() => {
+                      navigator.clipboard.writeText(pin);
+                      toast.success('PIN copied!');
+                    }}
                     variant="outline"
                   >
                     Copy
                   </Button>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">Players will use this PIN to join</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {tournamentId ? 'PIN cannot be changed' : 'Players will use this PIN to join'}
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Target Score</label>
@@ -193,11 +293,20 @@ export default function PuttingKingSetup() {
 
           {/* Actions */}
           <Button
-            onClick={handleCreateTournament}
-            disabled={createTournamentMutation.isPending}
+            onClick={handleSave}
+            disabled={createTournamentMutation.isPending || updateTournamentMutation.isPending || tournamentLoading}
             className="w-full h-14 bg-purple-600 hover:bg-purple-700 text-lg font-bold"
           >
-            {createTournamentMutation.isPending ? 'Creating...' : 'Create Tournament'}
+            {tournamentId ? (
+              <>
+                <Save className="w-5 h-5 mr-2" />
+                {updateTournamentMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </>
+            ) : (
+              <>
+                {createTournamentMutation.isPending ? 'Creating...' : 'Create Tournament'}
+              </>
+            )}
           </Button>
         </div>
       </div>

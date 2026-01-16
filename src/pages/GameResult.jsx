@@ -7,6 +7,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format as formatDate } from 'date-fns';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import { toast } from 'sonner';
+import PerformanceAnalysis from '@/components/putting/PerformanceAnalysis';
 
 
 
@@ -357,6 +358,11 @@ export default function GameResult() {
             </div>
           </div>
         </div>
+
+        {/* Performance Analysis for single player games */}
+        {game.players.length === 1 && (
+          <PerformanceAnalysis playerPutts={game.player_putts?.[game.players[0]] || []} />
+        )}
 
         {/* Player Results */}
         {!gameFormat.singlePuttMode ? (

@@ -13,6 +13,7 @@ import JylyScoreTable from './JylyScoreTable';
 import ProgressBar from './ProgressBar';
 import MobileLeaderboard from './MobileLeaderboard';
 import PuttTypeSelector from './PuttTypeSelector';
+import PerformanceAnalysis from './PerformanceAnalysis';
 import { 
   GAME_FORMATS, 
   getNextDistanceFromMade, 
@@ -240,17 +241,18 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     if (format.singlePuttMode) {
       // Back & Forth: remove 1 putt
       const lastPutt = newPutts.pop();
-      
+
       const allPlayerPutts = { ...game.player_putts };
       allPlayerPutts[playerName] = newPutts;
 
       const newTotalPoints = { ...game.total_points };
       newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) - lastPutt.points;
 
-      // Recalculate distance from previous putt
+      // Recalculate distance - if there was a previous putt, check if it was made/missed
       let prevDistance = format.startDistance;
       if (newPutts.length > 0) {
-        prevDistance = newPutts[newPutts.length - 1].distance;
+        const prevPutt = newPutts[newPutts.length - 1];
+        prevDistance = getNextDistanceBackAndForth(prevPutt.distance, prevPutt.result === 'made');
       }
 
       const newPlayerDistances = { ...game.player_distances };
@@ -333,9 +335,12 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             <h1 className="text-4xl font-bold text-slate-800 mb-4">🎉 Complete!</h1>
             <p className="text-xl text-slate-600 mb-2">You finished all rounds</p>
             <p className="text-4xl font-bold text-emerald-600">{game.total_points[playerName]} points</p>
-          </motion.div>
+            </motion.div>
 
-          <div className="space-y-3">
+            {/* Performance Analysis */}
+            <PerformanceAnalysis playerPutts={playerPutts} />
+
+            <div className="space-y-3 mt-6">
             {!hasSubmitted && (
               <Button
                 onClick={() => submitToLeaderboardMutation.mutate()}

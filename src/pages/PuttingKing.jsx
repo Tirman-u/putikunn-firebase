@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Plus, Trophy, Settings, ArrowLeft, Trash2 } from 'lucide-react';
+import { Plus, Trophy, Settings, ArrowLeft, Trash2, BookOpen } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
+import TournamentRulesDialog from '@/components/putting/TournamentRulesDialog';
 
 export default function PuttingKing() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [showRules, setShowRules] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -50,6 +52,13 @@ export default function PuttingKing() {
           </div>
           <h1 className="text-4xl font-bold text-slate-800 mb-2">Putting King!</h1>
           <p className="text-slate-600">2v2 Tournament Battles</p>
+          <button
+            onClick={() => setShowRules(true)}
+            className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 hover:border-purple-300 hover:bg-purple-50 transition-all text-sm font-medium text-slate-700"
+          >
+            <BookOpen className="w-4 h-4" />
+            Reeglid
+          </button>
         </div>
 
         {/* Create Tournament */}
@@ -154,6 +163,8 @@ export default function PuttingKing() {
           </div>
         )}
       </div>
+
+      {showRules && <TournamentRulesDialog onClose={() => setShowRules(false)} />}
     </div>
   );
 }

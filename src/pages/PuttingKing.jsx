@@ -2,21 +2,26 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Plus, Trophy, Settings, ArrowLeft, Trash2, BookOpen } from 'lucide-react';
+import { Plus, Trophy, Settings, ArrowLeft, Trash2, BookOpen, Users } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import TournamentRulesDialog from '@/components/putting/TournamentRulesDialog';
+import JoinPuttingKing from '@/components/putting/JoinPuttingKing';
 
 export default function PuttingKing() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showRules, setShowRules] = useState(false);
+  const [mode, setMode] = useState(null);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
     queryFn: () => base44.auth.me()
   });
+
+  const userRole = user?.app_role || 'user';
+  const canManage = ['trainer', 'admin', 'super_admin'].includes(userRole);
 
   const { data: tournaments = [] } = useQuery({
     queryKey: ['putting-king-tournaments'],
@@ -34,6 +39,15 @@ export default function PuttingKing() {
 
   const myTournaments = tournaments.filter(t => t.host_user === user?.email);
   const activeTournaments = tournaments.filter(t => t.status === 'active' && t.current_round < t.total_rounds);
+
+  if (mode === 'join') {
+    return (
+      <JoinPuttingKing
+        onJoin={(tournament) => navigate(`${createPageUrl('PuttingKingOverview')}?id=${tournament.id}`)}
+        onBack={() => setMode(null)}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
@@ -61,15 +75,39 @@ export default function PuttingKing() {
           </button>
         </div>
 
-        {/* Create Tournament */}
-        <div className="mb-6">
-          <Button
-            onClick={() => navigate(createPageUrl('PuttingKingSetup'))}
-            className="w-full h-16 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-lg font-bold rounded-2xl"
+        {/* Main Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <button
+            onClick={() => setMode('join')}
+            className="bg-white hover:bg-purple-50 rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-300 transition-all text-left"
           >
-            <Plus className="w-6 h-6 mr-2" />
-            Create New Tournament
-          </Button>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center">
+                <Users className="w-7 h-7 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-800">Join Tournament</h3>
+                <p className="text-sm text-slate-500">Enter PIN to join</p>
+              </div>
+            </div>
+          </button>
+
+          {canManage && (
+            <button
+              onClick={() => navigate(createPageUrl('PuttingKingSetup'))}
+              className="bg-purple-600 hover:bg-purple-700 text-white rounded-2xl p-6 shadow-md transition-all text-left"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
+                  <Plus className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Setup Tournament</h3>
+                  <p className="text-sm text-purple-100">Create new tournament</p>
+                </div>
+              </div>
+            </button>
+          )}
         </div>
 
         {/* Active Tournaments */}
@@ -101,7 +139,7 @@ export default function PuttingKing() {
         )}
 
         {/* My Tournaments */}
-        {myTournaments.length > 0 && (
+        {canManage && myTournaments.length > 0 && (
           <div>
             <h2 className="text-xl font-bold text-slate-800 mb-3">My Tournaments</h2>
             <div className="space-y-3">

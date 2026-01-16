@@ -366,7 +366,7 @@ export default function PuttingKingOverview() {
           </div>
 
           {/* Start Next Round Button (Host Only) */}
-          {isHost && allMatchesFinished && (
+          {canManage && allMatchesFinished && (
             <div className="flex flex-col items-center gap-2">
               {canStartNextRound ? (
                 <Button
@@ -384,6 +384,24 @@ export default function PuttingKingOverview() {
               )}
             </div>
           )}
+          
+          {/* PIN Display */}
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <div className="text-sm text-slate-500">Tournament PIN:</div>
+            <div className="px-4 py-2 bg-purple-100 rounded-lg">
+              <div className="text-xl font-bold text-purple-700 tracking-wider">{tournament.pin}</div>
+            </div>
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(tournament.pin);
+                toast.success('PIN copied!');
+              }}
+              variant="outline"
+              size="sm"
+            >
+              Copy
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -436,6 +454,7 @@ export default function PuttingKingOverview() {
                             distances={distances}
                             onScore={(scoreData) => scoreMutation.mutate({ matchId: match.id, scoreData })}
                             getPlayerName={getPlayerName}
+                            canManage={canManage}
                           />
                         ) : (
                           <Button
@@ -452,22 +471,24 @@ export default function PuttingKingOverview() {
                           <div className="text-center py-2 text-sm text-slate-500">
                             Winner: Team {match.winner_team}
                           </div>
-                          <Button
-                            onClick={async () => {
-                              await base44.entities.PuttingKingMatch.update(match.id, {
-                                status: 'playing',
-                                winner_team: null,
-                                finished_at: null
-                              });
-                              queryClient.invalidateQueries();
-                              setActiveScoringMatchId(match.id);
-                            }}
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                          >
-                            Edit Score
-                          </Button>
+                          {canManage && (
+                            <Button
+                              onClick={async () => {
+                                await base44.entities.PuttingKingMatch.update(match.id, {
+                                  status: 'playing',
+                                  winner_team: null,
+                                  finished_at: null
+                                });
+                                queryClient.invalidateQueries();
+                                setActiveScoringMatchId(match.id);
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                            >
+                              Edit Score
+                            </Button>
+                          )}
                         </div>
                       )}
                     </>

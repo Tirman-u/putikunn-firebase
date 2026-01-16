@@ -14,6 +14,7 @@ export default function PuttingKingSetup() {
   const queryClient = useQueryClient();
 
   const [tournamentName, setTournamentName] = useState('');
+  const [pin] = useState(() => Math.floor(1000 + Math.random() * 9000).toString());
   const [targetScore, setTargetScore] = useState(21);
   const [totalRounds, setTotalRounds] = useState(6);
   const [stations, setStations] = useState([
@@ -32,6 +33,7 @@ export default function PuttingKingSetup() {
       // Create tournament
       const tournament = await base44.entities.PuttingKingTournament.create({
         name: data.name,
+        pin: data.pin,
         status: 'setup',
         target_score: data.targetScore,
         bust_reset_score: 11,
@@ -144,6 +146,7 @@ export default function PuttingKingSetup() {
 
     createTournamentMutation.mutate({
       name: tournamentName,
+      pin,
       targetScore,
       totalRounds,
       stations,
@@ -193,6 +196,21 @@ export default function PuttingKingSetup() {
                   onChange={(e) => setTournamentName(e.target.value)}
                   placeholder="e.g., Friday Night Battles"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">PIN Code</label>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 bg-purple-50 border-2 border-purple-200 rounded-xl p-4 text-center">
+                    <div className="text-3xl font-bold text-purple-600 tracking-wider">{pin}</div>
+                  </div>
+                  <Button
+                    onClick={() => navigator.clipboard.writeText(pin)}
+                    variant="outline"
+                  >
+                    Copy
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Players will use this PIN to join</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Target Score</label>

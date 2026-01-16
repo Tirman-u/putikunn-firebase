@@ -62,6 +62,10 @@ export default function PuttingKingOverview() {
     queryFn: () => base44.auth.me()
   });
 
+  const userRole = user?.app_role || 'user';
+  const isHost = tournament?.host_user === user?.email;
+  const canManage = ['trainer', 'admin', 'super_admin'].includes(userRole) || isHost;
+
   const leaderboard = [...players]
     .sort((a, b) => {
       if (b.tournament_points !== a.tournament_points) {

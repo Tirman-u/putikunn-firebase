@@ -6,6 +6,34 @@ import { X, Save } from 'lucide-react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
+const rulesStyle = `
+  .rules-content ul {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    margin: 0.5rem 0;
+  }
+  .rules-content ol {
+    list-style-type: decimal;
+    padding-left: 1.5rem;
+    margin: 0.5rem 0;
+  }
+  .rules-content li {
+    margin: 0.25rem 0;
+  }
+  .rules-content p {
+    margin: 0.5rem 0;
+  }
+  .rules-content strong {
+    font-weight: 600;
+  }
+  .rules-content em {
+    font-style: italic;
+  }
+  .rules-content u {
+    text-decoration: underline;
+  }
+`;
+
 const DEFAULT_RULES = `<p><strong>Putting King</strong> on meeskondlik puttamisvõistlus, kus mängijad võistlevad paarikaupa erinevates puttamisjaamades. Mängu eesmärk on koguda etteantud punktisumma enne vastasmeeskonda.</p>
 
 <p><strong>Eesmärkpunktisumma:</strong> 21 punkti</p>
@@ -81,6 +109,7 @@ export default function TournamentRulesDialog({ onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <style>{rulesStyle}</style>
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
           <h2 className="text-2xl font-bold text-slate-800">Reeglid</h2>
@@ -112,7 +141,10 @@ export default function TournamentRulesDialog({ onClose }) {
               />
             </div>
           ) : (
-            <div className="prose prose-slate max-w-none text-sm" dangerouslySetInnerHTML={{ __html: displayRules }} />
+            <div 
+              className="rules-content text-slate-700"
+              dangerouslySetInnerHTML={{ __html: displayRules }} 
+            />
           )}
         </div>
 

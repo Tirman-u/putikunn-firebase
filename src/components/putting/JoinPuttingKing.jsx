@@ -37,11 +37,41 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
       return;
     }
 
-    onJoin(tournament);
+    await joinTournament(tournament);
   };
 
-  const handleQuickJoin = (tournament) => {
-    onJoin(tournament);
+  const handleQuickJoin = async (tournament) => {
+    await joinTournament(tournament);
+  };
+
+  const joinTournament = async (tournament) => {
+    try {
+      // Check if user is already a player
+      const allPlayers = await base44.entities.PuttingKingPlayer.list();
+      const existingPlayer = allPlayers.find(
+        p => p.tournament_id === tournament.id && p.user_email === user.email
+      );
+
+      if (!existingPlayer) {
+        // Add user as a player
+        await base44.entities.PuttingKingPlayer.create({
+          tournament_id: tournament.id,
+          user_email: user.email,
+          user_name: user.full_name || user.email.split('@')[0],
+          active: true,
+          tournament_points: 0,
+          wins: 0,
+          losses: 0,
+          total_made_putts: 0,
+          total_attempts: 0,
+          stats_by_distance: {}
+        });
+      }
+
+      onJoin(tournament);
+    } catch (error) {
+      setError('Failed to join tournament');
+    }
   };
 
   return (

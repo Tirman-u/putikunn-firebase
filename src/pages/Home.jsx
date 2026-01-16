@@ -25,7 +25,6 @@ export default function Home() {
   const userRole = user?.app_role || 'user';
   const canHostGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
   const canManageGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
-  const canAccessPuttingKing = ['trainer', 'admin', 'super_admin'].includes(userRole);
 
 
 
@@ -133,22 +132,20 @@ export default function Home() {
               </div>
             </button>
 
-            {canAccessPuttingKing && (
-              <button
-                onClick={() => window.location.href = createPageUrl('PuttingKing')}
-                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                    <Trophy className="w-7 h-7 text-purple-600" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <h3 className="text-lg font-bold text-slate-800">Putting King</h3>
-                    <p className="text-sm text-slate-500">Manage tournaments and competitions</p>
-                  </div>
+            <button
+              onClick={() => window.location.href = createPageUrl('PuttingKing')}
+              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                  <Trophy className="w-7 h-7 text-purple-600" />
                 </div>
-              </button>
-            )}
+                <div className="text-left flex-1">
+                  <h3 className="text-lg font-bold text-slate-800">Putting King</h3>
+                  <p className="text-sm text-slate-500">Join tournaments and compete</p>
+                </div>
+              </div>
+            </button>
 
             <div className="pt-8 border-t-2 border-slate-200 mt-8 space-y-3">
             {canManageGames && (

@@ -65,7 +65,7 @@ export default function Home() {
         <div className="max-w-lg mx-auto pt-16">
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-slate-800 mb-2">
-              Welcome {user?.full_name || 'Guest'}!
+              Welcome {user?.display_name || user?.full_name || 'Guest'}!
             </h1>
             <p className="text-slate-600 text-xl mb-8">Ready to make some putts?</p>
           </div>

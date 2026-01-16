@@ -45,6 +45,11 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     onSuccess: (updatedGame) => {
       // Update cache immediately with the response
       queryClient.setQueryData(['game', gameId], updatedGame);
+
+      // Auto-complete solo games when finished
+      if (updatedGame.pin === '0000' && isGameComplete(updatedGame.game_type, updatedGame.player_putts?.[playerName]?.length || 0)) {
+        base44.entities.Game.update(id, { status: 'completed' });
+      }
     }
   });
 

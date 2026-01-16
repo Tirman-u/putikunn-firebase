@@ -46,6 +46,23 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
 
   const joinTournament = async (tournament) => {
     try {
+      // Check if tournament is still joinable (setup or active only)
+      if (tournament.status === 'finished' || tournament.status === 'paused') {
+        setError('This tournament is no longer accepting players');
+        return;
+      }
+
+      // Check if tournament has completed all rounds
+      const allMatches = await base44.entities.PuttingKingMatch.list();
+      const tournamentMatches = allMatches.filter(m => m.tournament_id === tournament.id && m.round_number === tournament.current_round);
+      const allMatchesFinished = tournamentMatches.length > 0 && tournamentMatches.every(m => m.status === 'finished');
+      const isTournamentComplete = tournament.current_round === tournament.total_rounds && allMatchesFinished;
+      
+      if (isTournamentComplete) {
+        setError('This tournament has already finished');
+        return;
+      }
+
       // Check if user is already a player
       const allPlayers = await base44.entities.PuttingKingPlayer.list();
       const existingPlayer = allPlayers.find(

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { X, Save } from 'lucide-react';
 import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 const DEFAULT_RULES = `<p><strong>Putting King</strong> on meeskondlik puttamisvõistlus, kus mängijad võistlevad paarikaupa erinevates puttamisjaamades. Mängu eesmärk on koguda etteantud punktisumma enne vastasmeeskonda.</p>
 

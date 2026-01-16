@@ -95,17 +95,21 @@ export default function TournamentRulesDialog({ onClose }) {
           {isLoading ? (
             <div className="text-center text-slate-400">Loading...</div>
           ) : isEditing ? (
-            <ReactQuill
-              value={editedRules}
-              onChange={setEditedRules}
-              modules={{
-                toolbar: [
-                  ['bold', 'italic', 'underline'],
-                  [{ 'list': 'bullet' }, { 'list': 'ordered' }]
-                ]
-              }}
-              placeholder="Kirjuta reeglid siia..."
-            />
+            <div className="min-h-[400px]">
+              <ReactQuill
+                value={editedRules}
+                onChange={setEditedRules}
+                theme="snow"
+                className="h-[400px]"
+                modules={{
+                  toolbar: [
+                    ['bold', 'italic', 'underline'],
+                    [{ 'list': 'bullet' }, { 'list': 'ordered' }]
+                  ]
+                }}
+                placeholder="Kirjuta reeglid siia..."
+              />
+            </div>
           ) : (
             <div className="prose prose-slate max-w-none text-sm" dangerouslySetInnerHTML={{ __html: displayRules }} />
           )}

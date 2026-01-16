@@ -53,11 +53,11 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
       );
 
       if (!existingPlayer) {
-        // Add user as a player
+        // Add user as a player with display_name (nickname) or fallback to full_name
         await base44.entities.PuttingKingPlayer.create({
           tournament_id: tournament.id,
           user_email: user.email,
-          user_name: user.full_name || user.email.split('@')[0],
+          user_name: user.display_name || user.full_name || user.email.split('@')[0],
           active: true,
           tournament_points: 0,
           wins: 0,

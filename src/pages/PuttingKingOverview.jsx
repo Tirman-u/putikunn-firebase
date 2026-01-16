@@ -251,18 +251,32 @@ export default function PuttingKingOverview() {
     mutationFn: async (emailOrName) => {
       const trimmed = emailOrName.trim();
       let email = trimmed;
-      let name = trimmed;
+      let displayName = trimmed;
 
+      // If it's an email, try to find the user
       if (trimmed.includes('@')) {
-        name = trimmed.split('@')[0];
+        email = trimmed;
+        try {
+          const allUsers = await base44.entities.User.list();
+          const foundUser = allUsers.find(u => u.email === email);
+          if (foundUser) {
+            displayName = foundUser.display_name || foundUser.full_name;
+          } else {
+            displayName = trimmed.split('@')[0];
+          }
+        } catch {
+          displayName = trimmed.split('@')[0];
+        }
       } else {
+        // Just a name, create temp email
         email = `${trimmed}@temp.local`;
+        displayName = trimmed;
       }
 
       return await base44.entities.PuttingKingPlayer.create({
         tournament_id: tournament.id,
         user_email: email,
-        user_name: name,
+        user_name: displayName,
         active: true,
         tournament_points: 0,
         wins: 0,

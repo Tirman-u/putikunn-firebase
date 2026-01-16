@@ -2,33 +2,24 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { X, Save } from 'lucide-react';
+import ReactQuill from 'react-quill';
 
-const DEFAULT_RULES = `# Putting King Võistluse Reeglid
+const DEFAULT_RULES = `<p><strong>Putting King</strong> on meeskondlik puttamisvõistlus, kus mängijad võistlevad paarikaupa erinevates puttamisjaamades. Mängu eesmärk on koguda etteantud punktisumma enne vastasmeeskonda.</p>
 
-## Mängu Formaat
-• 2v2 võistkondlik turniir
-• Mäng kestab kuni 21 punktini
-• Bust'i korral tagasi 11 punktile
+<p><strong>Eesmärkpunktisumma:</strong> 21 punkti</p>
 
-## Punktisüsteem
-• Võit: 2 punkti
-• Viik: 1 punkt
-• Kaotus: 0 punkti
+<p><strong>Raundide arv:</strong> vaikimisi 6 raundi (seadistatav vahemikus 1–20)</p>
 
-## Kaugused ja Punktid
-• 5m: +1 punkt (sisse) / 0 punkti (mööda)
-• 7m: +2 punkti (sisse) / -1 punkt (mööda)
-• 9m: +3 punkti (sisse) / -2 punkti (mööda)
-• 11m: +5 punkti (sisse) / -3 punkti (mööda)
+<p><strong>Võit:</strong> mängu võidab meeskond, kes jõuab esimesena täpselt 21 punktini</p>
 
-## Ringide Arv
-• Kokku 6 ringi
-• Peale iga ringi toimub rotatsioon
-
-## Lisaküsimuste Korral
-Võta ühendust korraldajaga.`;
+<p><strong>Viik ja Sudden Death</strong></p>
+<p>Kui mõlemad meeskonnad saavutavad 21 punkti samas raundis, järgneb <strong>Sudden Death</strong>:</p>
+<ul>
+<li>mängitakse lisa-voor</li>
+<li>Sudden Death'i võitja teenib <strong>+1 lisapunkti</strong></li>
+<li>lõpptulemus võib olla näiteks 21 : 22</li>
+</ul>`;
 
 export default function TournamentRulesDialog({ onClose }) {
   const queryClient = useQueryClient();
@@ -104,16 +95,24 @@ export default function TournamentRulesDialog({ onClose }) {
           {isLoading ? (
             <div className="text-center text-slate-400">Loading...</div>
           ) : isEditing ? (
-            <Textarea
-              value={editedRules}
-              onChange={(e) => setEditedRules(e.target.value)}
-              className="w-full h-96 font-mono text-sm"
-              placeholder="Sisesta reeglid..."
-            />
-          ) : (
-            <div className="prose prose-slate max-w-none">
-              <pre className="whitespace-pre-wrap text-sm text-slate-700 font-sans">{displayRules}</pre>
+            <div className="bg-white">
+              <ReactQuill
+                value={editedRules}
+                onChange={setEditedRules}
+                theme="snow"
+                className="h-96"
+                modules={{
+                  toolbar: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    ['clean']
+                  ]
+                }}
+              />
             </div>
+          ) : (
+            <div className="prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: displayRules }} />
           )}
         </div>
 

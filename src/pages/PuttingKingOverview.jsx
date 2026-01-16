@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import PuttingKingScoreInput from '@/components/putting/PuttingKingScoreInput';
 import SuddenDeathDialog from '@/components/putting/SuddenDeathDialog';
 import PuttingKingRules from '@/components/putting/PuttingKingRules';
+import TournamentRulesDialog from '@/components/putting/TournamentRulesDialog';
 
 export default function PuttingKingOverview() {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ export default function PuttingKingOverview() {
   const [activeScoringMatchId, setActiveScoringMatchId] = useState(null);
   const [suddenDeathMatch, setSuddenDeathMatch] = useState(null);
   const [newPlayerEmail, setNewPlayerEmail] = useState('');
+  const [showRulesDialog, setShowRulesDialog] = useState(false);
 
   const { data: tournament } = useQuery({
     queryKey: ['tournament', tournamentId],
@@ -470,6 +472,9 @@ export default function PuttingKingOverview() {
           getPlayerName={getPlayerName}
         />
       )}
+      {showRulesDialog && (
+        <TournamentRulesDialog onClose={() => setShowRulesDialog(false)} />
+      )}
       <div className="max-w-7xl mx-auto pt-8">
         <button
           onClick={() => navigate(-1)}
@@ -567,6 +572,16 @@ export default function PuttingKingOverview() {
                       {players.length < minPlayersRequired ? `Need ${minPlayersRequired - players.length} more player${minPlayersRequired - players.length > 1 ? 's' : ''}` : 'Ready to start!'}
                     </div>
                   </div>
+                </div>
+                <div className="flex items-center justify-between mb-4">
+                  <div></div>
+                  <Button
+                    onClick={() => setShowRulesDialog(true)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Muuda Reegleid
+                  </Button>
                 </div>
                 <PuttingKingRules tournament={tournament} />
               </>

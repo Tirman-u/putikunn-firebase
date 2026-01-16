@@ -743,28 +743,36 @@ export default function PuttingKingOverview() {
                     <p className="text-sm">No players yet</p>
                   </div>
                 ) : (
-                  players.map((player) => (
-                    <div key={player.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg">
-                      <div className="flex-1">
-                        <div className="font-semibold text-slate-800">{player.user_name}</div>
-                        {tournament.status !== 'setup' && (
-                          <div className="text-xs text-slate-500">
-                            {player.wins}W-{player.losses}L • {player.tournament_points} pts
+                  players.map((player) => {
+                    const isCurrentUser = player.user_email === user?.email;
+                    const canRemove = (canManage || isCurrentUser) && tournament.status === 'setup';
+                    
+                    return (
+                      <div key={player.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-semibold text-slate-800">
+                            {player.user_name}
+                            {isCurrentUser && <span className="ml-2 text-xs text-emerald-600">(You)</span>}
                           </div>
+                          {tournament.status !== 'setup' && (
+                            <div className="text-xs text-slate-500">
+                              {player.wins}W-{player.losses}L • {player.tournament_points} pts
+                            </div>
+                          )}
+                        </div>
+                        {canRemove && (
+                          <Button
+                            onClick={() => removePlayerMutation.mutate(player.id)}
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         )}
                       </div>
-                      {canManage && tournament.status === 'setup' && (
-                        <Button
-                          onClick={() => removePlayerMutation.mutate(player.id)}
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

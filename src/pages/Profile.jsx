@@ -57,7 +57,8 @@ export default function Profile() {
 
   const updateUserMutation = useMutation({
     mutationFn: (data) => base44.auth.updateMe(data),
-    onSuccess: () => {
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(['user'], updatedUser);
       queryClient.invalidateQueries({ queryKey: ['user'] });
       setIsEditing(false);
     }

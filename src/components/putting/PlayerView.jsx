@@ -45,11 +45,6 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     onSuccess: (updatedGame) => {
       // Update cache immediately with the response
       queryClient.setQueryData(['game', gameId], updatedGame);
-
-      // Auto-complete solo games when finished
-      if (updatedGame.pin === '0000' && isGameComplete(updatedGame.game_type, updatedGame.player_putts?.[playerName]?.length || 0)) {
-        base44.entities.Game.update(id, { status: 'completed' });
-      }
     }
   });
 
@@ -133,12 +128,18 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const newPlayerDistances = { ...game.player_distances };
     newPlayerDistances[playerName] = nextDistance;
 
+    // Check if game is complete after this update
+    const updatedPuttsLength = allPlayerPutts[playerName].length;
+    const willBeComplete = isGameComplete(gameType, updatedPuttsLength);
+    const isSoloGame = game.pin === '0000';
+
     updateGameMutation.mutate({
       id: game.id,
       data: {
         player_putts: allPlayerPutts,
         total_points: newTotalPoints,
-        player_distances: newPlayerDistances
+        player_distances: newPlayerDistances,
+        ...(willBeComplete && isSoloGame ? { status: 'completed' } : {})
       }
     });
   };
@@ -200,13 +201,19 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const newPlayerDistances = { ...game.player_distances };
     newPlayerDistances[playerName] = nextDistance;
 
+    // Check if game is complete after this update (for back_and_forth)
+    const updatedPuttsLength = allPlayerPutts[playerName].length;
+    const willBeComplete = gameType !== 'streak_challenge' && isGameComplete(gameType, updatedPuttsLength);
+    const isSoloGame = game.pin === '0000';
+
     updateGameMutation.mutate({
       id: game.id,
       data: {
         player_putts: allPlayerPutts,
         total_points: newTotalPoints,
         player_distances: newPlayerDistances,
-        ...streakUpdate
+        ...streakUpdate,
+        ...(willBeComplete && isSoloGame ? { status: 'completed' } : {})
       }
     });
   };

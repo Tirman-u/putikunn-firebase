@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import PuttingKingScoreInput from '@/components/putting/PuttingKingScoreInput';
 import SuddenDeathDialog from '@/components/putting/SuddenDeathDialog';
+import PuttingKingRules from '@/components/putting/PuttingKingRules';
 
 export default function PuttingKingOverview() {
   const navigate = useNavigate();
@@ -566,6 +567,7 @@ export default function PuttingKingOverview() {
                   </div>
                 </div>
               </div>
+              <PuttingKingRules tournament={tournament} />
             ) : (
               <>
                 <h2 className="text-xl font-bold text-slate-800">Stations</h2>

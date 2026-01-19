@@ -7,9 +7,9 @@ import { toast } from 'sonner';
 const DIFFICULTY_PRESETS = {
   easy: { label: 'Easy', threshold: 1, discs: 1 },
   medium: { label: 'Medium', threshold: 2, discs: 3 },
-  hard: { label: 'Hard', threshold: 3, discs: 3 },
-  ultra_hard: { label: 'Ultra Hard', threshold: 4, discs: 4 },
-  impossible: { label: 'Impossible', threshold: 5, discs: 5 }
+  hard: { label: 'Hard', threshold: 3, discs: 5 },
+  ultra_hard: { label: 'Ultra Hard', threshold: 4, discs: 7 },
+  impossible: { label: 'Impossible', threshold: 5, discs: 10 }
 };
 
 export default function AroundTheWorldSetup({ isSolo, onBack, onStart }) {

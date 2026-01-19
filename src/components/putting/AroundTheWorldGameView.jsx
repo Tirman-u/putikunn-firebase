@@ -108,7 +108,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
           }
         }
 
-        const pointsAwarded = distances[currentIndex];
+        const pointsAwarded = distances[currentIndex] * config.discs_per_turn;
 
         const updatedState = {
           current_distance_index: newIndex,
@@ -227,7 +227,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         newIndex = 0;
       }
 
-      const pointsAwarded = distances[currentIndex];
+      const pointsAwarded = distances[currentIndex] * config.discs_per_turn;
 
       // Create turn record
       const turnRecord = {

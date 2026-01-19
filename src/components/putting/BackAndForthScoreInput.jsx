@@ -76,9 +76,7 @@ export default function BackAndForthScoreInput({
 
       {/* Current Distance - BIG AND CLEAR */}
       <div className="text-center bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <div className="text-xs text-slate-500 mb-1">Current Distance</div>
         <div className="text-5xl font-bold text-slate-800 mb-1">{currentDistance}m</div>
-        <div className="text-xs text-slate-500">Frame {currentFrameIndex + 1} of {totalFrames}</div>
       </div>
 
       {/* Current Frame Detail */}

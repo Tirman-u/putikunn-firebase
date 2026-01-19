@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X, Undo2 } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X, Undo2, Trophy, RotateCcw, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
-const ConfirmRoundDialog = ({ isOpen, onFinish, onRetry }) => {
+const ConfirmRoundDialog = ({ isOpen, onFinish, onRetry, onComplete }) => {
   if (!isOpen) return null;
 
   return (
@@ -18,14 +18,22 @@ const ConfirmRoundDialog = ({ isOpen, onFinish, onRetry }) => {
             <CheckCircle2 className="w-6 h-6 text-emerald-600" />
           </div>
           <h3 className="text-xl font-bold text-slate-800 mb-2">Ring salvestatud</h3>
-          <p className="text-slate-600">Kas see on õige?</p>
+          <p className="text-slate-600">Mida teha edasi?</p>
         </div>
         <div className="space-y-3">
           <Button
             onClick={onFinish}
             className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
           >
-            Lõpeta ring
+            Jätka mängu
+          </Button>
+          <Button
+            onClick={onComplete}
+            variant="outline"
+            className="w-full h-12 border-amber-300 text-amber-700 hover:bg-amber-50"
+          >
+            <Trophy className="w-4 h-4 mr-2" />
+            Lõpeta mäng
           </Button>
           <Button
             onClick={onRetry}
@@ -307,6 +315,64 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     finishRoundMutation.mutate();
   };
 
+  const completeGameMutation = useMutation({
+    mutationFn: async () => {
+      const playerState = game.atw_state[playerName];
+      const currentScore = game.total_points?.[playerName] || 0;
+      const bestScore = Math.max(playerState.best_score || 0, currentScore);
+
+      await base44.entities.Game.update(gameId, {
+        status: 'completed',
+        atw_state: {
+          ...game.atw_state,
+          [playerName]: {
+            ...playerState,
+            best_score: bestScore
+          }
+        }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+      setShowConfirmDialog(false);
+    }
+  });
+
+  const handleCompleteGame = () => {
+    completeGameMutation.mutate();
+  };
+
+  const handlePlayAgain = async () => {
+    const playerState = game.atw_state[playerName];
+    const currentScore = game.total_points?.[playerName] || 0;
+    const bestScore = Math.max(playerState.best_score || 0, currentScore);
+
+    await base44.entities.Game.update(gameId, {
+      status: 'active',
+      atw_state: {
+        ...game.atw_state,
+        [playerName]: {
+          current_distance_index: 0,
+          direction: 'UP',
+          laps_completed: 0,
+          turns_played: 0,
+          total_makes: 0,
+          total_putts: 0,
+          current_round_draft: { attempts: [], is_finalized: false },
+          history: [],
+          best_score: bestScore,
+          attempts_count: (playerState.attempts_count || 0) + 1
+        }
+      },
+      total_points: {
+        ...game.total_points,
+        [playerName]: 0
+      }
+    });
+
+    queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+  };
+
   const undoMutation = useMutation({
     mutationFn: async () => {
       const playerState = game.atw_state[playerName];
@@ -399,12 +465,108 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const difficultyLabel = difficultyLabels[config.difficulty] || 'Medium';
 
+  // Completed game view
+  if (game.status === 'completed') {
+    const attemptsCount = (playerState.attempts_count || 0) + 1;
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+        <div className="max-w-md mx-auto px-4 pt-8">
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={() => navigate(createPageUrl('Home'))}
+              className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span className="font-medium">Tagasi</span>
+            </button>
+          </div>
+
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trophy className="w-10 h-10 text-emerald-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">Mäng lõpetatud!</h1>
+            <p className="text-slate-600">Siin on sinu tulemused</p>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
+              <div className="text-4xl font-bold text-emerald-600 mb-2">{totalScore}</div>
+              <div className="text-sm text-slate-600">Viimane tulemus</div>
+            </div>
+            <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
+              <div className="text-4xl font-bold text-amber-600 mb-2">{bestScore}</div>
+              <div className="text-sm text-slate-600">Parim tulemus</div>
+            </div>
+            <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
+              <div className="text-4xl font-bold text-blue-600 mb-2">{attemptsCount}</div>
+              <div className="text-sm text-slate-600">Proovitud kordi</div>
+            </div>
+            <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
+              <div className="text-4xl font-bold text-purple-600 mb-2">{makeRate}%</div>
+              <div className="text-sm text-slate-600">Täpsus</div>
+            </div>
+          </div>
+
+          {/* Additional Stats */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
+            <h3 className="font-bold text-slate-800 mb-4">Kokkuvõte</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-slate-600">Läbitud ringe:</span>
+                <span className="font-semibold text-slate-800">{playerState.laps_completed}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-600">Käike kokku:</span>
+                <span className="font-semibold text-slate-800">{playerState.turns_played}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-600">Viskeid kokku:</span>
+                <span className="font-semibold text-slate-800">{playerState.total_putts}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-600">Sisse saadud:</span>
+                <span className="font-semibold text-slate-800">{playerState.total_makes}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-600">Raskusaste:</span>
+                <span className="font-semibold text-slate-800">{difficultyLabel} - {config.discs_per_turn} ketas{config.discs_per_turn > 1 ? 't' : ''}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <Button
+              onClick={handlePlayAgain}
+              className="w-full h-14 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-lg"
+            >
+              <RotateCcw className="w-5 h-5 mr-2" />
+              Mängi uuesti
+            </Button>
+            
+            <Button
+              onClick={() => navigate(createPageUrl('Home'))}
+              variant="outline"
+              className="w-full h-14 text-lg"
+            >
+              Tagasi avalehele
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <ConfirmRoundDialog
         isOpen={showConfirmDialog}
         onFinish={handleFinish}
         onRetry={handleRetry}
+        onComplete={handleCompleteGame}
       />
 
       <div className="max-w-md mx-auto px-4 pt-8">

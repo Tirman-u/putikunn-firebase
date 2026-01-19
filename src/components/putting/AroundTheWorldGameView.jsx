@@ -316,6 +316,29 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const difficultyLabel = difficultyLabels[config.difficulty] || 'Medium';
 
+  // Leaderboard view
+  if (showLeaderboard) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+        <div className="max-w-4xl mx-auto px-4 pt-8 pb-12">
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={() => setShowLeaderboard(false)}
+              className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span className="font-medium">Tagasi</span>
+            </button>
+            <h1 className="text-2xl font-bold text-slate-800">{game.name}</h1>
+            <div className="w-16" />
+          </div>
+          
+          <ATWLeaderboard game={game} />
+        </div>
+      </div>
+    );
+  }
+
   const ConfirmRoundDialog = ({ isOpen, onFinish, onRetry, onComplete }) => {
       if (!isOpen) return null;
 

@@ -61,7 +61,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   });
 
   const submitTurnMutation = useMutation({
-    mutationFn: async ({ madePutts, isRetry }) => {
+    mutationFn: async ({ madePutts }) => {
       const config = game.atw_config;
       const playerState = game.atw_state?.[playerName] || {
         current_distance_index: 0,
@@ -71,43 +71,100 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         total_makes: 0,
         total_putts: 0,
         current_round_draft: { attempts: [], is_finalized: false },
-        history: []
+        history: [],
+        best_score: 0
       };
 
-      // Add attempt to draft
-      const newAttempt = {
-        made_putts: madePutts,
-        timestamp: new Date().toISOString()
-      };
+      // For 1 disc mode with made putt - finalize immediately
+      if (config.discs_per_turn === 1 && madePutts === 1) {
+        const currentIndex = playerState.current_distance_index;
+        const direction = playerState.direction;
+        const threshold = config.advance_threshold;
+        const distances = config.distances;
 
-      const updatedDraft = {
-        ...playerState.current_round_draft,
-        attempts: [...(playerState.current_round_draft?.attempts || []), newAttempt]
-      };
+        let newIndex = currentIndex;
+        let newDirection = direction;
+        let lapEvent = false;
 
-      const updatedState = {
-        ...playerState,
-        current_round_draft: updatedDraft
-      };
-
-      await base44.entities.Game.update(gameId, {
-        atw_state: {
-          ...game.atw_state,
-          [playerName]: updatedState
+        // Advance
+        if (direction === 'UP') {
+          newIndex = Math.min(currentIndex + 1, distances.length - 1);
+          if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
+            newDirection = 'DOWN';
+          }
+        } else {
+          newIndex = Math.max(currentIndex - 1, 0);
+          if (newIndex === 0 && currentIndex > 0) {
+            newDirection = 'UP';
+            lapEvent = true;
+          }
         }
-      });
 
-      return { isRetry, madePutts };
+        const pointsAwarded = distances[currentIndex];
+
+        const updatedState = {
+          current_distance_index: newIndex,
+          direction: newDirection,
+          laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
+          turns_played: playerState.turns_played + 1,
+          total_makes: playerState.total_makes + madePutts,
+          total_putts: playerState.total_putts + 1,
+          current_round_draft: { attempts: [], is_finalized: false },
+          history: [...playerState.history, {
+            turn_number: playerState.turns_played + 1,
+            distance: distances[currentIndex],
+            direction: direction,
+            made_putts: madePutts,
+            moved_to_distance: distances[newIndex],
+            points_awarded: pointsAwarded,
+            lap_event: lapEvent
+          }],
+          best_score: playerState.best_score
+        };
+
+        await base44.entities.Game.update(gameId, {
+          atw_state: {
+            ...game.atw_state,
+            [playerName]: updatedState
+          },
+          total_points: {
+            ...game.total_points,
+            [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
+          }
+        });
+
+        return { showDialog: false };
+      } else {
+        // For miss or multi-disc mode - save to draft
+        const newAttempt = {
+          made_putts: madePutts,
+          timestamp: new Date().toISOString()
+        };
+
+        const updatedDraft = {
+          ...playerState.current_round_draft,
+          attempts: [...(playerState.current_round_draft?.attempts || []), newAttempt]
+        };
+
+        const updatedState = {
+          ...playerState,
+          current_round_draft: updatedDraft
+        };
+
+        await base44.entities.Game.update(gameId, {
+          atw_state: {
+            ...game.atw_state,
+            [playerName]: updatedState
+          }
+        });
+
+        return { showDialog: true };
+      }
     },
-    onSuccess: ({ isRetry, madePutts }) => {
+    onSuccess: ({ showDialog }) => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-      // For 1 disc: only show dialog on miss (0), auto-finalize on make (1)
-      const shouldShowDialog = config.discs_per_turn === 1 ? madePutts === 0 : true;
-      if (!isRetry && shouldShowDialog) {
+      if (showDialog) {
         setShowConfirmDialog(true);
-      } else if (config.discs_per_turn === 1 && madePutts === 1 && !isRetry) {
-        // Auto-finalize for made putt with 1 disc
-        finishRoundMutation.mutate();
       }
     }
   });
@@ -208,7 +265,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const handleSubmitPutts = (madePutts) => {
     setPendingMadePutts(madePutts);
-    submitTurnMutation.mutate({ madePutts, isRetry: false });
+    submitTurnMutation.mutate({ madePutts });
   };
 
   const handleRetry = async () => {

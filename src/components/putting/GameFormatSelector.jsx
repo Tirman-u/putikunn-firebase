@@ -70,7 +70,7 @@ export default function GameFormatSelector({ selected, onSelect }) {
           )}
         >
           {format.badge && (
-            <div className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded transform rotate-45">
+            <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded transform rotate-12">
               {format.badge}
             </div>
           )}

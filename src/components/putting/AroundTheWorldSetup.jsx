@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import PuttTypeSelector from './PuttTypeSelector';
 
 const DIFFICULTY_PRESETS = {
   easy: { label: 'Easy', threshold: 1, discs: 1 },
@@ -12,9 +13,10 @@ const DIFFICULTY_PRESETS = {
   impossible: { label: 'Impossible', threshold: 5, discs: 10 }
 };
 
-export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPin, initialName }) {
+export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPin, initialName, initialPuttType }) {
   const [gameName, setGameName] = useState(initialName || '');
   const [difficulty, setDifficulty] = useState('medium');
+  const [puttType, setPuttType] = useState(initialPuttType || 'regular');
   const [pin] = useState(initialPin || (isSolo ? '0000' : Math.floor(1000 + Math.random() * 9000).toString()));
   const [copied, setCopied] = useState(false);
 
@@ -29,6 +31,7 @@ export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPi
       name: gameName || 'Around the World',
       gameType: 'around_the_world',
       pin: isSolo ? null : pin,
+      puttType: puttType,
       config: {
         distances: [5, 6, 7, 8, 9, 10],
         discs_per_turn: preset.discs,
@@ -77,6 +80,13 @@ export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPi
             />
           </div>
         )}
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-3">
+            Putt Style
+          </label>
+          <PuttTypeSelector selectedType={puttType} onSelect={setPuttType} />
+        </div>
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-3">

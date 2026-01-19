@@ -24,7 +24,8 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
     if (gameType === 'around_the_world') {
       // For ATW, navigate to ATW setup instead
       const nameParam = gameName ? '&name=' + encodeURIComponent(gameName) : '';
-      window.location.href = createPageUrl('Home') + '?mode=atw-setup&solo=' + (isSolo ? '1' : '0') + (isSolo ? '' : '&pin=' + pin + nameParam);
+      const puttTypeParam = '&puttType=' + puttType;
+      window.location.href = createPageUrl('Home') + '?mode=atw-setup&solo=' + (isSolo ? '1' : '0') + (isSolo ? '' : '&pin=' + pin + nameParam) + puttTypeParam;
       return;
     }
     onStartGame({

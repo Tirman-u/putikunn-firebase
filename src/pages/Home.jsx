@@ -21,6 +21,7 @@ export default function Home() {
   const [isSoloATW, setIsSoloATW] = useState(false);
   const [atwPin, setAtwPin] = useState(null);
   const [atwName, setAtwName] = useState(null);
+  const [atwPuttType, setAtwPuttType] = useState(null);
 
   // Check URL params for ATW mode
   React.useEffect(() => {
@@ -28,18 +29,22 @@ export default function Home() {
     const urlMode = params.get('mode');
     const isSolo = params.get('solo') === '1';
     const urlGameId = params.get('gameId');
-    
+
     if (urlMode === 'atw-setup') {
       setIsSoloATW(isSolo);
       setMode('atw-setup');
-      // Store pin and name if available
+      // Store pin, name, and puttType if available
       const urlPin = params.get('pin');
       const urlName = params.get('name');
+      const urlPuttType = params.get('puttType');
       if (urlPin) {
         setAtwPin(urlPin);
       }
       if (urlName) {
         setAtwName(decodeURIComponent(urlName));
+      }
+      if (urlPuttType) {
+        setAtwPuttType(urlPuttType);
       }
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
@@ -296,20 +301,22 @@ export default function Home() {
         isSolo={isSoloATW}
         initialPin={atwPin}
         initialName={atwName}
+        initialPuttType={atwPuttType}
         onBack={() => {
           setMode(null);
           setAtwPin(null);
           setAtwName(null);
+          setAtwPuttType(null);
         }}
         onStart={async (setupData) => {
           const user = await base44.auth.me();
           const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
-          
+
           const game = await base44.entities.Game.create({
             name: setupData.name,
             pin: isSoloATW ? '0000' : setupData.pin,
             game_type: setupData.gameType,
-            putt_type: 'regular',
+            putt_type: setupData.puttType || 'regular',
             host_user: user.email,
             players: isSoloATW ? [playerName] : [],
             player_distances: {},

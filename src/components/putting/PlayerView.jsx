@@ -2,13 +2,12 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, Upload, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Trophy, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { createPageUrl } from '@/utils';
 import ClassicScoreInput from './ClassicScoreInput';
 import BackAndForthInput from './BackAndForthInput';
-import BackAndForthScoreInput from './BackAndForthScoreInput';
 import StreakChallengeInput from './StreakChallengeInput';
 import JylyScoreTable from './JylyScoreTable';
 import ProgressBar from './ProgressBar';
@@ -28,7 +27,6 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const [showLeaderboard, setShowLeaderboard] = React.useState(false);
   const [hasSubmitted, setHasSubmitted] = React.useState(false);
   const [streakDistanceSelected, setStreakDistanceSelected] = React.useState(false);
-  const [hideScore, setHideScore] = React.useState(false);
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -298,12 +296,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       if (newPutts.length >= 5) {
         const prevRoundPutts = newPutts.slice(-5);
         const prevMade = prevRoundPutts.filter(p => p.result === 'made').length;
-        // For random_distance mode, restore the actual previous distance instead of generating new
-        if (gameType === 'random_distance') {
-          prevDistance = prevRoundPutts[0].distance;
-        } else {
-          prevDistance = getNextDistanceFromMade(gameType, prevMade);
-        }
+        prevDistance = getNextDistanceFromMade(gameType, prevMade);
       }
 
       const newPlayerDistances = { ...game.player_distances };
@@ -425,45 +418,29 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         </div>
 
         {/* Progress Bar */}
-        {gameType !== 'streak_challenge' && gameType !== 'back_and_forth' && <ProgressBar putts={playerPutts} gameType={gameType} />}
+        {gameType !== 'streak_challenge' && <ProgressBar putts={playerPutts} gameType={gameType} />}
 
         {/* Your Stats */}
-        {gameType !== 'streak_challenge' && (
-          <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
-            <div className="flex items-center justify-around text-center">
-              <div>
-                <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Best Streak' : 'Points'}</div>
-                <div className="text-2xl font-bold text-emerald-600">
-                  {hideScore ? '***' : (gameType === 'streak_challenge' ? (game.player_highest_streaks?.[playerName] || 0) : (game.total_points[playerName] || 0))}
-                </div>
+        <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
+          <div className="flex items-center justify-around text-center">
+            <div>
+              <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Best Streak' : 'Points'}</div>
+              <div className="text-2xl font-bold text-emerald-600">
+                {gameType === 'streak_challenge' ? (game.player_highest_streaks?.[playerName] || 0) : (game.total_points[playerName] || 0)}
               </div>
-              <div className="h-10 w-px bg-slate-200" />
-              <div>
-                <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Putts' : 'Round'}</div>
-                <div className="text-2xl font-bold text-slate-600">
-                  {gameType === 'streak_challenge' ? playerPutts.length : `${currentRound}/${totalRounds}`}
-                </div>
+            </div>
+            <div className="h-10 w-px bg-slate-200" />
+            <div>
+              <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Putts' : 'Round'}</div>
+              <div className="text-2xl font-bold text-slate-600">
+                {gameType === 'streak_challenge' ? playerPutts.length : `${currentRound}/${totalRounds}`}
               </div>
-              <div className="h-10 w-px bg-slate-200" />
-              <button
-                onClick={() => setHideScore(!hideScore)}
-                className="flex flex-col items-center justify-center"
-              >
-                {hideScore ? (
-                  <EyeOff className="w-5 h-5 text-slate-400" />
-                ) : (
-                  <Eye className="w-5 h-5 text-slate-400" />
-                )}
-                <div className="text-xs text-slate-400 mt-1">
-                  {hideScore ? 'Show' : 'Hide'}
-                </div>
-              </button>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Putt Type Display */}
-        {gameType !== 'streak_challenge' && gameType !== 'back_and_forth' && (
+        {gameType !== 'streak_challenge' && (
           <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
             <div className="text-xs text-slate-500 mb-1">Putt Style</div>
             <div className="text-sm font-semibold text-slate-800">
@@ -487,29 +464,14 @@ export default function PlayerView({ gameId, playerName, onExit }) {
                onFinishTraining={handleFinishTraining}
              />
          ) : format.singlePuttMode ? (
-           gameType === 'back_and_forth' ? (
-             <BackAndForthScoreInput
-               player={playerName}
-               currentDistance={currentDistance}
-               onMade={() => handleBackAndForthPutt(true)}
-               onMissed={() => handleBackAndForthPutt(false)}
-               canUndo={canUndo}
-               onUndo={handleUndo}
-               putts={playerPutts}
-               puttType={game.putt_type || 'regular'}
-               totalPoints={game.total_points[playerName] || 0}
-               hideScore={hideScore}
-             />
-           ) : (
-             <BackAndForthInput
-               player={playerName}
-               currentDistance={currentDistance}
-               onMade={() => handleBackAndForthPutt(true)}
-               onMissed={() => handleBackAndForthPutt(false)}
-               canUndo={canUndo}
-               onUndo={handleUndo}
-             />
-           )
+           <BackAndForthInput
+             player={playerName}
+             currentDistance={currentDistance}
+             onMade={() => handleBackAndForthPutt(true)}
+             onMissed={() => handleBackAndForthPutt(false)}
+             canUndo={canUndo}
+             onUndo={handleUndo}
+           />
          ) : (
            <ClassicScoreInput
              player={playerName}

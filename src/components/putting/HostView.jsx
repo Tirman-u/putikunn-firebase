@@ -25,6 +25,18 @@ export default function HostView({ gameId, onExit }) {
   const userRole = user?.app_role || 'user';
   const canSubmitDiscgolf = ['trainer', 'admin', 'super_admin'].includes(userRole);
 
+  const completeGameMutation = useMutation({
+    mutationFn: async () => {
+      await base44.entities.Game.update(gameId, {
+        status: 'completed'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+      toast.success('Mäng lõpetatud!');
+    }
+  });
+
   const submitToDiscgolfMutation = useMutation({
     mutationFn: async () => {
       const results = [];
@@ -255,25 +267,47 @@ export default function HostView({ gameId, onExit }) {
         )}
 
         {/* Actions */}
-        {isCompleted && canSubmitDiscgolf && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-            <div className="flex flex-col gap-3">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+          <div className="flex flex-col gap-3">
+            {!isCompleted && isATWGame && (
               <Button 
-                onClick={() => submitToDiscgolfMutation.mutate()}
-                disabled={submitToDiscgolfMutation.isPending}
-                className="w-full bg-blue-600 hover:bg-blue-700"
+                onClick={() => completeGameMutation.mutate()}
+                disabled={completeGameMutation.isPending}
+                className="w-full bg-amber-600 hover:bg-amber-700"
               >
-                <Upload className="w-4 h-4 mr-2" />
-                Submit to Discgolf.ee
+                <Trophy className="w-4 h-4 mr-2" />
+                Lõpeta mäng
               </Button>
-              <Link to={`${createPageUrl('GameResult')}?id=${game.id}`}>
-                <Button variant="outline" className="w-full">
-                  View Full Results
+            )}
+            
+            {isCompleted && canSubmitDiscgolf && (
+              <>
+                <Button 
+                  onClick={() => submitToDiscgolfMutation.mutate()}
+                  disabled={submitToDiscgolfMutation.isPending}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Submit to Discgolf.ee
                 </Button>
-              </Link>
-            </div>
+                <Button 
+                  onClick={() => submitToDiscgolfMutation.mutate()}
+                  disabled={submitToDiscgolfMutation.isPending}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Submit to Leaderboard
+                </Button>
+              </>
+            )}
+            
+            <Link to={`${createPageUrl('GameResult')}?id=${game.id}`}>
+              <Button variant="outline" className="w-full">
+                View Full Results
+              </Button>
+            </Link>
           </div>
-        )}
+        </div>
 
         {game.players.length === 0 && (
           <div className="bg-white rounded-2xl p-12 text-center text-slate-400 shadow-sm border border-slate-100">

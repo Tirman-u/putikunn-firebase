@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X, Undo2, Trophy, RotateCc
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import ATWLeaderboard from './ATWLeaderboard';
 
 
 
@@ -13,6 +14,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -335,7 +337,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                 Proovi uuesti
               </Button>
               <Button
-                onClick={() => window.location.href = createPageUrl('PuttingRecordsPage')}
+                onClick={() => setShowLeaderboard(true)}
                 variant="outline"
                 className="w-full h-12"
               >

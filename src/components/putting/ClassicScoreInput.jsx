@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Undo, Target } from 'lucide-react';
+import { Undo, Target, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const DISTANCE_COLORS = {
@@ -25,35 +25,107 @@ export default function ClassicScoreInput({
   onSubmit, 
   canUndo, 
   onUndo,
-  distanceMap
+  distanceMap,
+  currentRoundPutts = []
 }) {
+  const [selectedCount, setSelectedCount] = React.useState(null);
+  
   const handleScoreClick = (made) => {
-    onSubmit(made);
+    setSelectedCount(made);
   };
 
+  const handleConfirm = () => {
+    if (selectedCount !== null) {
+      onSubmit(selectedCount);
+      setSelectedCount(null);
+    }
+  };
+
+  // Visual frames - 20 frames representing 20 rounds
+  const totalFrames = 20;
+  const currentFrameIndex = Math.floor(currentRoundPutts.length / 5);
+
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-      {/* Player Name & Distance */}
-      <div className="text-center mb-6">
-        <h3 className="text-xl font-bold text-slate-800 mb-3">{player}</h3>
-        <div className="flex items-center justify-center gap-3">
-          <Target className="w-5 h-5 text-slate-400" />
-          <div className={cn(
-            "px-6 py-2 rounded-xl bg-gradient-to-r shadow-lg",
-            DISTANCE_COLORS[currentDistance]
-          )}>
-            <span className="text-2xl font-bold text-white">{currentDistance}m</span>
-          </div>
+    <div className="space-y-4">
+      {/* Visual Frames Display - 20 boxes */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+        <div className="grid grid-cols-10 gap-2.5">
+          {Array.from({ length: totalFrames }).map((_, frameIdx) => {
+            const isCurrent = frameIdx === currentFrameIndex;
+            const isCompleted = frameIdx < currentFrameIndex;
+            
+            // Get putts for this frame (5 putts per frame)
+            const framePutts = currentRoundPutts.slice(frameIdx * 5, (frameIdx + 1) * 5);
+            const madeCount = framePutts.filter(p => p.result === 'made').length;
+            
+            return (
+              <div 
+                key={frameIdx}
+                className={`aspect-square rounded-lg border-2 flex flex-col items-center justify-center ${
+                  isCurrent
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : isCompleted
+                    ? 'border-slate-300 bg-slate-50'
+                    : 'border-slate-200 bg-white'
+                }`}
+              >
+                {/* 5 small indicators inside each box */}
+                <div className="grid grid-cols-1 gap-1">
+                  {Array.from({ length: 5 }).map((_, puttIdx) => {
+                    const puttResult = framePutts[puttIdx]?.result;
+                    return (
+                      <div
+                        key={puttIdx}
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          puttResult === 'made'
+                            ? 'bg-emerald-500'
+                            : puttResult === 'missed'
+                            ? 'bg-red-400'
+                            : 'bg-slate-300'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+                
+                {/* Frame number */}
+                <div className="text-[9px] text-slate-400 mt-1">{frameIdx + 1}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
+      {/* Current Distance - BIG AND CLEAR */}
+      <div className="text-center bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+        <div className="text-5xl font-bold text-slate-800">{currentDistance}m</div>
+      </div>
+
+      {/* Current Round Selection (visual feedback for selected count) */}
+      {selectedCount !== null && (
+        <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
+          <div className="flex gap-2">
+            {Array.from({ length: 5 }).map((_, idx) => (
+              <div
+                key={idx}
+                className={`flex-1 h-3 rounded-full ${
+                  idx < selectedCount
+                    ? 'bg-emerald-500'
+                    : 'bg-red-400'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Instructions */}
-      <div className="text-center text-sm text-slate-500 mb-4">
+      <div className="text-center text-sm text-slate-500">
         Tap how many putts you made (out of 5)
       </div>
 
       {/* One-Click Score Buttons */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-3 gap-3">
         {[0, 1, 2, 3, 4, 5].map((num) => {
           const potentialPoints = currentDistance * num;
           const nextDistance = distanceMap[num];
@@ -62,10 +134,15 @@ export default function ClassicScoreInput({
             <button
               key={num}
               onClick={() => handleScoreClick(num)}
-              className="relative py-8 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 hover:from-emerald-50 hover:to-emerald-100 active:scale-95 transition-all border-2 border-slate-200 hover:border-emerald-300 shadow-sm"
+              className={cn(
+                "relative py-6 rounded-2xl active:scale-95 transition-all border-2 shadow-sm",
+                selectedCount === num
+                  ? "bg-gradient-to-br from-emerald-100 to-emerald-200 border-emerald-400"
+                  : "bg-gradient-to-br from-slate-50 to-slate-100 hover:from-emerald-50 hover:to-emerald-100 border-slate-200 hover:border-emerald-300"
+              )}
             >
-              <div className="text-4xl font-bold text-slate-800 mb-2">{num}</div>
-              <div className="text-xs font-medium text-slate-500 mb-1">
+              <div className="text-3xl font-bold text-slate-800 mb-1">{num}</div>
+              <div className="text-xs font-medium text-slate-500 mb-0.5">
                 {potentialPoints} pts
               </div>
               <div className="text-[10px] text-slate-400">
@@ -76,14 +153,25 @@ export default function ClassicScoreInput({
         })}
       </div>
 
+      {/* Confirm Button */}
+      {selectedCount !== null && (
+        <Button
+          onClick={handleConfirm}
+          className="w-full h-16 bg-emerald-600 hover:bg-emerald-700 rounded-2xl text-lg font-bold"
+        >
+          <CheckCircle2 className="w-6 h-6 mr-2" />
+          Confirm {selectedCount} Made
+        </Button>
+      )}
+
       {/* Undo Button */}
       {canUndo && (
         <Button
           onClick={onUndo}
           variant="outline"
-          className="w-full h-12 rounded-xl border-2"
+          className="w-full h-14 rounded-xl text-base"
         >
-          <Undo className="w-4 h-4 mr-2" />
+          <Undo className="w-5 h-5 mr-2" />
           Undo Last Round
         </Button>
       )}

@@ -25,6 +25,7 @@ export default function PuttingRecords() {
     { id: 'general_short', label: 'Short', leaderboardType: 'general', gameType: 'short' },
     { id: 'general_streak_challenge', label: 'Streak', leaderboardType: 'general', gameType: 'streak_challenge' },
     { id: 'general_random_distance', label: 'Random', leaderboardType: 'general', gameType: 'random_distance' },
+    { id: 'general_around_the_world', label: 'Around World', leaderboardType: 'general', gameType: 'around_the_world' },
     { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'discgolf_ee', gameType: null }
   ];
 
@@ -93,7 +94,7 @@ export default function PuttingRecords() {
       </div>
 
       <Tabs value={selectedView} onValueChange={setSelectedView}>
-        <TabsList className="grid grid-cols-3 w-full mb-6 h-auto gap-1">
+        <TabsList className="grid grid-cols-3 md:grid-cols-4 w-full mb-6 h-auto gap-1">
           {viewTypes.map(type => (
             <TabsTrigger key={type.id} value={type.id}>
               {type.label}

@@ -277,7 +277,7 @@ export default function Home() {
           
           const game = await base44.entities.Game.create({
             name: setupData.name,
-            pin: setupData.pin,
+            pin: isSoloATW ? '0000' : setupData.pin,
             game_type: setupData.gameType,
             putt_type: 'regular',
             host_user: user.email,

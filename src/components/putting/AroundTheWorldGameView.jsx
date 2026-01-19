@@ -7,52 +7,11 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
-const ConfirmRoundDialog = ({ isOpen, onFinish, onRetry, onComplete }) => {
-  if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-            <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-          </div>
-          <h3 className="text-xl font-bold text-slate-800 mb-2">Ring salvestatud</h3>
-          <p className="text-slate-600">Mida teha edasi?</p>
-        </div>
-        <div className="space-y-3">
-          <Button
-            onClick={onFinish}
-            className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
-          >
-            Jätka mängu
-          </Button>
-          <Button
-            onClick={onComplete}
-            variant="outline"
-            className="w-full h-12 border-amber-300 text-amber-700 hover:bg-amber-50"
-          >
-            <Trophy className="w-4 h-4 mr-2" />
-            Lõpeta mäng
-          </Button>
-          <Button
-            onClick={onRetry}
-            variant="outline"
-            className="w-full h-12"
-          >
-            Proovi uuesti
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [pendingMadePutts, setPendingMadePutts] = useState(null);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -83,123 +42,19 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         best_score: 0
       };
 
-      // For 1 disc mode with made putt - finalize immediately
-      if (config.discs_per_turn === 1 && madePutts === 1) {
-        const currentIndex = playerState.current_distance_index;
-        const direction = playerState.direction;
-        const threshold = config.advance_threshold;
-        const distances = config.distances;
-
-        let newIndex = currentIndex;
-        let newDirection = direction;
-        let lapEvent = false;
-
-        // Advance
-        if (direction === 'UP') {
-          newIndex = Math.min(currentIndex + 1, distances.length - 1);
-          if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
-            newDirection = 'DOWN';
-          }
-        } else {
-          newIndex = Math.max(currentIndex - 1, 0);
-          if (newIndex === 0 && currentIndex > 0) {
-            newDirection = 'UP';
-            lapEvent = true;
-          }
-        }
-
-        const pointsAwarded = distances[currentIndex] * config.discs_per_turn;
-
-        const updatedState = {
-          current_distance_index: newIndex,
-          direction: newDirection,
-          laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
-          turns_played: playerState.turns_played + 1,
-          total_makes: playerState.total_makes + madePutts,
-          total_putts: playerState.total_putts + 1,
-          current_round_draft: { attempts: [], is_finalized: false },
-          history: [...playerState.history, {
-            turn_number: playerState.turns_played + 1,
-            distance: distances[currentIndex],
-            direction: direction,
-            made_putts: madePutts,
-            moved_to_distance: distances[newIndex],
-            points_awarded: pointsAwarded,
-            lap_event: lapEvent
-          }],
-          best_score: playerState.best_score
-        };
-
-        await base44.entities.Game.update(gameId, {
-          atw_state: {
-            ...game.atw_state,
-            [playerName]: updatedState
-          },
-          total_points: {
-            ...game.total_points,
-            [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
-          }
-        });
-
-        return { showDialog: false };
-      } else {
-        // For miss or multi-disc mode - save to draft
-        const newAttempt = {
-          made_putts: madePutts,
-          timestamp: new Date().toISOString()
-        };
-
-        const updatedDraft = {
-          ...playerState.current_round_draft,
-          attempts: [...(playerState.current_round_draft?.attempts || []), newAttempt]
-        };
-
-        const updatedState = {
-          ...playerState,
-          current_round_draft: updatedDraft
-        };
-
-        await base44.entities.Game.update(gameId, {
-          atw_state: {
-            ...game.atw_state,
-            [playerName]: updatedState
-          }
-        });
-
-        return { showDialog: true };
-      }
-    },
-    onSuccess: ({ showDialog }) => {
-      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-      if (showDialog) {
-        setShowConfirmDialog(true);
-      }
-    }
-  });
-
-  const finishRoundMutation = useMutation({
-    mutationFn: async () => {
-      const config = game.atw_config;
-      const playerState = game.atw_state[playerName];
-      const draft = playerState.current_round_draft;
-
-      // Find best attempt
-      const bestAttempt = draft.attempts.reduce((best, curr) => 
-        curr.made_putts > best.made_putts ? curr : best
-      );
-
-      const madePutts = bestAttempt.made_putts;
       const currentIndex = playerState.current_distance_index;
       const direction = playerState.direction;
       const threshold = config.advance_threshold;
       const distances = config.distances;
 
-      // Movement logic
+      // For Made button - assume all discs made
+      const actualMakes = madePutts === 1 ? config.discs_per_turn : 0;
+
       let newIndex = currentIndex;
       let newDirection = direction;
       let lapEvent = false;
 
-      if (madePutts >= threshold) {
+      if (actualMakes >= threshold) {
         // Advance
         if (direction === 'UP') {
           newIndex = Math.min(currentIndex + 1, distances.length - 1);
@@ -213,43 +68,31 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
             lapEvent = true;
           }
         }
-      } else if (madePutts === threshold - 1) {
-        // Stay
-      } else if (madePutts > 0 && madePutts < threshold - 1) {
-        // Move back
-        if (direction === 'UP') {
-          newIndex = Math.max(currentIndex - 1, 0);
-        } else {
-          newIndex = Math.min(currentIndex + 1, distances.length - 1);
-        }
-      } else if (madePutts === 0) {
-        // Reset to 5m
+      } else if (actualMakes === 0) {
+        // Missed all - reset to 5m
         newIndex = 0;
       }
 
-      const pointsAwarded = distances[currentIndex] * config.discs_per_turn;
+      const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * config.discs_per_turn : 0;
 
-      // Create turn record
-      const turnRecord = {
-        turn_number: playerState.turns_played + 1,
-        distance: distances[currentIndex],
-        direction: direction,
-        made_putts: madePutts,
-        moved_to_distance: distances[newIndex],
-        points_awarded: pointsAwarded,
-        lap_event: lapEvent
-      };
-
-      // Update state
       const updatedState = {
         current_distance_index: newIndex,
         direction: newDirection,
         laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
         turns_played: playerState.turns_played + 1,
-        total_makes: playerState.total_makes + madePutts,
+        total_makes: playerState.total_makes + actualMakes,
         total_putts: playerState.total_putts + config.discs_per_turn,
         current_round_draft: { attempts: [], is_finalized: false },
-        history: [...playerState.history, turnRecord]
+        history: [...playerState.history, {
+          turn_number: playerState.turns_played + 1,
+          distance: distances[currentIndex],
+          direction: direction,
+          made_putts: actualMakes,
+          moved_to_distance: distances[newIndex],
+          points_awarded: pointsAwarded,
+          lap_event: lapEvent
+        }],
+        best_score: playerState.best_score
       };
 
       await base44.entities.Game.update(gameId, {
@@ -262,57 +105,18 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
           [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
         }
       });
+
+      return { showDialog: false };
     },
-    onSuccess: () => {
+    onSuccess: ({ showDialog }) => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-      setShowConfirmDialog(false);
-      setPendingMadePutts(null);
-      toast.success('Ring lõpetatud!');
     }
   });
 
+
+
   const handleSubmitPutts = (madePutts) => {
-    setPendingMadePutts(madePutts);
     submitTurnMutation.mutate({ madePutts });
-  };
-
-  const handleRetry = async () => {
-    setShowConfirmDialog(false);
-    
-    // Reset player to starting position
-    const playerState = game.atw_state[playerName];
-    const currentScore = game.total_points?.[playerName] || 0;
-    const bestScore = game.atw_state[playerName]?.best_score || 0;
-    
-    const resetState = {
-      current_distance_index: 0,
-      direction: 'UP',
-      laps_completed: 0,
-      turns_played: 0,
-      total_makes: 0,
-      total_putts: 0,
-      current_round_draft: { attempts: [], is_finalized: false },
-      history: [],
-      best_score: Math.max(bestScore, currentScore)
-    };
-    
-    await base44.entities.Game.update(gameId, {
-      atw_state: {
-        ...game.atw_state,
-        [playerName]: resetState
-      },
-      total_points: {
-        ...game.total_points,
-        [playerName]: 0
-      }
-    });
-    
-    queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-    toast.success('Alustad uuesti 5m pealt!');
-  };
-
-  const handleFinish = () => {
-    setShowConfirmDialog(false);
   };
 
   const completeGameMutation = useMutation({
@@ -562,13 +366,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
-      <ConfirmRoundDialog
-        isOpen={showConfirmDialog}
-        onFinish={handleFinish}
-        onRetry={handleRetry}
-        onComplete={handleCompleteGame}
-      />
-
       <div className="max-w-md mx-auto px-4 pt-8">
         <div className="flex items-center justify-between mb-6">
           <button
@@ -649,69 +446,31 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
           {/* Quick Input */}
           <div>
-            {config.discs_per_turn === 1 ? (
-              <>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <button
-                    onClick={() => handleSubmitPutts(0)}
-                    disabled={submitTurnMutation.isPending || finishRoundMutation.isPending}
-                    className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all disabled:opacity-50"
-                  >
-                    Missed
-                  </button>
-                  <button
-                    onClick={() => handleSubmitPutts(1)}
-                    disabled={submitTurnMutation.isPending || finishRoundMutation.isPending}
-                    className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all disabled:opacity-50"
-                  >
-                    Made
-                  </button>
-                </div>
-                {playerState.history && playerState.history.length > 0 && (
-                  <button
-                    onClick={handleUndo}
-                    disabled={undoMutation.isPending}
-                    className="w-full h-16 rounded-xl font-bold text-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all disabled:opacity-50"
-                  >
-                    <Undo2 className="w-4 h-4 mr-2 inline" />
-                    Võta tagasi
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="text-sm font-medium text-slate-700 mb-3">
-                  Mitu sisse said? (vaja {config.advance_threshold}+)
-                </div>
-                <div className="grid grid-cols-6 gap-2 mb-3">
-                  {Array.from({ length: config.discs_per_turn + 1 }, (_, i) => i).map(num => (
-                    <button
-                      key={num}
-                      onClick={() => handleSubmitPutts(num)}
-                      disabled={submitTurnMutation.isPending}
-                      className={`h-14 rounded-xl font-bold text-lg transition-all disabled:opacity-50 ${
-                        num === 0
-                          ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                          : num >= config.advance_threshold
-                          ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      {num}
-                    </button>
-                  ))}
-                </div>
-                {playerState.history && playerState.history.length > 0 && (
-                  <button
-                    onClick={handleUndo}
-                    disabled={undoMutation.isPending}
-                    className="w-full h-14 rounded-xl font-bold text-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all disabled:opacity-50"
-                  >
-                    <Undo2 className="w-4 h-4 mr-2 inline" />
-                    Võta tagasi
-                  </button>
-                )}
-              </>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <button
+                onClick={() => handleSubmitPutts(0)}
+                disabled={submitTurnMutation.isPending}
+                className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all disabled:opacity-50"
+              >
+                Missed
+              </button>
+              <button
+                onClick={() => handleSubmitPutts(1)}
+                disabled={submitTurnMutation.isPending}
+                className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all disabled:opacity-50"
+              >
+                Made
+              </button>
+            </div>
+            {playerState.history && playerState.history.length > 0 && (
+              <button
+                onClick={handleUndo}
+                disabled={undoMutation.isPending}
+                className="w-full h-16 rounded-xl font-bold text-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all disabled:opacity-50"
+              >
+                <Undo2 className="w-4 h-4 mr-2 inline" />
+                Võta tagasi
+              </button>
             )}
           </div>
         </div>

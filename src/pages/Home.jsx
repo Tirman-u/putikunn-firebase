@@ -23,7 +23,7 @@ export default function Home() {
   const [atwName, setAtwName] = useState(null);
   const [atwPuttType, setAtwPuttType] = useState(null);
 
-  // Check URL params for ATW mode
+  // Check URL params for ATW mode and continuing games
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlMode = params.get('mode');
@@ -51,6 +51,32 @@ export default function Home() {
     } else if (urlMode === 'atw-host' && urlGameId) {
       setGameId(urlGameId);
       setMode('atw-host');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (urlMode === 'atw-game' && urlGameId) {
+      // Continue ATW game from profile
+      setGameId(urlGameId);
+      base44.entities.Game.list().then(games => {
+        const game = games.find(g => g.id === urlGameId);
+        if (game) {
+          setIsSoloATW(game.pin === '0000');
+          base44.auth.me().then(user => {
+            const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
+            setPlayerName(playerName);
+            setMode('atw-game');
+          });
+        }
+      });
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (urlMode === 'player' && urlGameId) {
+      // Continue regular game from profile
+      setGameId(urlGameId);
+      base44.auth.me().then(user => {
+        const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
+        setPlayerName(playerName);
+        setMode('player');
+      });
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
     }

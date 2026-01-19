@@ -29,7 +29,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   });
 
   const submitTurnMutation = useMutation({
-    mutationFn: async ({ madePutts }) => {
+    mutationFn: async ({ madePutts, showDialog }) => {
       const config = game.atw_config;
       const playerState = game.atw_state?.[playerName] || {
         current_distance_index: 0,
@@ -106,17 +106,22 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
           [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
         }
       });
+
+      return { showDialog };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-      setShowConfirmDialog(true);
+      if (data.showDialog) {
+        setShowConfirmDialog(true);
+      }
     }
   });
 
 
 
   const handleSubmitPutts = (madePutts) => {
-    submitTurnMutation.mutate({ madePutts });
+    // Made (1) = just update, Missed (0) = update AND show dialog
+    submitTurnMutation.mutate({ madePutts, showDialog: madePutts === 0 });
   };
 
   const handleFinish = () => {

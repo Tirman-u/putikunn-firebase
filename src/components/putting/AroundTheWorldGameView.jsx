@@ -668,15 +668,14 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                   </button>
                 </div>
                 {playerState.history && playerState.history.length > 0 && (
-                  <Button
+                  <button
                     onClick={handleUndo}
                     disabled={undoMutation.isPending}
-                    variant="outline"
-                    className="w-full h-12"
+                    className="w-full h-16 rounded-xl font-bold text-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all disabled:opacity-50"
                   >
-                    <Undo2 className="w-4 h-4 mr-2" />
+                    <Undo2 className="w-4 h-4 mr-2 inline" />
                     Võta tagasi
-                  </Button>
+                  </button>
                 )}
               </>
             ) : (
@@ -684,13 +683,13 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                 <div className="text-sm font-medium text-slate-700 mb-3">
                   Mitu sisse said? (vaja {config.advance_threshold}+)
                 </div>
-                <div className="grid grid-cols-6 gap-2">
+                <div className="grid grid-cols-6 gap-2 mb-3">
                   {Array.from({ length: config.discs_per_turn + 1 }, (_, i) => i).map(num => (
                     <button
                       key={num}
                       onClick={() => handleSubmitPutts(num)}
                       disabled={submitTurnMutation.isPending}
-                      className={`h-14 rounded-xl font-bold text-lg transition-all ${
+                      className={`h-14 rounded-xl font-bold text-lg transition-all disabled:opacity-50 ${
                         num === 0
                           ? 'bg-red-100 text-red-700 hover:bg-red-200'
                           : num >= config.advance_threshold
@@ -703,15 +702,14 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                   ))}
                 </div>
                 {playerState.history && playerState.history.length > 0 && (
-                  <Button
+                  <button
                     onClick={handleUndo}
                     disabled={undoMutation.isPending}
-                    variant="outline"
-                    className="w-full h-12 mt-3"
+                    className="w-full h-14 rounded-xl font-bold text-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all disabled:opacity-50"
                   >
-                    <Undo2 className="w-4 h-4 mr-2" />
+                    <Undo2 className="w-4 h-4 mr-2 inline" />
                     Võta tagasi
-                  </Button>
+                  </button>
                 )}
               </>
             )}

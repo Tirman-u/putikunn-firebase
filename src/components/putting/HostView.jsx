@@ -1,14 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tantml:react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Copy, Check, Users, Upload } from 'lucide-react';
-import JylyScoreTable from './JylyScoreTable';
+import { ArrowLeft, Copy, Check, Users, Upload, Trophy, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-
-const MAX_ROUNDS = 20;
 
 export default function HostView({ gameId, onExit }) {
   const [copied, setCopied] = useState(false);
@@ -22,7 +19,7 @@ export default function HostView({ gameId, onExit }) {
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],
     queryFn: () => base44.entities.Game.list().then(games => games.find(g => g.id === gameId)),
-    refetchInterval: 2000 // Poll every 2 seconds for updates
+    refetchInterval: 2000
   });
 
   const userRole = user?.app_role || 'user';
@@ -33,13 +30,12 @@ export default function HostView({ gameId, onExit }) {
       const results = [];
       
       for (const playerName of game.players || []) {
-        const playerPutts = game.player_putts?.[playerName] || [];
-        const madePutts = playerPutts.filter(p => p.result === 'made').length;
-        const totalPutts = playerPutts.length;
-        const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+        const playerState = game.atw_state?.[playerName];
         const score = game.total_points?.[playerName] || 0;
+        const totalPutts = playerState?.total_putts || 0;
+        const madePutts = playerState?.total_makes || 0;
+        const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
 
-        // Check if player already has an entry
         const existingEntries = await base44.entities.LeaderboardEntry.filter({
           player_name: playerName,
           game_type: game.game_type,
@@ -49,7 +45,6 @@ export default function HostView({ gameId, onExit }) {
         const existingEntry = existingEntries.length > 0 ? existingEntries[0] : null;
 
         if (existingEntry) {
-          // Update only if new score is better
           if (score > existingEntry.score) {
             await base44.entities.LeaderboardEntry.update(existingEntry.id, {
               game_id: game.id,
@@ -65,7 +60,6 @@ export default function HostView({ gameId, onExit }) {
             results.push({ player: playerName, action: 'skipped' });
           }
         } else {
-          // Create new entry
           await base44.entities.LeaderboardEntry.create({
             game_id: game.id,
             player_email: user?.email,
@@ -83,7 +77,6 @@ export default function HostView({ gameId, onExit }) {
           results.push({ player: playerName, action: 'created' });
         }
 
-        // Also submit to general leaderboard (always create new)
         await base44.entities.LeaderboardEntry.create({
           game_id: game.id,
           player_email: user?.email,
@@ -130,9 +123,27 @@ export default function HostView({ gameId, onExit }) {
     );
   }
 
-  const maxRoundReached = game.players.some(player => 
-    (game.round_scores?.[player]?.length || 0) >= MAX_ROUNDS
-  );
+  const isATWGame = game.game_type === 'around_the_world';
+  const isCompleted = game.status === 'completed';
+
+  // Calculate player stats for ATW
+  const playerStats = (game.players || []).map(playerName => {
+    const playerState = game.atw_state?.[playerName] || {};
+    const score = game.total_points?.[playerName] || 0;
+    const laps = playerState.laps_completed || 0;
+    const totalPutts = playerState.total_putts || 0;
+    const madePutts = playerState.total_makes || 0;
+    const accuracy = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
+
+    return {
+      name: playerName,
+      score,
+      laps,
+      accuracy
+    };
+  }).sort((a, b) => b.score - a.score);
+
+  const bestPlayer = playerStats[0];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -158,16 +169,14 @@ export default function HostView({ gameId, onExit }) {
               <div className="text-4xl font-bold tracking-widest">{game.pin}</div>
             </div>
             <div className="flex flex-col gap-2">
-              <div className="flex flex-col gap-2">
-                <Button
-                  onClick={copyPin}
-                  size="sm"
-                  className="bg-white/20 hover:bg-white/30 text-white border-white/30"
-                >
-                  {copied ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
-                  {copied ? 'Copied' : 'Copy'}
-                </Button>
-              </div>
+              <Button
+                onClick={copyPin}
+                size="sm"
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+              >
+                {copied ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
               <div className="flex items-center gap-2 text-sm opacity-90">
                 <Users className="w-4 h-4" />
                 <span>{game.players.length} players</span>
@@ -176,21 +185,79 @@ export default function HostView({ gameId, onExit }) {
           </div>
         </div>
 
-        {/* Round Progress */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-6">
-          <div className="text-center">
-            <span className="text-sm text-slate-500">Game Progress</span>
-            <div className="text-2xl font-bold text-emerald-600 mt-1">
-              Max {Math.max(...game.players.map(p => game.round_scores?.[p]?.length || 0), 0)} / {MAX_ROUNDS} rounds
+        {/* Stats Overview (Best Player) */}
+        {isATWGame && bestPlayer && (
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Trophy className="w-5 h-5 text-amber-500" />
+                <div className="text-sm text-slate-600">Best Score</div>
+              </div>
+              <div className="text-3xl font-bold text-emerald-600">{bestPlayer.score}</div>
+              <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
+            </div>
+            <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
+              <div className="text-sm text-slate-600 mb-2">Most Laps</div>
+              <div className="text-3xl font-bold text-blue-600">{bestPlayer.laps}</div>
+              <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
+            </div>
+            <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Target className="w-5 h-5 text-purple-500" />
+                <div className="text-sm text-slate-600">Best Accuracy</div>
+              </div>
+              <div className="text-3xl font-bold text-purple-600">{bestPlayer.accuracy}%</div>
+              <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
             </div>
           </div>
-          {maxRoundReached && (
-            <div className="mt-3 p-3 bg-amber-50 rounded-xl text-center text-amber-700 text-sm font-medium">
-              🏁 At least one player has completed all 20 rounds!
+        )}
+
+        {/* Player Table */}
+        {isATWGame && game.players.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50">
+                    <th className="text-left p-4 font-semibold text-slate-700">#</th>
+                    <th className="text-left p-4 font-semibold text-slate-700">Player</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Score</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Laps</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Accuracy</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {playerStats.map((player, index) => (
+                    <tr key={player.name} className={`border-b border-slate-100 ${index === 0 && isCompleted ? 'bg-amber-50' : ''}`}>
+                      <td className="p-4">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                          index === 0 ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {index + 1}
+                        </div>
+                      </td>
+                      <td className="p-4 font-medium text-slate-800">{player.name}</td>
+                      <td className="p-4 text-center">
+                        <div className="text-lg font-bold text-emerald-600">{player.score}</div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="text-lg font-bold text-blue-600">{player.laps}</div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="text-lg font-bold text-purple-600">{player.accuracy}%</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-          {canSubmitDiscgolf && maxRoundReached && (
-            <div className="mt-3 flex flex-col gap-2">
+          </div>
+        )}
+
+        {/* Actions */}
+        {isCompleted && canSubmitDiscgolf && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <div className="flex flex-col gap-3">
               <Button 
                 onClick={() => submitToDiscgolfMutation.mutate()}
                 disabled={submitToDiscgolfMutation.isPending}
@@ -205,27 +272,16 @@ export default function HostView({ gameId, onExit }) {
                 </Button>
               </Link>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Master Scoreboard */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          {game.players.length > 0 ? (
-            <JylyScoreTable 
-              players={game.players}
-              roundScores={game.round_scores}
-              totalPoints={game.total_points}
-              playerDistances={game.player_distances}
-              currentRound={Math.max(...game.players.map(p => (game.round_scores?.[p]?.length || 0) + 1))}
-            />
-          ) : (
-            <div className="p-12 text-center text-slate-400">
-              <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Waiting for players to join...</p>
-              <p className="text-sm mt-2">Share the PIN: <span className="font-bold text-emerald-600">{game.pin}</span></p>
-            </div>
-          )}
-        </div>
+        {game.players.length === 0 && (
+          <div className="bg-white rounded-2xl p-12 text-center text-slate-400 shadow-sm border border-slate-100">
+            <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p>Waiting for players to join...</p>
+            <p className="text-sm mt-2">Share the PIN: <span className="font-bold text-emerald-600">{game.pin}</span></p>
+          </div>
+        )}
       </div>
     </div>
   );

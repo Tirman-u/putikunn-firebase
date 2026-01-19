@@ -305,6 +305,9 @@ export default function GameResult() {
     entry.leaderboard_type === 'discgolf_ee'
   );
 
+  // Check if this is a solo ATW game
+  const isSoloATW = game.game_type === 'around_the_world' && game.pin === '0000';
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <div className="max-w-4xl mx-auto p-4">
@@ -351,14 +354,16 @@ export default function GameResult() {
               </Button>
             </div>
             <div className="flex gap-3">
-              <Button 
-                onClick={() => submitToLeaderboardMutation.mutate()}
-                disabled={submitToLeaderboardMutation.isPending || isSubmittedToLeaderboard}
-                className={isSubmittedToLeaderboard ? "flex-1 bg-slate-400" : "flex-1 bg-emerald-600 hover:bg-emerald-700"}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                {isSubmittedToLeaderboard ? 'Submitted' : 'Submit to Leaderboard'}
-              </Button>
+              {!isSoloATW && (
+                <Button 
+                  onClick={() => submitToLeaderboardMutation.mutate()}
+                  disabled={submitToLeaderboardMutation.isPending || isSubmittedToLeaderboard}
+                  className={isSubmittedToLeaderboard ? "flex-1 bg-slate-400" : "flex-1 bg-emerald-600 hover:bg-emerald-700"}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {isSubmittedToLeaderboard ? 'Submitted' : 'Submit to Leaderboard'}
+                </Button>
+              )}
               {canSubmitDiscgolf && !(game.pin === '0000') && (
                 <Button 
                   onClick={() => submitToDiscgolfMutation.mutate()}

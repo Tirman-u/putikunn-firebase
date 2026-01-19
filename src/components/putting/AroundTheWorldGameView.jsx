@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X, Undo2, Trophy, RotateCcw, Share2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X, Undo2, Trophy, RotateCcw, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -402,7 +402,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
               <div className="text-4xl font-bold text-blue-600 mb-2">{attemptsCount}</div>
-              <div className="text-sm text-slate-600">Proovitud kordi</div>
+              <div className="text-sm text-slate-600">Mitu korda proovitud</div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
               <div className="text-4xl font-bold text-purple-600 mb-2">{makeRate}%</div>
@@ -434,30 +434,25 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                 <span className="text-slate-600">Raskusaste:</span>
                 <span className="font-semibold text-slate-800">{difficultyLabel} - {config.discs_per_turn} ketas{config.discs_per_turn > 1 ? 't' : ''}</span>
               </div>
+              {failedTurns.length > 0 && (
+                <>
+                  <div className="pt-3 border-t border-slate-200">
+                    <span className="text-slate-600 font-semibold">Möödapanekud distantsilt:</span>
+                  </div>
+                  {failedTurns.map((turn, index) => (
+                    <div key={index} className="flex justify-between items-center">
+                      <span className="text-sm text-slate-700">
+                        {turn.distance}m ({turn.made_putts}/{config.discs_per_turn})
+                      </span>
+                      <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded">
+                        {turn.missed_all ? 'KÕIK MÖÖDA' : 'EI EDENENUD'}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           </div>
-
-          {/* Failed Attempts */}
-          {failedTurns.length > 0 && (
-            <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
-              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-red-500" />
-                Möödapanekud distantsilt
-              </h3>
-              <div className="space-y-2">
-                {failedTurns.map((turn, index) => (
-                  <div key={index} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
-                    <span className="text-sm text-slate-700">
-                      {turn.distance}m ({turn.made_putts}/{config.discs_per_turn})
-                    </span>
-                    <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded">
-                      {turn.missed_all ? 'KÕIK MÖÖDA' : 'EI EDENENUD'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Actions */}
           <div className="space-y-3">
@@ -465,7 +460,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
               onClick={handlePlayAgain}
               className="w-full h-14 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-lg"
             >
-              <RotateCcw className="w-5 h-5 mr-2" />
               Mängi uuesti
             </Button>
             

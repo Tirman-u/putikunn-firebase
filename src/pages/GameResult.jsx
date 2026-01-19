@@ -8,7 +8,7 @@ import { format as formatDate } from 'date-fns';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import { toast } from 'sonner';
 import PerformanceAnalysis from '@/components/putting/PerformanceAnalysis';
-
+import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView';
 
 
 export default function GameResult() {
@@ -215,6 +215,20 @@ export default function GameResult() {
           <Button onClick={() => navigate(-1)}>Go Back</Button>
         </div>
       </div>
+    );
+  }
+
+  const myDisplayName = user?.display_name || user?.full_name || user?.email;
+
+  // Show ATW completed view for completed Around The World games
+  if (game.game_type === 'around_the_world' && game.status === 'completed') {
+    const isSolo = game.players.length === 1 && game.pin === '0000';
+    return (
+      <AroundTheWorldGameView
+        gameId={game.id}
+        playerName={myDisplayName}
+        isSolo={isSolo}
+      />
     );
   }
 

@@ -28,8 +28,7 @@ export default function BackAndForthScoreInput({
   return (
     <div className="space-y-4">
       {/* Visual Frames Display - 20 boxes */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-        <div className="text-xs font-semibold text-slate-600 mb-4">Progress</div>
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
         <div className="grid grid-cols-10 gap-2.5">
           {Array.from({ length: totalFrames }).map((_, frameIdx) => {
             const framePutts = putts.slice(frameIdx * puttsPerFrame, (frameIdx + 1) * puttsPerFrame);

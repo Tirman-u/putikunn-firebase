@@ -312,7 +312,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   };
 
   const handleFinish = () => {
-    finishRoundMutation.mutate();
+    setShowConfirmDialog(false);
   };
 
   const completeGameMutation = useMutation({

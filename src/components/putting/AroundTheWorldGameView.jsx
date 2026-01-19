@@ -336,7 +336,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
             >
               Jätka mängu
             </Button>
-            {(isSolo || isHost) && (
+            {isSolo && (
               <Button
                 onClick={onComplete}
                 variant="outline"

@@ -25,20 +25,11 @@ export default function BackAndForthScoreInput({
     (currentFrameIndex + 1) * puttsPerFrame
   );
 
-  const puttTypeLabel = puttType === 'regular' ? 'Regular' : puttType === 'straddle' ? 'Straddle' : 'Turbo';
-
   return (
     <div className="space-y-4">
-      {/* Visual Frames Display - 20 boxes - MOVED TO TOP */}
+      {/* Visual Frames Display - 20 boxes */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-xs font-semibold text-slate-600">Progress</div>
-          <div className="flex items-center gap-3">
-            <div className="text-xs text-slate-500">
-              {puttTypeLabel} • Points: {hideScore ? '***' : totalPoints}
-            </div>
-          </div>
-        </div>
+        <div className="text-xs font-semibold text-slate-600 mb-4">Progress</div>
         <div className="grid grid-cols-10 gap-2.5">
           {Array.from({ length: totalFrames }).map((_, frameIdx) => {
             const framePutts = putts.slice(frameIdx * puttsPerFrame, (frameIdx + 1) * puttsPerFrame);

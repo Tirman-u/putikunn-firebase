@@ -427,8 +427,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         {/* Progress Bar */}
         {gameType !== 'streak_challenge' && gameType !== 'back_and_forth' && <ProgressBar putts={playerPutts} gameType={gameType} />}
 
-        {/* Your Stats - Hidden for back_and_forth */}
-        {gameType !== 'back_and_forth' && (
+        {/* Your Stats */}
+        {gameType !== 'streak_challenge' && (
           <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
             <div className="flex items-center justify-around text-center">
               <div>
@@ -462,7 +462,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           </div>
         )}
 
-        {/* Putt Type Display - Hidden for back_and_forth */}
+        {/* Putt Type Display */}
         {gameType !== 'streak_challenge' && gameType !== 'back_and_forth' && (
           <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
             <div className="text-xs text-slate-500 mb-1">Putt Style</div>

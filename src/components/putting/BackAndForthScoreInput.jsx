@@ -84,17 +84,14 @@ export default function BackAndForthScoreInput({
 
       {/* Current Frame Detail */}
       {currentFrameIndex < totalFrames && (
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-          <div className="text-sm font-semibold text-slate-700 mb-3">
-            Frame {currentFrameIndex + 1} - {currentFramePutts.length}/{puttsPerFrame} putts
-          </div>
-          <div className="flex gap-3">
+        <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
+          <div className="flex gap-2">
             {Array.from({ length: puttsPerFrame }).map((_, idx) => {
               const putt = currentFramePutts[idx];
               return (
                 <div
                   key={idx}
-                  className={`flex-1 h-4 rounded-full ${
+                  className={`flex-1 h-3 rounded-full ${
                     putt?.result === 'made'
                       ? 'bg-emerald-500'
                       : putt?.result === 'missed'

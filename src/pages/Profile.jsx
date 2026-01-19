@@ -101,24 +101,47 @@ export default function Profile() {
     );
   }
 
-  const myName = user?.full_name;
-  const myGames = games.filter(g => g.players?.includes(myName));
+  const myDisplayName = user?.display_name || user?.full_name || user?.email;
+  const myGames = games.filter(g => 
+    g.players?.includes(myDisplayName) || 
+    g.players?.includes(user?.full_name) ||
+    g.players?.includes(user?.email) ||
+    g.host_user === user?.email
+  );
   
-  // Calculate ATW stats
+  // Calculate ATW stats by difficulty
   const atwGames = myGames.filter(g => g.game_type === 'around_the_world');
+  const atwStatsByDifficulty = {
+    easy: 0,
+    medium: 0,
+    hard: 0,
+    ultra_hard: 0,
+    impossible: 0
+  };
+
+  atwGames.forEach(game => {
+    const playerState = game.atw_state?.[myDisplayName] || game.atw_state?.[user?.full_name] || game.atw_state?.[user?.email];
+    if (playerState) {
+      const difficulty = game.atw_config?.difficulty || 'medium';
+      const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+      atwStatsByDifficulty[difficulty] = Math.max(atwStatsByDifficulty[difficulty], score);
+    }
+  });
+
   const atwStats = atwGames.reduce((acc, game) => {
-    const playerState = game.atw_state?.[user?.display_name] || game.atw_state?.[user?.full_name] || game.atw_state?.[user?.email];
+    const playerState = game.atw_state?.[myDisplayName] || game.atw_state?.[user?.full_name] || game.atw_state?.[user?.email];
     if (playerState) {
       acc.totalLaps += playerState.laps_completed || 0;
       acc.totalTurns += playerState.turns_played || 0;
-      acc.bestScore = Math.max(acc.bestScore, game.total_points?.[user?.display_name] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0);
+      const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+      acc.bestScore = Math.max(acc.bestScore, score);
     }
     return acc;
   }, { totalLaps: 0, totalTurns: 0, bestScore: 0 });
 
   // Calculate statistics
-  const totalGames = games.length;
-  const allPutts = myGames.flatMap(g => g.player_putts?.[myName] || []);
+  const totalGames = myGames.length;
+  const allPutts = myGames.flatMap(g => g.player_putts?.[myDisplayName] || g.player_putts?.[user?.full_name] || g.player_putts?.[user?.email] || []);
   const totalPutts = allPutts.length;
   const madePutts = allPutts.filter(p => p.result === 'made').length;
   const puttingPercentage = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
@@ -126,7 +149,7 @@ export default function Profile() {
   let totalPoints = 0;
   let bestScore = 0;
   myGames.forEach(game => {
-    const points = game.total_points?.[myName] || 0;
+    const points = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
     totalPoints += points;
     if (points > bestScore) bestScore = points;
   });
@@ -162,8 +185,8 @@ export default function Profile() {
   // Group game stats
   const groupGames = games.filter(g => g.group_id);
   const groupScores = groupGames
-    .filter(g => g.players?.includes(myName))
-    .map(g => g.total_points?.[myName] || 0);
+    .filter(g => g.players?.includes(myDisplayName) || g.players?.includes(user?.full_name))
+    .map(g => g.total_points?.[myDisplayName] || g.total_points?.[user?.full_name] || 0);
   const avgGroupScore = groupScores.length > 0
     ? (groupScores.reduce((sum, s) => sum + s, 0) / groupScores.length).toFixed(1)
     : 0;
@@ -177,7 +200,7 @@ export default function Profile() {
     avgScore,
     allPutts,
     myGames,
-    myName
+    myName: myDisplayName
   }, isSuperAdmin);
 
   const unlockedAchievements = achievements.filter(a => a.unlocked);
@@ -191,9 +214,9 @@ export default function Profile() {
   
   myGames.forEach(game => {
     const puttType = game.putt_type || 'regular';
-    const putts = game.player_putts?.[myName] || [];
+    const putts = game.player_putts?.[myDisplayName] || game.player_putts?.[user?.full_name] || game.player_putts?.[user?.email] || [];
     const made = putts.filter(p => p.result === 'made').length;
-    const score = game.total_points?.[myName] || 0;
+    const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
     
     puttTypeStats[puttType].made += made;
     puttTypeStats[puttType].total += putts.length;
@@ -214,7 +237,7 @@ export default function Profile() {
 
   myGames.forEach(game => {
     const gameType = game.game_type || 'classic';
-    const score = game.total_points?.[myName] || 0;
+    const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
     gameFormatStats[gameType] = Math.max(gameFormatStats[gameType], score);
   });
 
@@ -233,8 +256,8 @@ export default function Profile() {
     if (sortBy === 'date') {
       return new Date(b.date || 0) - new Date(a.date || 0);
     } else if (sortBy === 'score') {
-      const scoreA = a.total_points?.[myName] || 0;
-      const scoreB = b.total_points?.[myName] || 0;
+      const scoreA = a.total_points?.[myDisplayName] || a.total_points?.[user?.full_name] || 0;
+      const scoreB = b.total_points?.[myDisplayName] || b.total_points?.[user?.full_name] || 0;
       return scoreB - scoreA;
     } else if (sortBy === 'format') {
       return (a.game_type || 'classic').localeCompare(b.game_type || 'classic');
@@ -417,8 +440,7 @@ export default function Profile() {
                 { key: 'long', label: 'Long', unit: 'pts' },
                 { key: 'back_and_forth', label: 'Back & Forth', unit: 'pts' },
                 { key: 'streak_challenge', label: 'Streak', unit: 'putts' },
-                { key: 'random_distance', label: 'Random', unit: 'pts' },
-                { key: 'around_the_world', label: 'Around World', unit: 'pts' }
+                { key: 'random_distance', label: 'Random', unit: 'pts' }
               ].map((format) => (
                 <div key={format.key} className="p-3 bg-gradient-to-br from-amber-50 to-emerald-50 rounded-xl border border-amber-100">
                   <div className="text-xs font-semibold text-slate-600 mb-1">{format.label}</div>
@@ -428,6 +450,34 @@ export default function Profile() {
                   </div>
                 </div>
               ))}
+              
+              {/* Around The World with all difficulties */}
+              <div className="p-3 bg-gradient-to-br from-amber-50 to-emerald-50 rounded-xl border border-amber-100">
+                <div className="text-xs font-semibold text-slate-600 mb-1">Around The World</div>
+                <div className="space-y-1">
+                  {Object.entries(atwStatsByDifficulty).map(([difficulty, score]) => {
+                    const labels = {
+                      easy: 'Easy',
+                      medium: 'Med',
+                      hard: 'Hard',
+                      ultra_hard: 'Ultra',
+                      impossible: 'Imp'
+                    };
+                    if (score === 0) return null;
+                    return (
+                      <div key={difficulty} className="flex justify-between items-center">
+                        <span className="text-xs text-slate-500">{labels[difficulty]}:</span>
+                        <span className="text-sm font-bold text-emerald-600">{score}</span>
+                      </div>
+                    );
+                  })}
+                  {Object.values(atwStatsByDifficulty).every(s => s === 0) && (
+                    <div className="text-2xl font-bold text-emerald-600">
+                      0<span className="text-xs ml-1 text-slate-500">pts</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -577,7 +627,7 @@ export default function Profile() {
         )}
 
         {/* AI Insights */}
-        <AIInsights games={myGames} userName={myName} />
+        <AIInsights games={myGames} userName={myDisplayName} />
 
         {/* Game History with Filters */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
@@ -596,7 +646,7 @@ export default function Profile() {
                    <SelectItem value="back_and_forth">Back & Forth</SelectItem>
                    <SelectItem value="streak_challenge">Streak</SelectItem>
                    <SelectItem value="random_distance">Random</SelectItem>
-                   <SelectItem value="around_the_world">Around World</SelectItem>
+                   <SelectItem value="around_the_world">Around The World</SelectItem>
                    </SelectContent>
                    </Select>
                <Select value={filterPuttType} onValueChange={() => { setFilterPuttType(arguments[0]); setCurrentPage(1); }}>
@@ -643,10 +693,10 @@ export default function Profile() {
                    </thead>
                   <tbody>
                     {filteredGames.slice((currentPage - 1) * GAMES_PER_PAGE, currentPage * GAMES_PER_PAGE).map((game) => {
-                      const putts = game.player_putts?.[myName] || [];
+                      const putts = game.player_putts?.[myDisplayName] || game.player_putts?.[user?.full_name] || game.player_putts?.[user?.email] || [];
                       const made = putts.filter(p => p.result === 'made').length;
                       const percentage = putts.length > 0 ? ((made / putts.length) * 100).toFixed(0) : 0;
-                      const score = game.total_points?.[myName] || 0;
+                      const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
                       const gameFormat = GAME_FORMATS[game.game_type || 'classic'];
 
                       return (

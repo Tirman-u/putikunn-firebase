@@ -307,50 +307,50 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const difficultyLabel = difficultyLabels[config.difficulty] || 'Medium';
 
+  const ConfirmRoundDialog = ({ isOpen, onFinish, onRetry, onComplete }) => {
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Ring salvestatud</h3>
+            <p className="text-slate-600">Mida teha edasi?</p>
+          </div>
+          <div className="space-y-3">
+            <Button
+              onClick={onFinish}
+              className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
+            >
+              Jätka mängu
+            </Button>
+            <Button
+              onClick={onComplete}
+              variant="outline"
+              className="w-full h-12 border-amber-300 text-amber-700 hover:bg-amber-50"
+            >
+              <Trophy className="w-4 h-4 mr-2" />
+              Lõpeta mäng
+            </Button>
+            <Button
+              onClick={onRetry}
+              variant="outline"
+              className="w-full h-12"
+            >
+              Proovi uuesti
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Completed game view
   if (game.status === 'completed') {
     const attemptsCount = (playerState.attempts_count || 0) + 1;
-    
-    const ConfirmRoundDialog = ({ isOpen, onFinish, onRetry, onComplete }) => {
-      if (!isOpen) return null;
-
-      return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-            <div className="text-center mb-6">
-              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Ring salvestatud</h3>
-              <p className="text-slate-600">Mida teha edasi?</p>
-            </div>
-            <div className="space-y-3">
-              <Button
-                onClick={onFinish}
-                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
-              >
-                Jätka mängu
-              </Button>
-              <Button
-                onClick={onComplete}
-                variant="outline"
-                className="w-full h-12 border-amber-300 text-amber-700 hover:bg-amber-50"
-              >
-                <Trophy className="w-4 h-4 mr-2" />
-                Lõpeta mäng
-              </Button>
-              <Button
-                onClick={onRetry}
-                variant="outline"
-                className="w-full h-12"
-              >
-                Proovi uuesti
-              </Button>
-            </div>
-          </div>
-        </div>
-      );
-    };
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -452,6 +452,13 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+      <ConfirmRoundDialog
+        isOpen={showConfirmDialog}
+        onFinish={handleFinish}
+        onRetry={handleRetry}
+        onComplete={handleCompleteGame}
+      />
+
       <div className="max-w-md mx-auto px-4 pt-8">
         <div className="flex items-center justify-between mb-6">
           <button

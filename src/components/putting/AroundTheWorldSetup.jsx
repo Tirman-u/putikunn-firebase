@@ -111,58 +111,6 @@ export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPi
           </div>
         </div>
 
-        {!isSolo && (
-          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg text-white">
-            <div className="text-center mb-4">
-              <h3 className="text-sm font-semibold mb-2 opacity-90">Mängu PIN</h3>
-              <div className="text-5xl font-bold tracking-widest mb-3">{pin}</div>
-              <p className="text-sm opacity-90">Jaga seda PIN-koodi mängijatega</p>
-            </div>
-            <Button
-              onClick={copyPin}
-              className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 h-12 rounded-xl"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-5 h-5 mr-2" />
-                  Kopeeritud!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-5 h-5 mr-2" />
-                  Kopeeri PIN
-                </>
-              )}
-            </Button>
-          </div>
-        )}
-
-        {!isSolo && (
-          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg mb-4 text-white">
-            <div className="text-center mb-4">
-              <h3 className="text-sm font-semibold mb-2 opacity-90">Mängu PIN</h3>
-              <div className="text-5xl font-bold tracking-widest mb-3">{pin}</div>
-              <p className="text-sm opacity-90">Jaga seda PIN-koodi mängijatega</p>
-            </div>
-            <Button
-              onClick={copyPin}
-              className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 h-12 rounded-xl"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-5 h-5 mr-2" />
-                  Kopeeritud!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-5 h-5 mr-2" />
-                  Kopeeri PIN
-                </>
-              )}
-            </Button>
-          </div>
-        )}
-
         <Button
           onClick={handleStart}
           className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-lg font-semibold"

@@ -203,7 +203,19 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const handleSubmitPutts = (madePutts) => {
     setPendingMadePutts(madePutts);
-    submitTurnMutation.mutate({ madePutts, isRetry: false });
+    
+    // If only 1 disc, skip confirmation and finish immediately
+    if (config.discs_per_turn === 1) {
+      submitTurnMutation.mutate({ madePutts, isRetry: false }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+          // Immediately finalize without showing dialog
+          finishRoundMutation.mutate();
+        }
+      });
+    } else {
+      submitTurnMutation.mutate({ madePutts, isRetry: false });
+    }
   };
 
   const handleRetry = () => {
@@ -313,27 +325,48 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
           {/* Quick Input */}
           <div>
-            <div className="text-sm font-medium text-slate-700 mb-3">
-              Mitu sisse said? (vaja {config.advance_threshold}+)
-            </div>
-            <div className="grid grid-cols-6 gap-2">
-              {Array.from({ length: config.discs_per_turn + 1 }, (_, i) => i).map(num => (
+            {config.discs_per_turn === 1 ? (
+              <div className="grid grid-cols-2 gap-3">
                 <button
-                  key={num}
-                  onClick={() => handleSubmitPutts(num)}
-                  disabled={submitTurnMutation.isPending}
-                  className={`h-14 rounded-xl font-bold text-lg transition-all ${
-                    num === 0
-                      ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                      : num >= config.advance_threshold
-                      ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
+                  onClick={() => handleSubmitPutts(0)}
+                  disabled={submitTurnMutation.isPending || finishRoundMutation.isPending}
+                  className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all"
                 >
-                  {num}
+                  Missed
                 </button>
-              ))}
-            </div>
+                <button
+                  onClick={() => handleSubmitPutts(1)}
+                  disabled={submitTurnMutation.isPending || finishRoundMutation.isPending}
+                  className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all"
+                >
+                  Made
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="text-sm font-medium text-slate-700 mb-3">
+                  Mitu sisse said? (vaja {config.advance_threshold}+)
+                </div>
+                <div className="grid grid-cols-6 gap-2">
+                  {Array.from({ length: config.discs_per_turn + 1 }, (_, i) => i).map(num => (
+                    <button
+                      key={num}
+                      onClick={() => handleSubmitPutts(num)}
+                      disabled={submitTurnMutation.isPending}
+                      className={`h-14 rounded-xl font-bold text-lg transition-all ${
+                        num === 0
+                          ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                          : num >= config.advance_threshold
+                          ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
 

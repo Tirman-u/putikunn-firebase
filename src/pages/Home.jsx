@@ -10,12 +10,15 @@ import HostSetup from '@/components/putting/HostSetup';
 import JoinGame from '@/components/putting/JoinGame';
 import HostView from '@/components/putting/HostView';
 import PlayerView from '@/components/putting/PlayerView';
+import AroundTheWorldSetup from '@/components/putting/AroundTheWorldSetup';
+import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 
 export default function Home() {
-  const [mode, setMode] = useState(null); // null, 'host', 'player'
+  const [mode, setMode] = useState(null); // null, 'host', 'player', 'atw-setup', 'atw-game'
   const [gameId, setGameId] = useState(null);
   const [playerName, setPlayerName] = useState(null);
+  const [isSoloATW, setIsSoloATW] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -102,20 +105,40 @@ export default function Home() {
               </div>
             </button>
 
-            <button
-              onClick={() => setMode('solo')}
-              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                  <Target className="w-7 h-7 text-emerald-600" />
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => setMode('solo')}
+                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
+              >
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                    <Target className="w-7 h-7 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800">Solo Practice</h3>
+                    <p className="text-xs text-slate-500">Classic formats</p>
+                  </div>
                 </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Solo Practice</h3>
-                  <p className="text-sm text-slate-500">Practice alone without hosting</p>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsSoloATW(true);
+                  setMode('atw-setup');
+                }}
+                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
+              >
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                    <Trophy className="w-7 h-7 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800">Around World</h3>
+                    <p className="text-xs text-slate-500">Solo ATW</p>
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
+            </div>
 
             <button
               onClick={() => window.location.href = createPageUrl('PuttingRecordsPage')}
@@ -146,6 +169,26 @@ export default function Home() {
                 </div>
               </div>
             </button>
+
+            {canHostGames && (
+              <button
+                onClick={() => {
+                  setIsSoloATW(false);
+                  setMode('atw-setup');
+                }}
+                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                    <Target className="w-7 h-7 text-emerald-600" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="text-lg font-bold text-slate-800">Around the World</h3>
+                    <p className="text-sm text-slate-500">Host "Around the World" game</p>
+                  </div>
+                </div>
+              </button>
+            )}
 
             <div className="pt-8 border-t-2 border-slate-200 mt-8 space-y-3">
             {canManageGames && (
@@ -244,6 +287,62 @@ export default function Home() {
   // Player view
   if (mode === 'player') {
     return <PlayerView gameId={gameId} playerName={playerName} onExit={() => setMode(null)} />;
+  }
+
+  // Around the World setup
+  if (mode === 'atw-setup') {
+    return (
+      <AroundTheWorldSetup
+        isSolo={isSoloATW}
+        onBack={() => setMode(null)}
+        onStart={async (setupData) => {
+          const user = await base44.auth.me();
+          const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
+          
+          const game = await base44.entities.Game.create({
+            name: setupData.name,
+            pin: setupData.pin,
+            game_type: setupData.gameType,
+            putt_type: 'regular',
+            host_user: user.email,
+            players: [playerName],
+            player_distances: {},
+            player_putts: {},
+            total_points: {},
+            status: 'active',
+            date: new Date().toISOString(),
+            atw_config: setupData.config,
+            atw_state: {
+              [playerName]: {
+                current_distance_index: 0,
+                direction: 'UP',
+                laps_completed: 0,
+                turns_played: 0,
+                total_makes: 0,
+                total_putts: 0,
+                current_round_draft: { attempts: [], is_finalized: false },
+                history: []
+              }
+            }
+          });
+          
+          setGameId(game.id);
+          setPlayerName(playerName);
+          setMode('atw-game');
+        }}
+      />
+    );
+  }
+
+  // Around the World game view
+  if (mode === 'atw-game') {
+    return (
+      <AroundTheWorldGameView
+        gameId={gameId}
+        playerName={playerName}
+        isSolo={isSoloATW}
+      />
+    );
   }
 
   return null;

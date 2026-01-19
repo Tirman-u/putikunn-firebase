@@ -20,6 +20,20 @@ export default function Home() {
   const [playerName, setPlayerName] = useState(null);
   const [isSoloATW, setIsSoloATW] = useState(false);
 
+  // Check URL params for ATW mode
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlMode = params.get('mode');
+    const isSolo = params.get('solo') === '1';
+    
+    if (urlMode === 'atw-setup') {
+      setIsSoloATW(isSolo);
+      setMode('atw-setup');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   const { data: user } = useQuery({
     queryKey: ['user'],
     queryFn: () => base44.auth.me()

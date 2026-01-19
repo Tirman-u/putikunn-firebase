@@ -21,6 +21,11 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   );
 
   const handleStart = () => {
+    if (gameType === 'around_the_world') {
+      // Navigate to ATW setup
+      navigate(createPageUrl('Home') + '?mode=atw-setup&solo=' + (isSolo ? '1' : '0'));
+      return;
+    }
     onStartGame({
       name: gameName || `Game ${new Date().toLocaleDateString()}`,
       pin: isSolo ? null : pin,

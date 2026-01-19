@@ -1,5 +1,15 @@
 // Game format configurations
 export const GAME_FORMATS = {
+  around_the_world: {
+    name: 'Around the World',
+    minDistance: 5,
+    maxDistance: 10,
+    startDistance: 5,
+    puttsPerRound: 3,
+    isStreakMode: false,
+    isBackAndForth: false,
+    isRandomDistance: false
+  },
   classic: {
     name: 'Classic',
     minDistance: 5,

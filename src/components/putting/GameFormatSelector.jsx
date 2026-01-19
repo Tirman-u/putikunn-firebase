@@ -44,6 +44,14 @@ const GAME_FORMATS = [
     distance: '3-10m',
     description: 'Random distances each round',
     color: 'indigo'
+  },
+  {
+    id: 'around_the_world',
+    name: 'Around the World',
+    distance: '5-10m',
+    description: 'Move through stations',
+    color: 'emerald',
+    badge: 'BETA'
   }
 ];
 
@@ -61,6 +69,11 @@ export default function GameFormatSelector({ selected, onSelect }) {
               : "border-slate-200 bg-white hover:border-slate-300"
           )}
         >
+          {format.badge && (
+            <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded">
+              {format.badge}
+            </div>
+          )}
           {selected === format.id && (
             <div className="absolute top-2 right-2 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
               <Check className="w-4 h-4 text-white" />

@@ -105,43 +105,20 @@ export default function Home() {
               </div>
             </button>
 
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={() => setMode('solo')}
-                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
-              >
-                <div className="flex flex-col items-center gap-3 text-center">
-                  <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                    <Target className="w-7 h-7 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-800">Solo Practice</h3>
-                    <p className="text-xs text-slate-500">Classic formats</p>
-                  </div>
+            <button
+              onClick={() => setMode('solo')}
+              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                  <Target className="w-7 h-7 text-emerald-600" />
                 </div>
-              </button>
-
-              <button
-                onClick={() => {
-                  setIsSoloATW(true);
-                  setMode('atw-setup');
-                }}
-                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group relative"
-              >
-                <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded">
-                  BETA
+                <div className="text-left flex-1">
+                  <h3 className="text-lg font-bold text-slate-800">Solo Practice</h3>
+                  <p className="text-sm text-slate-500">Practice alone without hosting</p>
                 </div>
-                <div className="flex flex-col items-center gap-3 text-center">
-                  <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                    <Trophy className="w-7 h-7 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-800">Around World</h3>
-                    <p className="text-xs text-slate-500">Solo ATW</p>
-                  </div>
-                </div>
-              </button>
-            </div>
+              </div>
+            </button>
 
             <button
               onClick={() => window.location.href = createPageUrl('PuttingRecordsPage')}
@@ -173,28 +150,7 @@ export default function Home() {
               </div>
             </button>
 
-            {canHostGames && (
-              <button
-                onClick={() => {
-                  setIsSoloATW(false);
-                  setMode('atw-setup');
-                }}
-                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group relative"
-              >
-                <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded">
-                  BETA
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                    <Target className="w-7 h-7 text-emerald-600" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <h3 className="text-lg font-bold text-slate-800">Around the World</h3>
-                    <p className="text-sm text-slate-500">Host "Around the World" game</p>
-                  </div>
-                </div>
-              </button>
-            )}
+
 
             <div className="pt-8 border-t-2 border-slate-200 mt-8 space-y-3">
             {canManageGames && (

@@ -204,8 +204,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const handleSubmitPutts = (madePutts) => {
     setPendingMadePutts(madePutts);
     
-    // If only 1 disc, skip confirmation and finish immediately
-    if (config.discs_per_turn === 1) {
+    // If only 1 disc and Made, skip confirmation and finish immediately
+    if (config.discs_per_turn === 1 && madePutts === 1) {
       submitTurnMutation.mutate({ madePutts, isRetry: false }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ['game', gameId] });

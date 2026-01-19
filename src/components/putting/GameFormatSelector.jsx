@@ -55,10 +55,12 @@ const GAME_FORMATS = [
   }
 ];
 
-export default function GameFormatSelector({ selected, onSelect }) {
+export default function GameFormatSelector({ selected, onSelect, excludeFormats = [] }) {
+  const filteredFormats = GAME_FORMATS.filter(f => !excludeFormats.includes(f.id));
+  
   return (
     <div className="grid grid-cols-2 gap-3">
-      {GAME_FORMATS.map((format) => (
+      {filteredFormats.map((format) => (
         <button
           key={format.id}
           onClick={() => onSelect(format.id)}

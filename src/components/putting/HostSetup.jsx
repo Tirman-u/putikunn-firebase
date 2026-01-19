@@ -21,11 +21,6 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   );
 
   const handleStart = () => {
-    if (gameType === 'around_the_world') {
-      // Navigate to ATW setup
-      navigate(createPageUrl('Home') + '?mode=atw-setup&solo=' + (isSolo ? '1' : '0'));
-      return;
-    }
     onStartGame({
       name: gameName || `Game ${new Date().toLocaleDateString()}`,
       pin: isSolo ? null : pin,
@@ -78,7 +73,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
             </label>
             <FormatRulesPopup format={gameType} />
           </div>
-          <GameFormatSelector selected={gameType} onSelect={setGameType} />
+          <GameFormatSelector selected={gameType} onSelect={setGameType} excludeFormats={['around_the_world']} />
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-4">

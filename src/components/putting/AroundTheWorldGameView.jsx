@@ -12,6 +12,7 @@ import { createPageUrl } from '@/utils';
 export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -105,11 +106,10 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
           [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
         }
       });
-
-      return { showDialog: false };
     },
-    onSuccess: ({ showDialog }) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+      setShowConfirmDialog(true);
     }
   });
 
@@ -117,6 +117,44 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const handleSubmitPutts = (madePutts) => {
     submitTurnMutation.mutate({ madePutts });
+  };
+
+  const handleFinish = () => {
+    setShowConfirmDialog(false);
+  };
+
+  const handleRetry = async () => {
+    setShowConfirmDialog(false);
+
+    const playerState = game.atw_state[playerName];
+    const currentScore = game.total_points?.[playerName] || 0;
+    const bestScore = game.atw_state[playerName]?.best_score || 0;
+
+    const resetState = {
+      current_distance_index: 0,
+      direction: 'UP',
+      laps_completed: 0,
+      turns_played: 0,
+      total_makes: 0,
+      total_putts: 0,
+      current_round_draft: { attempts: [], is_finalized: false },
+      history: [],
+      best_score: Math.max(bestScore, currentScore)
+    };
+
+    await base44.entities.Game.update(gameId, {
+      atw_state: {
+        ...game.atw_state,
+        [playerName]: resetState
+      },
+      total_points: {
+        ...game.total_points,
+        [playerName]: 0
+      }
+    });
+
+    queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+    toast.success('Alustad uuesti 5m pealt!');
   };
 
   const completeGameMutation = useMutation({
@@ -273,8 +311,56 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   if (game.status === 'completed') {
     const attemptsCount = (playerState.attempts_count || 0) + 1;
     
+    const ConfirmRoundDialog = ({ isOpen, onFinish, onRetry, onComplete }) => {
+      if (!isOpen) return null;
+
+      return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Ring salvestatud</h3>
+              <p className="text-slate-600">Mida teha edasi?</p>
+            </div>
+            <div className="space-y-3">
+              <Button
+                onClick={onFinish}
+                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
+              >
+                Jätka mängu
+              </Button>
+              <Button
+                onClick={onComplete}
+                variant="outline"
+                className="w-full h-12 border-amber-300 text-amber-700 hover:bg-amber-50"
+              >
+                <Trophy className="w-4 h-4 mr-2" />
+                Lõpeta mäng
+              </Button>
+              <Button
+                onClick={onRetry}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Proovi uuesti
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+        <ConfirmRoundDialog
+          isOpen={showConfirmDialog}
+          onFinish={handleFinish}
+          onRetry={handleRetry}
+          onComplete={handleCompleteGame}
+        />
+
         <div className="max-w-md mx-auto px-4 pt-8">
           <div className="flex items-center justify-between mb-6">
             <button

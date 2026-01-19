@@ -220,9 +220,17 @@ export default function GameResult() {
 
   const myDisplayName = user?.display_name || user?.full_name || user?.email;
 
-  // Show ATW completed view for completed Around The World games
-  if (game.game_type === 'around_the_world' && game.status === 'completed') {
+  // Show ATW views for Around The World games
+  if (game.game_type === 'around_the_world') {
     const isSolo = game.players.length === 1 && game.pin === '0000';
+    
+    // If user is the host, redirect to HostView
+    if (user?.email === game.host_user && !isSolo) {
+      window.location.href = `/app?page=Home&mode=atw-host&gameId=${game.id}`;
+      return null;
+    }
+    
+    // Otherwise show player view
     return (
       <AroundTheWorldGameView
         gameId={game.id}

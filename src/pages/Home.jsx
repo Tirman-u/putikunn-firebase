@@ -27,6 +27,7 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     const urlMode = params.get('mode');
     const isSolo = params.get('solo') === '1';
+    const urlGameId = params.get('gameId');
     
     if (urlMode === 'atw-setup') {
       setIsSoloATW(isSolo);
@@ -40,6 +41,11 @@ export default function Home() {
       if (urlName) {
         setAtwName(decodeURIComponent(urlName));
       }
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (urlMode === 'atw-host' && urlGameId) {
+      setGameId(urlGameId);
+      setMode('atw-host');
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
     }

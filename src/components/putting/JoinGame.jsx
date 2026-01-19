@@ -48,7 +48,8 @@ export default function JoinGame({ onJoin, onBack }) {
       short: 'Short',
       long: 'Long',
       streak_challenge: 'Streak',
-      random_distance: 'Random'
+      random_distance: 'Random',
+      around_the_world: 'Around The World'
     };
     return names[type] || 'Classic';
   };

@@ -317,6 +317,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const ConfirmRoundDialog = ({ isOpen, onFinish, onRetry, onComplete }) => {
     if (!isOpen) return null;
 
+    const isHost = user?.email === game.host_user;
+
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
@@ -334,14 +336,16 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
             >
               Jätka mängu
             </Button>
-            <Button
-              onClick={onComplete}
-              variant="outline"
-              className="w-full h-12 border-amber-300 text-amber-700 hover:bg-amber-50"
-            >
-              <Trophy className="w-4 h-4 mr-2" />
-              Lõpeta mäng
-            </Button>
+            {(isSolo || isHost) && (
+              <Button
+                onClick={onComplete}
+                variant="outline"
+                className="w-full h-12 border-amber-300 text-amber-700 hover:bg-amber-50"
+              >
+                <Trophy className="w-4 h-4 mr-2" />
+                Lõpeta mäng
+              </Button>
+            )}
             <Button
               onClick={onRetry}
               variant="outline"

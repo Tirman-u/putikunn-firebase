@@ -137,15 +137,41 @@ export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPi
           </div>
         )}
 
+        {!isSolo && (
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg mb-4 text-white">
+            <div className="text-center mb-4">
+              <h3 className="text-sm font-semibold mb-2 opacity-90">Mängu PIN</h3>
+              <div className="text-5xl font-bold tracking-widest mb-3">{pin}</div>
+              <p className="text-sm opacity-90">Jaga seda PIN-koodi mängijatega</p>
+            </div>
+            <Button
+              onClick={copyPin}
+              className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 h-12 rounded-xl"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-5 h-5 mr-2" />
+                  Kopeeritud!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-5 h-5 mr-2" />
+                  Kopeeri PIN
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
         <Button
           onClick={handleStart}
           className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-lg font-semibold"
         >
           {isSolo ? 'Alusta treeningut' : 'Loo mäng'}
         </Button>
-      </div>
+        </div>
 
-      <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200">
+        <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200">
         <h3 className="font-semibold text-blue-900 mb-2">Kuidas mängida?</h3>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• Alusta 5m pealt, liigu ülespoole 10m-ni</li>

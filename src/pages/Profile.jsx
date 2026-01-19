@@ -687,7 +687,7 @@ export default function Profile() {
                        <th className="text-left py-3 px-2 text-slate-600 font-semibold">Style</th>
                        <th className="text-right py-3 px-2 text-slate-600 font-semibold">Score</th>
                        <th className="text-right py-3 px-2 text-slate-600 font-semibold">%</th>
-                       <th className="text-right py-3 px-2 text-slate-600 font-semibold">Putts</th>
+                       <th className="text-center py-3 px-2 text-slate-600 font-semibold">Status</th>
                        <th className="text-center py-3 px-2 text-slate-600 font-semibold"></th>
                      </tr>
                    </thead>
@@ -721,16 +721,33 @@ export default function Profile() {
                            <td className="py-3 px-2 text-right text-slate-700">
                              {percentage}%
                            </td>
-                           <td className="py-3 px-2 text-right text-slate-500">
-                             {made}/{putts.length}
+                           <td className="py-3 px-2 text-center">
+                             <span className={`text-xs px-2 py-1 rounded ${
+                               game.status === 'active' 
+                                 ? 'bg-amber-100 text-amber-700' 
+                                 : 'bg-slate-100 text-slate-600'
+                             }`}>
+                               {game.status === 'active' ? 'In Progress' : 'Completed'}
+                             </span>
                            </td>
                            <td className="py-3 px-2 text-center">
-                             <Link
-                               to={`${createPageUrl('GameResult')}?id=${game.id}`}
-                               className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
-                             >
-                               <ExternalLink className="w-4 h-4" />
-                             </Link>
+                             {game.status === 'active' ? (
+                               <Link
+                                 to={game.game_type === 'around_the_world' 
+                                   ? createPageUrl('Home') + '?mode=atw-game&gameId=' + game.id
+                                   : createPageUrl('Home') + '?mode=player&gameId=' + game.id}
+                                 className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
+                               >
+                                 <ExternalLink className="w-4 h-4" />
+                               </Link>
+                             ) : (
+                               <Link
+                                 to={`${createPageUrl('GameResult')}?id=${game.id}`}
+                                 className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
+                               >
+                                 <ExternalLink className="w-4 h-4" />
+                               </Link>
+                             )}
                            </td>
                          </tr>
                       );

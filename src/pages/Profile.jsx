@@ -104,6 +104,18 @@ export default function Profile() {
   const myName = user?.full_name;
   const myGames = games.filter(g => g.players?.includes(myName));
   
+  // Calculate ATW stats
+  const atwGames = myGames.filter(g => g.game_type === 'around_the_world');
+  const atwStats = atwGames.reduce((acc, game) => {
+    const playerState = game.atw_state?.[user?.display_name] || game.atw_state?.[user?.full_name] || game.atw_state?.[user?.email];
+    if (playerState) {
+      acc.totalLaps += playerState.laps_completed || 0;
+      acc.totalTurns += playerState.turns_played || 0;
+      acc.bestScore = Math.max(acc.bestScore, game.total_points?.[user?.display_name] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0);
+    }
+    return acc;
+  }, { totalLaps: 0, totalTurns: 0, bestScore: 0 });
+
   // Calculate statistics
   const totalGames = games.length;
   const allPutts = myGames.flatMap(g => g.player_putts?.[myName] || []);
@@ -196,7 +208,8 @@ export default function Profile() {
     long: 0,
     back_and_forth: 0,
     streak_challenge: 0,
-    random_distance: 0
+    random_distance: 0,
+    around_the_world: 0
   };
 
   myGames.forEach(game => {
@@ -351,7 +364,7 @@ export default function Profile() {
         </div>
 
         {/* Stats */}
-         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
              <div className="flex items-center gap-2 mb-2">
                <Trophy className="w-5 h-5 text-emerald-600" />
@@ -359,6 +372,15 @@ export default function Profile() {
              </div>
              <div className="text-2xl font-bold text-slate-800">{totalGames}</div>
            </div>
+           {atwStats.totalLaps > 0 && (
+             <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+               <div className="flex items-center gap-2 mb-2">
+                 <Trophy className="w-5 h-5 text-emerald-600" />
+                 <span className="text-sm text-slate-500">ATW Laps</span>
+               </div>
+               <div className="text-2xl font-bold text-emerald-600">{atwStats.totalLaps}</div>
+             </div>
+           )}
            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
              <div className="flex items-center gap-2 mb-2">
                <Target className="w-5 h-5 text-emerald-600" />
@@ -395,7 +417,8 @@ export default function Profile() {
                 { key: 'long', label: 'Long', unit: 'pts' },
                 { key: 'back_and_forth', label: 'Back & Forth', unit: 'pts' },
                 { key: 'streak_challenge', label: 'Streak', unit: 'putts' },
-                { key: 'random_distance', label: 'Random', unit: 'pts' }
+                { key: 'random_distance', label: 'Random', unit: 'pts' },
+                { key: 'around_the_world', label: 'Around World', unit: 'pts' }
               ].map((format) => (
                 <div key={format.key} className="p-3 bg-gradient-to-br from-amber-50 to-emerald-50 rounded-xl border border-amber-100">
                   <div className="text-xs font-semibold text-slate-600 mb-1">{format.label}</div>
@@ -573,8 +596,9 @@ export default function Profile() {
                    <SelectItem value="back_and_forth">Back & Forth</SelectItem>
                    <SelectItem value="streak_challenge">Streak</SelectItem>
                    <SelectItem value="random_distance">Random</SelectItem>
-                 </SelectContent>
-               </Select>
+                   <SelectItem value="around_the_world">Around World</SelectItem>
+                   </SelectContent>
+                   </Select>
                <Select value={filterPuttType} onValueChange={() => { setFilterPuttType(arguments[0]); setCurrentPage(1); }}>
                  <SelectTrigger className="w-32">
                    <SelectValue />

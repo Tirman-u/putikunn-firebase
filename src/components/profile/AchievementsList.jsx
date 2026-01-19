@@ -220,7 +220,7 @@ export function getAchievements(stats, isAdmin = false) {
       id: 'all_formats', 
       name: 'Jack of All Trades', 
       description: 'Play all game formats',
-      unlocked: new Set(myGames?.map(g => g.game_type)).size >= 6,
+      unlocked: new Set(myGames?.map(g => g.game_type)).size >= 7,
       icon: '🃏',
       tier: 'platinum'
     },

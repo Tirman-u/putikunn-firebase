@@ -126,8 +126,11 @@ export default function Home() {
                   setIsSoloATW(true);
                   setMode('atw-setup');
                 }}
-                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
+                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group relative"
               >
+                <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded">
+                  BETA
+                </div>
                 <div className="flex flex-col items-center gap-3 text-center">
                   <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
                     <Trophy className="w-7 h-7 text-emerald-600" />
@@ -176,8 +179,11 @@ export default function Home() {
                   setIsSoloATW(false);
                   setMode('atw-setup');
                 }}
-                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
+                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group relative"
               >
+                <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded">
+                  BETA
+                </div>
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
                     <Target className="w-7 h-7 text-emerald-600" />

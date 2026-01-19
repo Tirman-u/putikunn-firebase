@@ -91,7 +91,9 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
           made_putts: actualMakes,
           moved_to_distance: distances[newIndex],
           points_awarded: pointsAwarded,
-          lap_event: lapEvent
+          lap_event: lapEvent,
+          failed_to_advance: actualMakes > 0 && actualMakes < threshold,
+          missed_all: actualMakes === 0
         }],
         best_score: playerState.best_score
       };
@@ -357,6 +359,9 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   if (game.status === 'completed') {
     const attemptsCount = (playerState.attempts_count || 0) + 1;
 
+    // Get failed turns
+    const failedTurns = playerState.history.filter(turn => turn.failed_to_advance || turn.missed_all);
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
         <ConfirmRoundDialog
@@ -431,6 +436,28 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
               </div>
             </div>
           </div>
+
+          {/* Failed Attempts */}
+          {failedTurns.length > 0 && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
+              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+                Möödapanekud distantsilt
+              </h3>
+              <div className="space-y-2">
+                {failedTurns.map((turn, index) => (
+                  <div key={index} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
+                    <span className="text-sm text-slate-700">
+                      {turn.distance}m ({turn.made_putts}/{config.discs_per_turn})
+                    </span>
+                    <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded">
+                      {turn.missed_all ? 'KÕIK MÖÖDA' : 'EI EDENENUD'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="space-y-3">

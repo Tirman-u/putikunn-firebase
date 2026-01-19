@@ -345,7 +345,7 @@ export default function GameResult() {
                 <Upload className="w-4 h-4 mr-2" />
                 {isSubmittedToLeaderboard ? 'Submitted' : 'Submit to Leaderboard'}
               </Button>
-              {canSubmitDiscgolf && (
+              {canSubmitDiscgolf && !(game.pin === '0000') && (
                 <Button 
                   onClick={() => submitToDiscgolfMutation.mutate()}
                   disabled={submitToDiscgolfMutation.isPending || isSubmittedToDgEe}

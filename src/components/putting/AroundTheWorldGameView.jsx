@@ -474,7 +474,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         <div className="max-w-md mx-auto px-4 pt-8">
           <div className="flex items-center justify-between mb-6">
             <button
-              onClick={() => navigate(createPageUrl('Home'))}
+              onClick={() => window.location.href = createPageUrl('Home')}
               className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -548,7 +548,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
             </Button>
             
             <Button
-              onClick={() => navigate(createPageUrl('Home'))}
+              onClick={() => window.location.href = createPageUrl('Home')}
               variant="outline"
               className="w-full h-14 text-lg"
             >
@@ -572,7 +572,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       <div className="max-w-md mx-auto px-4 pt-8">
         <div className="flex items-center justify-between mb-6">
           <button
-            onClick={() => navigate(createPageUrl('Home'))}
+            onClick={() => window.location.href = createPageUrl('Home')}
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
           >
             <ArrowLeft className="w-5 h-5" />

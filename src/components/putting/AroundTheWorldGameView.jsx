@@ -315,49 +315,45 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const difficultyLabel = difficultyLabels[config.difficulty] || 'Medium';
 
   const ConfirmRoundDialog = ({ isOpen, onFinish, onRetry, onComplete }) => {
-    if (!isOpen) return null;
+      if (!isOpen) return null;
 
-    const isHost = user?.email === game.host_user;
-
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-          <div className="text-center mb-6">
-            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+      return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Ring salvestatud</h3>
+              <p className="text-slate-600">Mida teha edasi?</p>
             </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">Ring salvestatud</h3>
-            <p className="text-slate-600">Mida teha edasi?</p>
-          </div>
-          <div className="space-y-3">
-            <Button
-              onClick={onFinish}
-              className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
-            >
-              Jätka mängu
-            </Button>
-            {isSolo && (
+            <div className="space-y-3">
               <Button
-                onClick={onComplete}
+                onClick={onRetry}
+                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
+              >
+                Proovi uuesti
+              </Button>
+              <Button
+                onClick={() => window.location.href = createPageUrl('PuttingRecordsPage')}
                 variant="outline"
-                className="w-full h-12 border-amber-300 text-amber-700 hover:bg-amber-50"
+                className="w-full h-12"
               >
                 <Trophy className="w-4 h-4 mr-2" />
-                Lõpeta mäng
+                Vaata edetabelit
               </Button>
-            )}
-            <Button
-              onClick={onRetry}
-              variant="outline"
-              className="w-full h-12"
-            >
-              Proovi uuesti
-            </Button>
+              <Button
+                onClick={() => window.location.href = createPageUrl('Home')}
+                variant="outline"
+                className="w-full h-12 text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                Välju mängust
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-    );
-  };
+      );
+    };
 
   // Completed game view
   if (game.status === 'completed') {

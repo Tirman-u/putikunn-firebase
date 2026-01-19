@@ -9,6 +9,7 @@ import { GAME_FORMATS } from '@/components/putting/gameRules';
 import { toast } from 'sonner';
 import PerformanceAnalysis from '@/components/putting/PerformanceAnalysis';
 import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView';
+import { createPageUrl } from '@/utils';
 
 
 export default function GameResult() {
@@ -226,7 +227,7 @@ export default function GameResult() {
     
     // If user is the host, redirect to HostView
     if (user?.email === game.host_user && !isSolo) {
-      window.location.href = `/app?page=Home&mode=atw-host&gameId=${game.id}`;
+      window.location.href = createPageUrl('Home') + '?mode=atw-host&gameId=' + game.id;
       return null;
     }
     

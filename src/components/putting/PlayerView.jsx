@@ -518,6 +518,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
              canUndo={canUndo}
              onUndo={handleUndo}
              distanceMap={format.distanceMap || {}}
+             currentRoundPutts={playerPutts}
            />
          )}
       </div>

@@ -211,9 +211,39 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     submitTurnMutation.mutate({ madePutts, isRetry: false });
   };
 
-  const handleRetry = () => {
+  const handleRetry = async () => {
     setShowConfirmDialog(false);
-    // Allow immediate retry
+    
+    // Reset player to starting position
+    const playerState = game.atw_state[playerName];
+    const currentScore = game.total_points?.[playerName] || 0;
+    const bestScore = game.atw_state[playerName]?.best_score || 0;
+    
+    const resetState = {
+      current_distance_index: 0,
+      direction: 'UP',
+      laps_completed: 0,
+      turns_played: 0,
+      total_makes: 0,
+      total_putts: 0,
+      current_round_draft: { attempts: [], is_finalized: false },
+      history: [],
+      best_score: Math.max(bestScore, currentScore)
+    };
+    
+    await base44.entities.Game.update(gameId, {
+      atw_state: {
+        ...game.atw_state,
+        [playerName]: resetState
+      },
+      total_points: {
+        ...game.total_points,
+        [playerName]: 0
+      }
+    });
+    
+    queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+    toast.success('Alustad uuesti 5m pealt!');
   };
 
   const handleFinish = () => {
@@ -237,6 +267,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const currentDistance = config.distances[playerState.current_distance_index];
   const totalScore = game.total_points?.[playerName] || 0;
+  const bestScore = playerState.best_score || 0;
   const makeRate = playerState.total_putts > 0 
     ? ((playerState.total_makes / playerState.total_putts) * 100).toFixed(0) 
     : 0;
@@ -264,17 +295,21 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-white rounded-xl p-4 text-center shadow-sm">
-            <div className="text-2xl font-bold text-emerald-600">{totalScore}</div>
+        <div className="grid grid-cols-4 gap-2 mb-6">
+          <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+            <div className="text-xl font-bold text-emerald-600">{totalScore}</div>
             <div className="text-xs text-slate-600">Punktid</div>
           </div>
-          <div className="bg-white rounded-xl p-4 text-center shadow-sm">
-            <div className="text-2xl font-bold text-blue-600">{playerState.laps_completed}</div>
+          <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+            <div className="text-xl font-bold text-amber-600">{bestScore}</div>
+            <div className="text-xs text-slate-600">Parim</div>
+          </div>
+          <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+            <div className="text-xl font-bold text-blue-600">{playerState.laps_completed}</div>
             <div className="text-xs text-slate-600">Ringe</div>
           </div>
-          <div className="bg-white rounded-xl p-4 text-center shadow-sm">
-            <div className="text-2xl font-bold text-purple-600">{makeRate}%</div>
+          <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+            <div className="text-xl font-bold text-purple-600">{makeRate}%</div>
             <div className="text-xs text-slate-600">Täpsus</div>
           </div>
         </div>
@@ -289,7 +324,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                 <ArrowDown className="w-4 h-4 text-emerald-700" />
               )}
               <span className="text-sm font-semibold text-emerald-700">
-                {playerState.direction === 'UP' ? 'Eemale' : 'Tagasi'}
+                {playerState.direction === 'UP' ? 'Kaugemale' : 'Lähemale'}
               </span>
             </div>
             <div className="text-5xl font-bold text-slate-800 mb-2">{currentDistance}m</div>
@@ -323,14 +358,14 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                 <button
                   onClick={() => handleSubmitPutts(0)}
                   disabled={submitTurnMutation.isPending || finishRoundMutation.isPending}
-                  className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all"
+                  className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all disabled:opacity-50"
                 >
                   Missed
                 </button>
                 <button
                   onClick={() => handleSubmitPutts(1)}
                   disabled={submitTurnMutation.isPending || finishRoundMutation.isPending}
-                  className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all"
+                  className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all disabled:opacity-50"
                 >
                   Made
                 </button>
@@ -360,16 +395,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                 </div>
               </>
             )}
-          </div>
-        </div>
-
-        {/* Rules Reminder */}
-        <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-          <div className="text-xs text-blue-800 space-y-1">
-            <div>✓ {config.advance_threshold}+ sisse = liigu edasi</div>
-            <div>→ {config.advance_threshold - 1} sisse = jää samale</div>
-            <div>← Alla {config.advance_threshold - 1} sisse = liigu tagasi</div>
-            <div>⚠️ 0 sisse = tagasi 5m peale</div>
           </div>
         </div>
       </div>

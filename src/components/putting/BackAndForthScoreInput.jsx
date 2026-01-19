@@ -1,68 +1,139 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Undo, Target, CheckCircle2, XCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { CheckCircle2, XCircle, Undo2 } from 'lucide-react';
 
-const DISTANCE_COLORS = {
-  5: 'from-red-400 to-red-500',
-  6: 'from-orange-400 to-orange-500',
-  7: 'from-amber-400 to-amber-500',
-  8: 'from-yellow-400 to-yellow-500',
-  9: 'from-lime-400 to-lime-500',
-  10: 'from-emerald-400 to-emerald-500'
-};
+export default function BackAndForthScoreInput({ 
+  player, 
+  currentDistance, 
+  onMade, 
+  onMissed, 
+  canUndo, 
+  onUndo,
+  putts = []
+}) {
+  // Group putts into frames of 20
+  const totalFrames = 20;
+  const puttsPerFrame = 5;
+  
+  // Calculate which frame we're in
+  const currentFrameIndex = Math.floor(putts.length / puttsPerFrame);
+  const currentFramePutts = putts.slice(
+    currentFrameIndex * puttsPerFrame,
+    (currentFrameIndex + 1) * puttsPerFrame
+  );
 
-export default function BackAndForthScoreInput({ player, currentDistance, onMade, onMissed, canUndo, onUndo }) {
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-      {/* Player Name & Distance */}
-      <div className="text-center mb-6">
-        <h3 className="text-xl font-bold text-slate-800 mb-3">{player}</h3>
-        <div className="flex items-center justify-center gap-3">
-          <Target className="w-5 h-5 text-slate-400" />
-          <div className={cn(
-            "px-6 py-2 rounded-xl bg-gradient-to-r shadow-lg",
-            DISTANCE_COLORS[currentDistance]
-          )}>
-            <span className="text-2xl font-bold text-white">{currentDistance}m</span>
-          </div>
+    <div className="space-y-4">
+      {/* Current Distance */}
+      <div className="text-center bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className="text-sm text-slate-500 mb-2">Current Distance</div>
+        <div className="text-6xl font-bold text-slate-800 mb-1">{currentDistance}m</div>
+        <div className="text-sm text-slate-500">Frame {currentFrameIndex + 1} of {totalFrames}</div>
+      </div>
+
+      {/* Visual Frames Display - 20 boxes */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+        <div className="text-xs font-semibold text-slate-600 mb-3">Progress</div>
+        <div className="grid grid-cols-10 gap-2">
+          {Array.from({ length: totalFrames }).map((_, frameIdx) => {
+            const framePutts = putts.slice(frameIdx * puttsPerFrame, (frameIdx + 1) * puttsPerFrame);
+            const isCurrent = frameIdx === currentFrameIndex;
+            const isCompleted = framePutts.length === puttsPerFrame;
+            const madeCount = framePutts.filter(p => p.result === 'made').length;
+            
+            return (
+              <div 
+                key={frameIdx}
+                className={`aspect-square rounded-lg border-2 flex flex-col items-center justify-center ${
+                  isCurrent
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : isCompleted
+                    ? 'border-slate-300 bg-slate-50'
+                    : 'border-slate-200 bg-white'
+                }`}
+              >
+                {/* 5 small indicators inside each box */}
+                <div className="grid grid-cols-1 gap-0.5">
+                  {Array.from({ length: puttsPerFrame }).map((_, puttIdx) => {
+                    const puttResult = framePutts[puttIdx]?.result;
+                    return (
+                      <div
+                        key={puttIdx}
+                        className={`w-1 h-1 rounded-full ${
+                          puttResult === 'made'
+                            ? 'bg-emerald-500'
+                            : puttResult === 'missed'
+                            ? 'bg-red-400'
+                            : 'bg-slate-300'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+                
+                {/* Frame number */}
+                <div className="text-[8px] text-slate-400 mt-0.5">{frameIdx + 1}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Instructions */}
-      <div className="text-center text-sm text-slate-500 mb-4">
-        Did you make the putt?
-      </div>
+      {/* Current Frame Detail */}
+      {currentFrameIndex < totalFrames && (
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+          <div className="text-xs font-semibold text-slate-600 mb-3">
+            Frame {currentFrameIndex + 1} - {currentFramePutts.length}/{puttsPerFrame} putts
+          </div>
+          <div className="flex gap-2 mb-4">
+            {Array.from({ length: puttsPerFrame }).map((_, idx) => {
+              const putt = currentFramePutts[idx];
+              return (
+                <div
+                  key={idx}
+                  className={`flex-1 h-3 rounded-full ${
+                    putt?.result === 'made'
+                      ? 'bg-emerald-500'
+                      : putt?.result === 'missed'
+                      ? 'bg-red-400'
+                      : 'bg-slate-200'
+                  }`}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-      {/* Made/Missed Buttons */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <button
-          onClick={onMade}
-          className="py-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 active:scale-95 transition-all shadow-lg text-white"
-        >
-          <CheckCircle2 className="w-12 h-12 mx-auto mb-3" />
-          <div className="text-2xl font-bold">Made</div>
-          <div className="text-sm opacity-90 mt-1">→ {Math.min(currentDistance + 1, 10)}m</div>
-        </button>
+      {/* Action Buttons */}
+      {currentFrameIndex < totalFrames && (
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            onClick={onMissed}
+            className="h-20 bg-red-100 hover:bg-red-200 text-red-700 text-lg font-bold rounded-2xl"
+            variant="ghost"
+          >
+            <XCircle className="w-6 h-6 mr-2" />
+            Miss
+          </Button>
+          <Button
+            onClick={onMade}
+            className="h-20 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-lg font-bold rounded-2xl"
+            variant="ghost"
+          >
+            <CheckCircle2 className="w-6 h-6 mr-2" />
+            Make
+          </Button>
+        </div>
+      )}
 
-        <button
-          onClick={onMissed}
-          className="py-12 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 active:scale-95 transition-all shadow-lg text-white"
-        >
-          <XCircle className="w-12 h-12 mx-auto mb-3" />
-          <div className="text-2xl font-bold">Missed</div>
-          <div className="text-sm opacity-90 mt-1">→ {Math.max(currentDistance - 1, 5)}m</div>
-        </button>
-      </div>
-
-      {/* Undo Button */}
       {canUndo && (
         <Button
           onClick={onUndo}
           variant="outline"
-          className="w-full h-12 rounded-xl border-2"
+          className="w-full h-12 rounded-xl"
         >
-          <Undo className="w-4 h-4 mr-2" />
+          <Undo2 className="w-5 h-5 mr-2" />
           Undo Last Putt
         </Button>
       )}

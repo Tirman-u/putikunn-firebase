@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X, Undo2, Trophy, RotateCcw, Share2 } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X, Undo2, Trophy, RotateCcw, Share2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -15,6 +15,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const queryClient = useQueryClient();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [hideScore, setHideScore] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -530,11 +531,11 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         {/* Stats Overview */}
         <div className="grid grid-cols-4 gap-2 mb-6">
           <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-            <div className="text-xl font-bold text-emerald-600">{totalScore}</div>
+            <div className="text-xl font-bold text-emerald-600">{hideScore ? '***' : totalScore}</div>
             <div className="text-xs text-slate-600">Punktid</div>
           </div>
           <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-            <div className="text-xl font-bold text-amber-600">{bestScore}</div>
+            <div className="text-xl font-bold text-amber-600">{hideScore ? '***' : bestScore}</div>
             <div className="text-xs text-slate-600">Parim</div>
           </div>
           <div className="bg-white rounded-xl p-3 text-center shadow-sm">
@@ -545,6 +546,23 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
             <div className="text-xl font-bold text-purple-600">{makeRate}%</div>
             <div className="text-xs text-slate-600">Täpsus</div>
           </div>
+        </div>
+        
+        {/* Hide Score Toggle */}
+        <div className="flex justify-center mb-6">
+          <button
+            onClick={() => setHideScore(!hideScore)}
+            className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-slate-300 transition-colors"
+          >
+            {hideScore ? (
+              <EyeOff className="w-4 h-4 text-slate-500" />
+            ) : (
+              <Eye className="w-4 h-4 text-slate-500" />
+            )}
+            <span className="text-sm font-medium text-slate-700">
+              {hideScore ? 'Näita skoori' : 'Peida skoor'}
+            </span>
+          </button>
         </div>
 
         {/* Current Status */}

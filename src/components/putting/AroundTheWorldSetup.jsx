@@ -12,8 +12,8 @@ const DIFFICULTY_PRESETS = {
   impossible: { label: 'Impossible', threshold: 5, discs: 10 }
 };
 
-export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPin }) {
-  const [gameName, setGameName] = useState('');
+export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPin, initialName }) {
+  const [gameName, setGameName] = useState(initialName || '');
   const [difficulty, setDifficulty] = useState('medium');
   const [pin] = useState(initialPin || (isSolo ? '0000' : Math.floor(1000 + Math.random() * 9000).toString()));
   const [copied, setCopied] = useState(false);

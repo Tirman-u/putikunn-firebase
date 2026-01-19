@@ -15,10 +15,12 @@ import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView'
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 
 export default function Home() {
-  const [mode, setMode] = useState(null); // null, 'host', 'player', 'atw-setup', 'atw-game'
+  const [mode, setMode] = useState(null); // null, 'host', 'player', 'atw-setup', 'atw-game', 'atw-host'
   const [gameId, setGameId] = useState(null);
   const [playerName, setPlayerName] = useState(null);
   const [isSoloATW, setIsSoloATW] = useState(false);
+  const [atwPin, setAtwPin] = useState(null);
+  const [atwName, setAtwName] = useState(null);
 
   // Check URL params for ATW mode
   React.useEffect(() => {
@@ -29,10 +31,14 @@ export default function Home() {
     if (urlMode === 'atw-setup') {
       setIsSoloATW(isSolo);
       setMode('atw-setup');
-      // Store pin if available
+      // Store pin and name if available
       const urlPin = params.get('pin');
+      const urlName = params.get('name');
       if (urlPin) {
-        setGameId(urlPin); // Temporarily store PIN in gameId state
+        setAtwPin(urlPin);
+      }
+      if (urlName) {
+        setAtwName(decodeURIComponent(urlName));
       }
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
@@ -282,10 +288,12 @@ export default function Home() {
     return (
       <AroundTheWorldSetup
         isSolo={isSoloATW}
-        initialPin={gameId} // Pass the pin from URL (temporarily stored in gameId)
+        initialPin={atwPin}
+        initialName={atwName}
         onBack={() => {
           setMode(null);
-          setGameId(null); // Clear temporary pin storage
+          setAtwPin(null);
+          setAtwName(null);
         }}
         onStart={async (setupData) => {
           const user = await base44.auth.me();
@@ -297,14 +305,14 @@ export default function Home() {
             game_type: setupData.gameType,
             putt_type: 'regular',
             host_user: user.email,
-            players: [playerName],
+            players: isSoloATW ? [playerName] : [],
             player_distances: {},
             player_putts: {},
             total_points: {},
             status: 'active',
             date: new Date().toISOString(),
             atw_config: setupData.config,
-            atw_state: {
+            atw_state: isSoloATW ? {
               [playerName]: {
                 current_distance_index: 0,
                 direction: 'UP',
@@ -315,15 +323,24 @@ export default function Home() {
                 current_round_draft: { attempts: [], is_finalized: false },
                 history: []
               }
-            }
+            } : {}
           });
           
           setGameId(game.id);
-          setPlayerName(playerName);
-          setMode('atw-game');
+          if (isSoloATW) {
+            setPlayerName(playerName);
+            setMode('atw-game');
+          } else {
+            setMode('atw-host');
+          }
         }}
       />
     );
+  }
+
+  // Around the World host view
+  if (mode === 'atw-host') {
+    return <HostView gameId={gameId} onExit={() => setMode(null)} />;
   }
 
   // Around the World game view

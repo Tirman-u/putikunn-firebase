@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -307,6 +307,66 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     finishRoundMutation.mutate();
   };
 
+  const undoMutation = useMutation({
+    mutationFn: async () => {
+      const playerState = game.atw_state[playerName];
+      
+      if (!playerState.history || playerState.history.length === 0) {
+        throw new Error('Pole midagi tagasi võtta');
+      }
+
+      const lastTurn = playerState.history[playerState.history.length - 1];
+      const newHistory = playerState.history.slice(0, -1);
+      
+      // Find previous state
+      let previousIndex = 0;
+      let previousDirection = 'UP';
+      let previousLaps = 0;
+      
+      if (newHistory.length > 0) {
+        const prevTurn = newHistory[newHistory.length - 1];
+        const distances = config.distances;
+        previousIndex = distances.indexOf(prevTurn.moved_to_distance);
+        previousDirection = prevTurn.direction;
+        previousLaps = playerState.laps_completed - (lastTurn.lap_event ? 1 : 0);
+      }
+
+      const updatedState = {
+        ...playerState,
+        current_distance_index: previousIndex,
+        direction: previousDirection,
+        laps_completed: previousLaps,
+        turns_played: playerState.turns_played - 1,
+        total_makes: playerState.total_makes - lastTurn.made_putts,
+        total_putts: playerState.total_putts - config.discs_per_turn,
+        history: newHistory,
+        current_round_draft: { attempts: [], is_finalized: false }
+      };
+
+      await base44.entities.Game.update(gameId, {
+        atw_state: {
+          ...game.atw_state,
+          [playerName]: updatedState
+        },
+        total_points: {
+          ...game.total_points,
+          [playerName]: Math.max(0, (game.total_points?.[playerName] || 0) - lastTurn.points_awarded)
+        }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+      toast.success('Viimane käik tühistatud');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Viga tagasivõtmisel');
+    }
+  });
+
+  const handleUndo = () => {
+    undoMutation.mutate();
+  };
+
   if (isLoading || !game) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
@@ -328,6 +388,16 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const makeRate = playerState.total_putts > 0 
     ? ((playerState.total_makes / playerState.total_putts) * 100).toFixed(0) 
     : 0;
+
+  const difficultyLabels = {
+    easy: 'Easy',
+    medium: 'Medium',
+    hard: 'Hard',
+    ultra_hard: 'Ultra Hard',
+    impossible: 'Impossible'
+  };
+
+  const difficultyLabel = difficultyLabels[config.difficulty] || 'Medium';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -374,15 +444,22 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         {/* Current Status */}
         <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
           <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full mb-3">
-              {playerState.direction === 'UP' ? (
-                <ArrowUp className="w-4 h-4 text-emerald-700" />
-              ) : (
-                <ArrowDown className="w-4 h-4 text-emerald-700" />
-              )}
-              <span className="text-sm font-semibold text-emerald-700">
-                {playerState.direction === 'UP' ? 'Kaugemale' : 'Lähemale'}
-              </span>
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full">
+                <span className="text-sm font-semibold text-slate-700">
+                  {difficultyLabel} - {config.discs_per_turn} ketas{config.discs_per_turn > 1 ? 't' : ''}
+                </span>
+              </div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full">
+                {playerState.direction === 'UP' ? (
+                  <ArrowUp className="w-4 h-4 text-emerald-700" />
+                ) : (
+                  <ArrowDown className="w-4 h-4 text-emerald-700" />
+                )}
+                <span className="text-sm font-semibold text-emerald-700">
+                  {playerState.direction === 'UP' ? 'Kaugemale' : 'Lähemale'}
+                </span>
+              </div>
             </div>
             <div className="text-5xl font-bold text-slate-800 mb-2">{currentDistance}m</div>
             <div className="text-sm text-slate-600">
@@ -411,22 +488,35 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
           {/* Quick Input */}
           <div>
             {config.discs_per_turn === 1 ? (
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => handleSubmitPutts(0)}
-                  disabled={submitTurnMutation.isPending || finishRoundMutation.isPending}
-                  className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all disabled:opacity-50"
-                >
-                  Missed
-                </button>
-                <button
-                  onClick={() => handleSubmitPutts(1)}
-                  disabled={submitTurnMutation.isPending || finishRoundMutation.isPending}
-                  className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all disabled:opacity-50"
-                >
-                  Made
-                </button>
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <button
+                    onClick={() => handleSubmitPutts(0)}
+                    disabled={submitTurnMutation.isPending || finishRoundMutation.isPending}
+                    className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all disabled:opacity-50"
+                  >
+                    Missed
+                  </button>
+                  <button
+                    onClick={() => handleSubmitPutts(1)}
+                    disabled={submitTurnMutation.isPending || finishRoundMutation.isPending}
+                    className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all disabled:opacity-50"
+                  >
+                    Made
+                  </button>
+                </div>
+                {playerState.history && playerState.history.length > 0 && (
+                  <Button
+                    onClick={handleUndo}
+                    disabled={undoMutation.isPending}
+                    variant="outline"
+                    className="w-full h-12"
+                  >
+                    <Undo2 className="w-4 h-4 mr-2" />
+                    Võta tagasi
+                  </Button>
+                )}
+              </>
             ) : (
               <>
                 <div className="text-sm font-medium text-slate-700 mb-3">
@@ -450,6 +540,17 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                     </button>
                   ))}
                 </div>
+                {playerState.history && playerState.history.length > 0 && (
+                  <Button
+                    onClick={handleUndo}
+                    disabled={undoMutation.isPending}
+                    variant="outline"
+                    className="w-full h-12 mt-3"
+                  >
+                    <Undo2 className="w-4 h-4 mr-2" />
+                    Võta tagasi
+                  </Button>
+                )}
               </>
             )}
           </div>

@@ -425,43 +425,45 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         </div>
 
         {/* Progress Bar */}
-        {gameType !== 'streak_challenge' && <ProgressBar putts={playerPutts} gameType={gameType} />}
+        {gameType !== 'streak_challenge' && gameType !== 'back_and_forth' && <ProgressBar putts={playerPutts} gameType={gameType} />}
 
-        {/* Your Stats */}
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
-          <div className="flex items-center justify-around text-center">
-            <div>
-              <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Best Streak' : 'Points'}</div>
-              <div className="text-2xl font-bold text-emerald-600">
-                {hideScore ? '***' : (gameType === 'streak_challenge' ? (game.player_highest_streaks?.[playerName] || 0) : (game.total_points[playerName] || 0))}
+        {/* Your Stats - Hidden for back_and_forth */}
+        {gameType !== 'back_and_forth' && (
+          <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
+            <div className="flex items-center justify-around text-center">
+              <div>
+                <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Best Streak' : 'Points'}</div>
+                <div className="text-2xl font-bold text-emerald-600">
+                  {hideScore ? '***' : (gameType === 'streak_challenge' ? (game.player_highest_streaks?.[playerName] || 0) : (game.total_points[playerName] || 0))}
+                </div>
               </div>
+              <div className="h-10 w-px bg-slate-200" />
+              <div>
+                <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Putts' : 'Round'}</div>
+                <div className="text-2xl font-bold text-slate-600">
+                  {gameType === 'streak_challenge' ? playerPutts.length : `${currentRound}/${totalRounds}`}
+                </div>
+              </div>
+              <div className="h-10 w-px bg-slate-200" />
+              <button
+                onClick={() => setHideScore(!hideScore)}
+                className="flex flex-col items-center justify-center"
+              >
+                {hideScore ? (
+                  <EyeOff className="w-5 h-5 text-slate-400" />
+                ) : (
+                  <Eye className="w-5 h-5 text-slate-400" />
+                )}
+                <div className="text-xs text-slate-400 mt-1">
+                  {hideScore ? 'Show' : 'Hide'}
+                </div>
+              </button>
             </div>
-            <div className="h-10 w-px bg-slate-200" />
-            <div>
-              <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Putts' : 'Round'}</div>
-              <div className="text-2xl font-bold text-slate-600">
-                {gameType === 'streak_challenge' ? playerPutts.length : `${currentRound}/${totalRounds}`}
-              </div>
-            </div>
-            <div className="h-10 w-px bg-slate-200" />
-            <button
-              onClick={() => setHideScore(!hideScore)}
-              className="flex flex-col items-center justify-center"
-            >
-              {hideScore ? (
-                <EyeOff className="w-5 h-5 text-slate-400" />
-              ) : (
-                <Eye className="w-5 h-5 text-slate-400" />
-              )}
-              <div className="text-xs text-slate-400 mt-1">
-                {hideScore ? 'Show' : 'Hide'}
-              </div>
-            </button>
           </div>
-        </div>
+        )}
 
-        {/* Putt Type Display */}
-        {gameType !== 'streak_challenge' && (
+        {/* Putt Type Display - Hidden for back_and_forth */}
+        {gameType !== 'streak_challenge' && gameType !== 'back_and_forth' && (
           <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
             <div className="text-xs text-slate-500 mb-1">Putt Style</div>
             <div className="text-sm font-semibold text-slate-800">
@@ -494,6 +496,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
                canUndo={canUndo}
                onUndo={handleUndo}
                putts={playerPutts}
+               puttType={game.putt_type || 'regular'}
+               totalPoints={game.total_points[playerName] || 0}
+               hideScore={hideScore}
              />
            ) : (
              <BackAndForthInput

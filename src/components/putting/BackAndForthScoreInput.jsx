@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle, Undo2 } from 'lucide-react';
 
-export default function BackAndForthScoreInput({ 
-  player, 
-  currentDistance, 
-  onMade, 
-  onMissed, 
-  canUndo, 
+export default function BackAndForthScoreInput({
+  player,
+  currentDistance,
+  onMade,
+  onMissed,
+  canUndo,
   onUndo,
   putts = [],
   puttType = 'regular',
@@ -17,7 +17,7 @@ export default function BackAndForthScoreInput({
   // Group putts into frames of 20
   const totalFrames = 20;
   const puttsPerFrame = 5;
-  
+
   // Calculate which frame we're in
   const currentFrameIndex = Math.floor(putts.length / puttsPerFrame);
   const currentFramePutts = putts.slice(
@@ -28,25 +28,25 @@ export default function BackAndForthScoreInput({
   return (
     <div className="space-y-4">
       {/* Visual Frames Display - 20 boxes */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+      <div className="bg-white pt-2 pr-6 pb-2 pl-6 rounded-2xl shadow-sm border border-slate-100">
         <div className="grid grid-cols-10 gap-2.5">
           {Array.from({ length: totalFrames }).map((_, frameIdx) => {
             const framePutts = putts.slice(frameIdx * puttsPerFrame, (frameIdx + 1) * puttsPerFrame);
             const isCurrent = frameIdx === currentFrameIndex;
             const isCompleted = framePutts.length === puttsPerFrame;
-            const madeCount = framePutts.filter(p => p.result === 'made').length;
-            
+            const madeCount = framePutts.filter((p) => p.result === 'made').length;
+
             return (
-              <div 
+              <div
                 key={frameIdx}
                 className={`aspect-square rounded-lg border-2 flex flex-col items-center justify-center ${
-                  isCurrent
-                    ? 'border-emerald-500 bg-emerald-50'
-                    : isCompleted
-                    ? 'border-slate-300 bg-slate-50'
-                    : 'border-slate-200 bg-white'
-                }`}
-              >
+                isCurrent ?
+                'border-emerald-500 bg-emerald-50' :
+                isCompleted ?
+                'border-slate-300 bg-slate-50' :
+                'border-slate-200 bg-white'}`
+                }>
+
                 {/* 5 small indicators inside each box */}
                 <div className="grid grid-cols-1 gap-1">
                   {Array.from({ length: puttsPerFrame }).map((_, puttIdx) => {
@@ -55,21 +55,21 @@ export default function BackAndForthScoreInput({
                       <div
                         key={puttIdx}
                         className={`w-1.5 h-1.5 rounded-full ${
-                          puttResult === 'made'
-                            ? 'bg-emerald-500'
-                            : puttResult === 'missed'
-                            ? 'bg-red-400'
-                            : 'bg-slate-300'
-                        }`}
-                      />
-                    );
+                        puttResult === 'made' ?
+                        'bg-emerald-500' :
+                        puttResult === 'missed' ?
+                        'bg-red-400' :
+                        'bg-slate-300'}`
+                        } />);
+
+
                   })}
                 </div>
                 
                 {/* Frame number */}
                 <div className="text-[9px] text-slate-400 mt-1">{frameIdx + 1}</div>
-              </div>
-            );
+              </div>);
+
           })}
         </div>
       </div>
@@ -80,60 +80,60 @@ export default function BackAndForthScoreInput({
       </div>
 
       {/* Current Frame Detail */}
-      {currentFrameIndex < totalFrames && (
-        <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
+      {currentFrameIndex < totalFrames &&
+      <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
           <div className="flex gap-2">
             {Array.from({ length: puttsPerFrame }).map((_, idx) => {
-              const putt = currentFramePutts[idx];
-              return (
-                <div
-                  key={idx}
-                  className={`flex-1 h-3 rounded-full ${
-                    putt?.result === 'made'
-                      ? 'bg-emerald-500'
-                      : putt?.result === 'missed'
-                      ? 'bg-red-400'
-                      : 'bg-slate-200'
-                  }`}
-                />
-              );
-            })}
+            const putt = currentFramePutts[idx];
+            return (
+              <div
+                key={idx}
+                className={`flex-1 h-3 rounded-full ${
+                putt?.result === 'made' ?
+                'bg-emerald-500' :
+                putt?.result === 'missed' ?
+                'bg-red-400' :
+                'bg-slate-200'}`
+                } />);
+
+
+          })}
           </div>
         </div>
-      )}
+      }
 
       {/* Action Buttons */}
-      {currentFrameIndex < totalFrames && (
-        <div className="grid grid-cols-2 gap-4">
+      {currentFrameIndex < totalFrames &&
+      <div className="grid grid-cols-2 gap-4">
           <Button
-            onClick={onMissed}
-            className="h-24 bg-red-100 hover:bg-red-200 text-red-700 text-xl font-bold rounded-2xl"
-            variant="ghost"
-          >
+          onClick={onMissed}
+          className="h-24 bg-red-100 hover:bg-red-200 text-red-700 text-xl font-bold rounded-2xl"
+          variant="ghost">
+
             <XCircle className="w-7 h-7 mr-2" />
             Miss
           </Button>
           <Button
-            onClick={onMade}
-            className="h-24 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xl font-bold rounded-2xl"
-            variant="ghost"
-          >
+          onClick={onMade}
+          className="h-24 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xl font-bold rounded-2xl"
+          variant="ghost">
+
             <CheckCircle2 className="w-7 h-7 mr-2" />
             Make
           </Button>
         </div>
-      )}
+      }
 
-      {canUndo && (
-        <Button
-          onClick={onUndo}
-          variant="outline"
-          className="w-full h-14 rounded-xl text-base"
-        >
+      {canUndo &&
+      <Button
+        onClick={onUndo}
+        variant="outline"
+        className="w-full h-14 rounded-xl text-base">
+
           <Undo2 className="w-5 h-5 mr-2" />
           Undo Last Putt
         </Button>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }

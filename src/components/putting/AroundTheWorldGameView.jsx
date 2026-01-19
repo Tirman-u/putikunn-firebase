@@ -97,12 +97,17 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         }
       });
 
-      return { isRetry };
+      return { isRetry, madePutts };
     },
-    onSuccess: ({ isRetry }) => {
+    onSuccess: ({ isRetry, madePutts }) => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-      if (!isRetry) {
+      // For 1 disc: only show dialog on miss (0), auto-finalize on make (1)
+      const shouldShowDialog = config.discs_per_turn === 1 ? madePutts === 0 : true;
+      if (!isRetry && shouldShowDialog) {
         setShowConfirmDialog(true);
+      } else if (config.discs_per_turn === 1 && madePutts === 1 && !isRetry) {
+        // Auto-finalize for made putt with 1 disc
+        finishRoundMutation.mutate();
       }
     }
   });
@@ -203,19 +208,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const handleSubmitPutts = (madePutts) => {
     setPendingMadePutts(madePutts);
-    
-    // If only 1 disc and Made, skip confirmation and finish immediately
-    if (config.discs_per_turn === 1 && madePutts === 1) {
-      submitTurnMutation.mutate({ madePutts, isRetry: false }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-          // Immediately finalize without showing dialog
-          finishRoundMutation.mutate();
-        }
-      });
-    } else {
-      submitTurnMutation.mutate({ madePutts, isRetry: false });
-    }
+    submitTurnMutation.mutate({ madePutts, isRetry: false });
   };
 
   const handleRetry = () => {

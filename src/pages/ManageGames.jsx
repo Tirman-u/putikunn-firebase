@@ -189,8 +189,8 @@ export default function ManageGames() {
     );
   };
 
-  const completedGames = games.filter(g => g.status === 'completed');
-  const activeGames = games.filter(g => g.status !== 'completed');
+  const completedGames = games.filter(g => g.status === 'completed' && g.pin !== '0000');
+  const activeGames = games.filter(g => g.status !== 'completed' && g.pin !== '0000');
 
   const getMonthKey = (date) => {
     const d = new Date(date);

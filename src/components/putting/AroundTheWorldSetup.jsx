@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 const DIFFICULTY_PRESETS = {
@@ -12,10 +12,11 @@ const DIFFICULTY_PRESETS = {
   impossible: { label: 'Impossible', threshold: 5, discs: 10 }
 };
 
-export default function AroundTheWorldSetup({ isSolo, onBack, onStart }) {
+export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPin }) {
   const [gameName, setGameName] = useState('');
   const [difficulty, setDifficulty] = useState('medium');
-  const [pin] = useState(() => Math.floor(1000 + Math.random() * 9000).toString());
+  const [pin] = useState(initialPin || (isSolo ? '0000' : Math.floor(1000 + Math.random() * 9000).toString()));
+  const [copied, setCopied] = useState(false);
 
   const handleStart = () => {
     if (!isSolo && !gameName.trim()) {
@@ -35,6 +36,12 @@ export default function AroundTheWorldSetup({ isSolo, onBack, onStart }) {
         difficulty
       }
     });
+  };
+
+  const copyPin = () => {
+    navigator.clipboard.writeText(pin);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -105,11 +112,28 @@ export default function AroundTheWorldSetup({ isSolo, onBack, onStart }) {
         </div>
 
         {!isSolo && (
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <div className="text-sm text-slate-600 mb-2">Mängu PIN</div>
-            <div className="text-3xl font-bold text-slate-800 tracking-wider text-center">
-              {pin}
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg text-white">
+            <div className="text-center mb-4">
+              <h3 className="text-sm font-semibold mb-2 opacity-90">Mängu PIN</h3>
+              <div className="text-5xl font-bold tracking-widest mb-3">{pin}</div>
+              <p className="text-sm opacity-90">Jaga seda PIN-koodi mängijatega</p>
             </div>
+            <Button
+              onClick={copyPin}
+              className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 h-12 rounded-xl"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-5 h-5 mr-2" />
+                  Kopeeritud!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-5 h-5 mr-2" />
+                  Kopeeri PIN
+                </>
+              )}
+            </Button>
           </div>
         )}
 

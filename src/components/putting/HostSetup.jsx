@@ -23,7 +23,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   const handleStart = () => {
     if (gameType === 'around_the_world') {
       // For ATW, navigate to ATW setup instead
-      window.location.href = createPageUrl('Home') + '?mode=atw-setup&solo=' + (isSolo ? '1' : '0');
+      window.location.href = createPageUrl('Home') + '?mode=atw-setup&solo=' + (isSolo ? '1' : '0') + (isSolo ? '' : '&pin=' + pin);
       return;
     }
     onStartGame({

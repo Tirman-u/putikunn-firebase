@@ -29,6 +29,11 @@ export default function Home() {
     if (urlMode === 'atw-setup') {
       setIsSoloATW(isSolo);
       setMode('atw-setup');
+      // Store pin if available
+      const urlPin = params.get('pin');
+      if (urlPin) {
+        setGameId(urlPin); // Temporarily store PIN in gameId state
+      }
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
     }
@@ -71,7 +76,14 @@ export default function Home() {
   const handleJoinGame = ({ game, playerName }) => {
     setGameId(game.id);
     setPlayerName(playerName);
-    setMode('player');
+    
+    // Check if this is an ATW game
+    if (game.game_type === 'around_the_world') {
+      setMode('atw-game');
+      setIsSoloATW(game.pin === '0000');
+    } else {
+      setMode('player');
+    }
   };
 
   // Initial selection screen
@@ -270,7 +282,11 @@ export default function Home() {
     return (
       <AroundTheWorldSetup
         isSolo={isSoloATW}
-        onBack={() => setMode(null)}
+        initialPin={gameId} // Pass the pin from URL (temporarily stored in gameId)
+        onBack={() => {
+          setMode(null);
+          setGameId(null); // Clear temporary pin storage
+        }}
         onStart={async (setupData) => {
           const user = await base44.auth.me();
           const playerName = user?.display_name || user?.full_name || user?.email || 'Player';

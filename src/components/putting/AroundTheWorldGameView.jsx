@@ -337,7 +337,10 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                 Proovi uuesti
               </Button>
               <Button
-                onClick={() => setShowLeaderboard(true)}
+                onClick={() => {
+                  setShowConfirmDialog(false);
+                  setShowLeaderboard(true);
+                }}
                 variant="outline"
                 className="w-full h-12"
               >

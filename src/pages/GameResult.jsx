@@ -26,7 +26,6 @@ export default function GameResult() {
 
   const userRole = user?.app_role || 'user';
   const canSubmitDiscgolf = ['trainer', 'admin', 'super_admin'].includes(userRole);
-  const canDelete = ['admin', 'super_admin'].includes(userRole) || user?.email === game?.host_user;
 
   const { data: game, isLoading, error } = useQuery({
     queryKey: ['game', gameId],
@@ -244,6 +243,7 @@ export default function GameResult() {
 
   const gameType = game.game_type || 'classic';
   const gameFormat = GAME_FORMATS[gameType];
+  const canDelete = ['admin', 'super_admin'].includes(userRole) || user?.email === game?.host_user;
 
   // Calculate statistics for each player
   const playerStats = game.players.map(player => {

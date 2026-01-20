@@ -26,19 +26,11 @@ export default function ClassicScoreInput({
   canUndo, 
   onUndo,
   distanceMap,
-  currentRoundPutts = []
+  currentRoundPutts = [],
+  puttType = 'regular'
 }) {
-  const [selectedCount, setSelectedCount] = React.useState(null);
-  
   const handleScoreClick = (made) => {
-    setSelectedCount(made);
-  };
-
-  const handleConfirm = () => {
-    if (selectedCount !== null) {
-      onSubmit(selectedCount);
-      setSelectedCount(null);
-    }
+    onSubmit(made);
   };
 
   // Visual frames - 20 frames representing 20 rounds
@@ -96,28 +88,16 @@ export default function ClassicScoreInput({
         </div>
       </div>
 
-      {/* Current Distance - BIG AND CLEAR */}
-      <div className="text-center bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <div className="text-5xl font-bold text-slate-800">{currentDistance}m</div>
-      </div>
-
-      {/* Current Round Selection (visual feedback for selected count) */}
-      {selectedCount !== null && (
-        <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
-          <div className="flex gap-2">
-            {Array.from({ length: 5 }).map((_, idx) => (
-              <div
-                key={idx}
-                className={`flex-1 h-3 rounded-full ${
-                  idx < selectedCount
-                    ? 'bg-emerald-500'
-                    : 'bg-red-400'
-                }`}
-              />
-            ))}
+      {/* Current Distance and Putt Style */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+        <div className="text-center">
+          <div className="text-5xl font-bold text-slate-800 mb-2">{currentDistance}m</div>
+          <div className="text-xs text-slate-500">Putt Style</div>
+          <div className="text-sm font-semibold text-slate-800">
+            {puttType === 'regular' ? 'Regular' : puttType === 'straddle' ? 'Straddle' : 'Turbo'}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Instructions */}
       <div className="text-center text-sm text-slate-500">
@@ -134,12 +114,7 @@ export default function ClassicScoreInput({
             <button
               key={num}
               onClick={() => handleScoreClick(num)}
-              className={cn(
-                "relative py-6 rounded-2xl active:scale-95 transition-all border-2 shadow-sm",
-                selectedCount === num
-                  ? "bg-gradient-to-br from-emerald-100 to-emerald-200 border-emerald-400"
-                  : "bg-gradient-to-br from-slate-50 to-slate-100 hover:from-emerald-50 hover:to-emerald-100 border-slate-200 hover:border-emerald-300"
-              )}
+              className="relative py-6 rounded-2xl active:scale-95 transition-all border-2 shadow-sm bg-gradient-to-br from-slate-50 to-slate-100 hover:from-emerald-50 hover:to-emerald-100 border-slate-200 hover:border-emerald-300"
             >
               <div className="text-3xl font-bold text-slate-800 mb-1">{num}</div>
               <div className="text-xs font-medium text-slate-500 mb-0.5">
@@ -152,17 +127,6 @@ export default function ClassicScoreInput({
           );
         })}
       </div>
-
-      {/* Confirm Button */}
-      {selectedCount !== null && (
-        <Button
-          onClick={handleConfirm}
-          className="w-full h-16 bg-emerald-600 hover:bg-emerald-700 rounded-2xl text-lg font-bold"
-        >
-          <CheckCircle2 className="w-6 h-6 mr-2" />
-          Confirm {selectedCount} Made
-        </Button>
-      )}
 
       {/* Undo Button */}
       {canUndo && (

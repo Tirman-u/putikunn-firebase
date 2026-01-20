@@ -11,7 +11,6 @@ import BackAndForthInput from './BackAndForthInput';
 import BackAndForthScoreInput from './BackAndForthScoreInput';
 import StreakChallengeInput from './StreakChallengeInput';
 import JylyScoreTable from './JylyScoreTable';
-import ProgressBar from './ProgressBar';
 import MobileLeaderboard from './MobileLeaderboard';
 import PuttTypeSelector from './PuttTypeSelector';
 import PerformanceAnalysis from './PerformanceAnalysis';
@@ -423,9 +422,6 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             <Trophy className="w-5 h-5" />
           </button>
         </div>
-
-        {/* Progress Bar */}
-        {gameType !== 'streak_challenge' && gameType !== 'back_and_forth' && <ProgressBar putts={playerPutts} gameType={gameType} />}
 
         {/* Your Stats */}
         {gameType !== 'streak_challenge' && (

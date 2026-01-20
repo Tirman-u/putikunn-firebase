@@ -13,11 +13,19 @@ export default function PuttingRecords() {
   const [selectedGender, setSelectedGender] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
 
+  const { data: user } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: () => base44.auth.me()
+  });
+
   const { data: leaderboardEntries = [] } = useQuery({
     queryKey: ['leaderboard-entries'],
     queryFn: () => base44.entities.LeaderboardEntry.list(),
     refetchInterval: 10000
   });
+
+  const userRole = user?.app_role || 'user';
+  const canDelete = ['admin', 'super_admin'].includes(userRole);
 
   const viewTypes = [
     { id: 'general_classic', label: 'Classic', leaderboardType: 'general', gameType: 'classic' },

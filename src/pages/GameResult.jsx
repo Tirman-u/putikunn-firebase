@@ -26,6 +26,7 @@ export default function GameResult() {
 
   const userRole = user?.app_role || 'user';
   const canSubmitDiscgolf = ['trainer', 'admin', 'super_admin'].includes(userRole);
+  const canDelete = ['admin', 'super_admin'].includes(userRole) || user?.email === game?.host_user;
 
   const { data: game, isLoading, error } = useQuery({
     queryKey: ['game', gameId],
@@ -357,10 +358,12 @@ export default function GameResult() {
                 <Share2 className="w-4 h-4 mr-2" />
                 Share Results
               </Button>
-              <Button onClick={handleDelete} variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
+              {canDelete && (
+                <Button onClick={handleDelete} variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </Button>
+              )}
             </div>
             <div className="flex gap-3">
               {!isSoloATW && (

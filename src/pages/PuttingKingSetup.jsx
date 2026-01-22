@@ -17,7 +17,6 @@ export default function PuttingKingSetup() {
   const [tournamentName, setTournamentName] = useState('');
   const [pin, setPin] = useState(() => Math.floor(1000 + Math.random() * 9000).toString());
   const [targetScore, setTargetScore] = useState(21);
-  const [totalRounds, setTotalRounds] = useState(6);
   const [stations, setStations] = useState([
     { name: 'Basket 1', order: 1 },
     { name: 'Basket 2', order: 2 }
@@ -52,7 +51,6 @@ export default function PuttingKingSetup() {
       setTournamentName(tournament.name);
       setPin(tournament.pin);
       setTargetScore(tournament.target_score);
-      setTotalRounds(tournament.total_rounds);
     }
   }, [tournament]);
 
@@ -71,7 +69,6 @@ export default function PuttingKingSetup() {
         status: 'setup',
         target_score: data.targetScore,
         bust_reset_score: 11,
-        total_rounds: data.totalRounds,
         current_round: 1,
         distances: [
           { id: 'd1', label: '5m', points_for_made: 1, points_for_missed: 0, enabled: true, order: 1 },
@@ -106,8 +103,7 @@ export default function PuttingKingSetup() {
       // Update tournament
       await base44.entities.PuttingKingTournament.update(tournamentId, {
         name: data.name,
-        target_score: data.targetScore,
-        total_rounds: data.totalRounds
+        target_score: data.targetScore
       });
 
       // Update/create/delete stations
@@ -163,7 +159,6 @@ export default function PuttingKingSetup() {
       name: tournamentName,
       pin,
       targetScore,
-      totalRounds,
       stations
     };
 
@@ -241,17 +236,6 @@ export default function PuttingKingSetup() {
                   value={targetScore}
                   onChange={(e) => setTargetScore(Number(e.target.value))}
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Total Rounds</label>
-                <Input
-                  type="number"
-                  value={totalRounds}
-                  onChange={(e) => setTotalRounds(Number(e.target.value))}
-                  min={1}
-                  max={20}
-                />
-                <p className="text-xs text-slate-500 mt-1">How many rounds to play (default: 6)</p>
               </div>
             </div>
           </div>

@@ -107,7 +107,7 @@ export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPi
                   <div>
                     <div className="font-semibold text-slate-800">{preset.label}</div>
                     <div className="text-sm text-slate-600">
-                      {preset.discs} {preset.discs === 1 ? 'putt' : 'putti'} • Vaja {preset.threshold}+ sisse
+                      {preset.discs} {preset.discs === 1 ? 'Putt' : 'Putti'} sisse
                     </div>
                   </div>
                   {difficulty === key && (

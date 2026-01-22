@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X, Undo2, Trophy, RotateCcw, Share2, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X, Undo2, Trophy, RotateCcw, Share2, Eye, EyeOff, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -187,6 +187,31 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
       setShowConfirmDialog(false);
+    }
+  });
+
+  const submitToLeaderboardMutation = useMutation({
+    mutationFn: async () => {
+      const madePutts = playerState.total_makes;
+      const totalPutts = playerState.total_putts;
+      const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+
+      return await base44.entities.LeaderboardEntry.create({
+        game_id: game.id,
+        player_email: user?.email || 'unknown',
+        player_name: playerName,
+        game_type: 'around_the_world',
+        score: totalScore,
+        accuracy: Math.round(accuracy * 10) / 10,
+        made_putts: madePutts,
+        total_putts: totalPutts,
+        leaderboard_type: 'general',
+        player_gender: user?.gender || 'M',
+        date: new Date().toISOString()
+      });
+    },
+    onSuccess: () => {
+      toast.success('Result submitted to leaderboard!');
     }
   });
 
@@ -491,6 +516,15 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
           {/* Actions */}
           <div className="space-y-3">
+            {isSolo && (
+              <Button
+                onClick={() => submitToLeaderboardMutation.mutate()}
+                disabled={submitToLeaderboardMutation.isPending || submitToLeaderboardMutation.isSuccess}
+                className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg"
+              >
+                {submitToLeaderboardMutation.isSuccess ? '✓ Submitted' : 'Submit to Leaderboard'}
+              </Button>
+            )}
             <Button
               onClick={handlePlayAgain}
               className="w-full h-14 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-lg"

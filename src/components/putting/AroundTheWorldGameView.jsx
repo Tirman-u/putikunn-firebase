@@ -372,7 +372,13 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                 Vaata edetabelit
               </Button>
               <Button
-                onClick={() => window.location.href = createPageUrl('Home')}
+                onClick={() => {
+                  if (isSolo) {
+                    handleCompleteGame();
+                  } else {
+                    window.location.href = createPageUrl('Home');
+                  }
+                }}
                 variant="outline"
                 className="w-full h-12 text-red-600 hover:text-red-700 hover:bg-red-50"
               >

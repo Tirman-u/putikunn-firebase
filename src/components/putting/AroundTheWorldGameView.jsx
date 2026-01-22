@@ -531,13 +531,27 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
             >
               Mängi uuesti
             </Button>
-            
+
             <Button
               onClick={() => window.location.href = createPageUrl('Home')}
               variant="outline"
               className="w-full h-14 text-lg"
             >
               Tagasi avalehele
+            </Button>
+
+            <Button
+              onClick={async () => {
+                if (confirm('Kas oled kindel, et soovid mängu kustutada?')) {
+                  await base44.entities.Game.delete(gameId);
+                  toast.success('Mäng kustutatud');
+                  window.location.href = createPageUrl('Home');
+                }
+              }}
+              variant="outline"
+              className="w-full h-14 text-lg text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300"
+            >
+              Kustuta mäng
             </Button>
           </div>
         </div>

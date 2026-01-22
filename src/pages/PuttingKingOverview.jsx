@@ -379,48 +379,73 @@ export default function PuttingKingOverview() {
     mutationFn: async () => {
       const nextRound = tournament.current_round + 1;
       
-      // Get all stations
+      // Get all stations sorted by order
       const allStations = await base44.entities.PuttingKingStation.list();
       const tournamentStations = allStations.filter(s => s.tournament_id === tournament.id && s.enabled)
         .sort((a, b) => a.order_index - b.order_index);
 
-      // Get all players sorted individually by performance (Mexicano style)
-      const allPlayers = await base44.entities.PuttingKingPlayer.list();
-      const tournamentPlayers = allPlayers
-        .filter(p => p.tournament_id === tournament.id && p.active)
-        .sort((a, b) => {
-          if (b.tournament_points !== a.tournament_points) {
-            return b.tournament_points - a.tournament_points;
-          }
-          return b.wins - a.wins;
-        });
-
-      const playersPerStation = 4;
+      // Get current round matches to determine winners/losers and their movement
+      const currentRoundMatches = matches.filter(m => m.round_number === tournament.current_round && m.status === 'finished');
       
-      // Create new matches with rotation - distribute players to stations
-      for (let i = 0; i < tournamentStations.length && i * playersPerStation < tournamentPlayers.length; i++) {
-        const station = tournamentStations[i];
-        const stationPlayers = tournamentPlayers.slice(i * playersPerStation, (i + 1) * playersPerStation);
-
-        if (stationPlayers.length === 4) {
-          const [p1, p2, p3, p4] = stationPlayers;
+      // Build pairs: each pair consists of previous partners who now play against each other
+      const pairs = [];
+      
+      for (const match of currentRoundMatches) {
+        const station = tournamentStations.find(s => s.id === match.station_id);
+        if (!station) continue;
+        
+        const currentStationIndex = tournamentStations.indexOf(station);
+        
+        // Winners move up (lower index), losers move down (higher index)
+        const winners = match.winner_team === 'A' ? match.team_a_players : match.team_b_players;
+        const losers = match.winner_team === 'A' ? match.team_b_players : match.team_a_players;
+        
+        // Determine winner pair's new station (move up, but not above Basket 1)
+        const winnerStationIndex = Math.max(0, currentStationIndex - 1);
+        const winnerStation = tournamentStations[winnerStationIndex];
+        
+        // Determine loser pair's new station (move down, but not below last basket)
+        const loserStationIndex = Math.min(tournamentStations.length - 1, currentStationIndex + 1);
+        const loserStation = tournamentStations[loserStationIndex];
+        
+        // Add pairs (previous partners now play against each other)
+        pairs.push({
+          players: winners,
+          station: winnerStation,
+          stationIndex: winnerStationIndex
+        });
+        
+        pairs.push({
+          players: losers,
+          station: loserStation,
+          stationIndex: loserStationIndex
+        });
+      }
+      
+      // Group pairs by station
+      const stationPairs = {};
+      pairs.forEach(pair => {
+        if (!stationPairs[pair.station.id]) {
+          stationPairs[pair.station.id] = [];
+        }
+        stationPairs[pair.station.id].push(pair);
+      });
+      
+      // Create matches for each station
+      for (const stationId in stationPairs) {
+        const stationPairsList = stationPairs[stationId];
+        
+        // Need exactly 2 pairs (4 players) per station
+        if (stationPairsList.length === 2) {
+          const [pair1, pair2] = stationPairsList;
           
-          // Create teams avoiding last round partners
-          let teamA = [p1.user_email, p2.user_email];
-          let teamB = [p3.user_email, p4.user_email];
+          // Previous partners now become opponents
+          const teamA = pair1.players;
+          const teamB = pair2.players;
           
-          // Try different combinations to avoid repeating partners
-          if (p1.last_partner_email === p2.user_email) {
-            teamA = [p1.user_email, p3.user_email];
-            teamB = [p2.user_email, p4.user_email];
-          } else if (p3.last_partner_email === p4.user_email) {
-            teamA = [p1.user_email, p3.user_email];
-            teamB = [p2.user_email, p4.user_email];
-          }
-
           const match = await base44.entities.PuttingKingMatch.create({
             tournament_id: tournament.id,
-            station_id: station.id,
+            station_id: stationId,
             round_number: nextRound,
             status: 'ready',
             team_a_players: teamA,
@@ -428,19 +453,24 @@ export default function PuttingKingOverview() {
             score_a: 0,
             score_b: 0
           });
-
-          // Update player states with new partners
-          for (const player of stationPlayers) {
-            const partner = teamA.includes(player.user_email)
-              ? teamA.find(e => e !== player.user_email)
-              : teamB.find(e => e !== player.user_email);
+          
+          // Update all 4 players
+          const allMatchPlayers = [...teamA, ...teamB];
+          for (const email of allMatchPlayers) {
+            const player = players.find(p => p.user_email === email);
+            if (player) {
+              // Partner is now the other person in your team
+              const partner = teamA.includes(email) 
+                ? teamA.find(e => e !== email)
+                : teamB.find(e => e !== email);
               
-            await base44.entities.PuttingKingPlayer.update(player.id, {
-              current_status: 'ready',
-              current_station_id: station.id,
-              current_match_id: match.id,
-              last_partner_email: partner
-            });
+              await base44.entities.PuttingKingPlayer.update(player.id, {
+                current_status: 'ready',
+                current_station_id: stationId,
+                current_match_id: match.id,
+                last_partner_email: partner
+              });
+            }
           }
         }
       }

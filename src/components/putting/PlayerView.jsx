@@ -28,6 +28,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const [hasSubmitted, setHasSubmitted] = React.useState(false);
   const [streakDistanceSelected, setStreakDistanceSelected] = React.useState(false);
   const [hideScore, setHideScore] = React.useState(false);
+  const [localGameState, setLocalGameState] = React.useState(null);
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -38,14 +39,59 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],
     queryFn: () => base44.entities.Game.list().then(games => games.find(g => g.id === gameId)),
-    refetchInterval: 2000
+    refetchInterval: (data) => {
+      // Only refetch for multiplayer games
+      if (data?.pin === '0000') return false;
+      return 2000;
+    }
   });
+
+  const isSoloGame = game?.pin === '0000';
+
+  // Initialize local state for solo games
+  React.useEffect(() => {
+    if (game && isSoloGame && !localGameState) {
+      setLocalGameState({
+        player_putts: game.player_putts || {},
+        total_points: game.total_points || {},
+        player_distances: game.player_distances || {},
+        player_current_streaks: game.player_current_streaks || {},
+        player_highest_streaks: game.player_highest_streaks || {},
+        status: game.status
+      });
+    }
+  }, [game, isSoloGame, localGameState]);
 
   const updateGameMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Game.update(id, data),
     onSuccess: (updatedGame) => {
       // Update cache immediately with the response
       queryClient.setQueryData(['game', gameId], updatedGame);
+    }
+  });
+
+  // Helper to update game state (local for solo, DB for multiplayer)
+  const updateGameState = (data) => {
+    if (isSoloGame) {
+      // For solo games, update local state only
+      setLocalGameState(prev => ({
+        ...prev,
+        ...data
+      }));
+    } else {
+      // For multiplayer games, update DB as before
+      updateGameMutation.mutate({
+        id: game.id,
+        data
+      });
+    }
+  };
+
+  // Save solo game to DB when completed
+  const saveSoloGameMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Game.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['game', gameId]);
     }
   });
 
@@ -87,7 +133,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const handleClassicSubmit = (madeCount) => {
     const gameType = game.game_type || 'classic';
     const format = GAME_FORMATS[gameType];
-    const playerDist = game.player_distances || {};
+    const currentState = isSoloGame ? localGameState : game;
+    const playerDist = currentState.player_distances || {};
     const currentDistance = playerDist[playerName] || format.startDistance;
     
     // Create 5 putt records
@@ -103,7 +150,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     });
     }
 
-    const allPlayerPutts = { ...game.player_putts };
+    const allPlayerPutts = { ...currentState.player_putts };
     if (!allPlayerPutts[playerName]) {
       allPlayerPutts[playerName] = [];
     }
@@ -112,7 +159,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     // Calculate round score
     const roundScore = calculateRoundScore(currentDistance, madeCount);
     
-    const newTotalPoints = { ...game.total_points };
+    const newTotalPoints = { ...currentState.total_points };
     newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) + roundScore;
 
     // Calculate next distance
@@ -126,30 +173,37 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       nextDistance = getNextDistanceFromMade(gameType, madeCount);
     }
 
-    const newPlayerDistances = { ...game.player_distances };
+    const newPlayerDistances = { ...currentState.player_distances };
     newPlayerDistances[playerName] = nextDistance;
 
     // Check if game is complete after this update
     const updatedPuttsLength = allPlayerPutts[playerName].length;
     const willBeComplete = isGameComplete(gameType, updatedPuttsLength);
-    const isSoloGame = game.pin === '0000';
 
-    updateGameMutation.mutate({
-      id: game.id,
-      data: {
-        player_putts: allPlayerPutts,
-        total_points: newTotalPoints,
-        player_distances: newPlayerDistances,
-        ...(willBeComplete && isSoloGame ? { status: 'completed' } : {})
-      }
-    });
+    const updateData = {
+      player_putts: allPlayerPutts,
+      total_points: newTotalPoints,
+      player_distances: newPlayerDistances,
+      ...(willBeComplete ? { status: 'completed' } : {})
+    };
+
+    // For solo games that are complete, save to DB
+    if (isSoloGame && willBeComplete) {
+      saveSoloGameMutation.mutate({
+        id: game.id,
+        data: updateData
+      });
+    } else {
+      updateGameState(updateData);
+    }
   };
 
   // Handle Back & Forth / Streak / Random format (1 putt at a time)
   const handleBackAndForthPutt = (wasMade) => {
     const gameType = game.game_type || 'classic';
     const format = GAME_FORMATS[gameType];
-    const playerDist = game.player_distances || {};
+    const currentState = isSoloGame ? localGameState : game;
+    const playerDist = currentState.player_distances || {};
     const currentDistance = playerDist[playerName] || format.startDistance;
     const result = wasMade ? 'made' : 'missed';
     const points = wasMade ? currentDistance : 0;
@@ -162,13 +216,13 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       putt_type: game.putt_type || 'regular'
     };
 
-    const allPlayerPutts = { ...game.player_putts };
+    const allPlayerPutts = { ...currentState.player_putts };
     if (!allPlayerPutts[playerName]) {
       allPlayerPutts[playerName] = [];
     }
     allPlayerPutts[playerName].push(newPutt);
 
-    const newTotalPoints = { ...game.total_points };
+    const newTotalPoints = { ...currentState.total_points };
     newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) + points;
 
     // For Streak Challenge, handle streak tracking
@@ -176,8 +230,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     let streakUpdate = {};
 
     if (gameType === 'streak_challenge') {
-      const currentStreaks = game.player_current_streaks || {};
-      const highestStreaks = game.player_highest_streaks || {};
+      const currentStreaks = currentState.player_current_streaks || {};
+      const highestStreaks = currentState.player_highest_streaks || {};
       let playerCurrentStreak = currentStreaks[playerName] || 0;
       let playerHighestStreak = highestStreaks[playerName] || 0;
 
@@ -199,52 +253,65 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       nextDistance = getNextDistanceBackAndForth(currentDistance, wasMade);
     }
 
-    const newPlayerDistances = { ...game.player_distances };
+    const newPlayerDistances = { ...currentState.player_distances };
     newPlayerDistances[playerName] = nextDistance;
 
     // Check if game is complete after this update (for back_and_forth)
     const updatedPuttsLength = allPlayerPutts[playerName].length;
     const willBeComplete = gameType !== 'streak_challenge' && isGameComplete(gameType, updatedPuttsLength);
-    const isSoloGame = game.pin === '0000';
 
-    updateGameMutation.mutate({
-      id: game.id,
-      data: {
-        player_putts: allPlayerPutts,
-        total_points: newTotalPoints,
-        player_distances: newPlayerDistances,
-        ...streakUpdate,
-        ...(willBeComplete && isSoloGame ? { status: 'completed' } : {})
-      }
-    });
+    const updateData = {
+      player_putts: allPlayerPutts,
+      total_points: newTotalPoints,
+      player_distances: newPlayerDistances,
+      ...streakUpdate,
+      ...(willBeComplete ? { status: 'completed' } : {})
+    };
+
+    // For solo games that are complete, save to DB
+    if (isSoloGame && willBeComplete) {
+      saveSoloGameMutation.mutate({
+        id: game.id,
+        data: updateData
+      });
+    } else {
+      updateGameState(updateData);
+    }
   };
 
   // Handle Streak Challenge distance selection
   const handleStreakDistanceSelect = (distance) => {
-    const newPlayerDistances = { ...game.player_distances };
+    const currentState = isSoloGame ? localGameState : game;
+    const newPlayerDistances = { ...currentState.player_distances };
     newPlayerDistances[playerName] = distance;
 
-    updateGameMutation.mutate({
-      id: game.id,
-      data: {
-        player_distances: newPlayerDistances
-      }
+    updateGameState({
+      player_distances: newPlayerDistances
     });
     setStreakDistanceSelected(true);
   };
 
   // Handle Finish Training for Streak Challenge
   const handleFinishTraining = () => {
-    updateGameMutation.mutate({
-      id: game.id,
-      data: {
-        status: 'completed'
-      }
-    });
+    const updateData = { status: 'completed' };
+    
+    // For solo games, save everything to DB now
+    if (isSoloGame) {
+      saveSoloGameMutation.mutate({
+        id: game.id,
+        data: {
+          ...localGameState,
+          ...updateData
+        }
+      });
+    } else {
+      updateGameState(updateData);
+    }
   };
 
   const handleUndo = () => {
-    const playerPutts = game.player_putts?.[playerName];
+    const currentState = isSoloGame ? localGameState : game;
+    const playerPutts = currentState.player_putts?.[playerName];
     if (!playerPutts || playerPutts.length === 0) return;
 
     const gameType = game.game_type || 'classic';
@@ -255,10 +322,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       // Back & Forth: remove 1 putt
       const lastPutt = newPutts.pop();
 
-      const allPlayerPutts = { ...game.player_putts };
+      const allPlayerPutts = { ...currentState.player_putts };
       allPlayerPutts[playerName] = newPutts;
 
-      const newTotalPoints = { ...game.total_points };
+      const newTotalPoints = { ...currentState.total_points };
       newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) - lastPutt.points;
 
       // Recalculate distance - if there was a previous putt, check if it was made/missed
@@ -268,16 +335,13 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         prevDistance = getNextDistanceBackAndForth(prevPutt.distance, prevPutt.result === 'made');
       }
 
-      const newPlayerDistances = { ...game.player_distances };
+      const newPlayerDistances = { ...currentState.player_distances };
       newPlayerDistances[playerName] = prevDistance;
 
-      updateGameMutation.mutate({
-        id: game.id,
-        data: {
-          player_putts: allPlayerPutts,
-          total_points: newTotalPoints,
-          player_distances: newPlayerDistances
-        }
+      updateGameState({
+        player_putts: allPlayerPutts,
+        total_points: newTotalPoints,
+        player_distances: newPlayerDistances
       });
     } else {
       // Classic/Short/Long: remove last 5 putts (1 round)
@@ -286,10 +350,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       const roundDistance = lastRoundPutts[0].distance;
       const roundScore = calculateRoundScore(roundDistance, madeCount);
 
-      const allPlayerPutts = { ...game.player_putts };
+      const allPlayerPutts = { ...currentState.player_putts };
       allPlayerPutts[playerName] = newPutts;
 
-      const newTotalPoints = { ...game.total_points };
+      const newTotalPoints = { ...currentState.total_points };
       newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) - roundScore;
 
       // Recalculate distance from previous round
@@ -305,16 +369,13 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         }
       }
 
-      const newPlayerDistances = { ...game.player_distances };
+      const newPlayerDistances = { ...currentState.player_distances };
       newPlayerDistances[playerName] = prevDistance;
 
-      updateGameMutation.mutate({
-        id: game.id,
-        data: {
-          player_putts: allPlayerPutts,
-          total_points: newTotalPoints,
-          player_distances: newPlayerDistances
-        }
+      updateGameState({
+        player_putts: allPlayerPutts,
+        total_points: newTotalPoints,
+        player_distances: newPlayerDistances
       });
     }
   };
@@ -327,15 +388,18 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     );
   }
 
+  // Use local state for solo games, otherwise use game data
+  const currentState = isSoloGame && localGameState ? localGameState : game;
+  
   const gameType = game.game_type || 'classic';
   const format = GAME_FORMATS[gameType];
-  const playerPutts = game.player_putts?.[playerName] || [];
-  const playerDistances = game.player_distances || {};
+  const playerPutts = currentState.player_putts?.[playerName] || [];
+  const playerDistances = currentState.player_distances || {};
   const currentDistance = playerDistances[playerName] || format.startDistance;
   const canUndo = playerPutts.length > 0;
-  const currentStreaks = game.player_current_streaks || {};
+  const currentStreaks = currentState.player_current_streaks || {};
   const currentStreak = currentStreaks[playerName] || 0;
-  const isComplete = isGameComplete(gameType, playerPutts.length) || (gameType === 'streak_challenge' && game.status === 'completed');
+  const isComplete = isGameComplete(gameType, playerPutts.length) || (gameType === 'streak_challenge' && currentState.status === 'completed');
 
   // Completed View
   if (isComplete) {
@@ -352,7 +416,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             </div>
             <h1 className="text-4xl font-bold text-slate-800 mb-4">🎉 Complete!</h1>
             <p className="text-xl text-slate-600 mb-2">You finished all rounds</p>
-            <p className="text-4xl font-bold text-emerald-600">{game.total_points[playerName]} points</p>
+            <p className="text-4xl font-bold text-emerald-600">{currentState.total_points[playerName]} points</p>
             </motion.div>
 
             {/* Performance Analysis */}
@@ -430,7 +494,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
               <div>
                 <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Best Streak' : 'Points'}</div>
                 <div className="text-2xl font-bold text-emerald-600">
-                  {hideScore ? '***' : (gameType === 'streak_challenge' ? (game.player_highest_streaks?.[playerName] || 0) : (game.total_points[playerName] || 0))}
+                  {hideScore ? '***' : (gameType === 'streak_challenge' ? (currentState.player_highest_streaks?.[playerName] || 0) : (currentState.total_points[playerName] || 0))}
                 </div>
               </div>
               <div className="h-10 w-px bg-slate-200" />
@@ -483,7 +547,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
                onUndo={handleUndo}
                putts={playerPutts}
                puttType={game.putt_type || 'regular'}
-               totalPoints={game.total_points[playerName] || 0}
+               totalPoints={currentState.total_points[playerName] || 0}
                hideScore={hideScore}
              />
            ) : (

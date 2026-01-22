@@ -384,11 +384,11 @@ export default function PuttingKingOverview() {
       const tournamentStations = allStations.filter(s => s.tournament_id === tournament.id && s.enabled)
         .sort((a, b) => a.order_index - b.order_index);
 
-      // Get current round matches to determine winners/losers and their movement
+      // Get current round matches
       const currentRoundMatches = matches.filter(m => m.round_number === tournament.current_round && m.status === 'finished');
       
-      // Build pairs: each pair consists of previous partners who now play against each other
-      const pairs = [];
+      // For each match, determine new station and split teams
+      const newMatches = [];
       
       for (const match of currentRoundMatches) {
         const station = tournamentStations.find(s => s.id === match.station_id);
@@ -396,52 +396,49 @@ export default function PuttingKingOverview() {
         
         const currentStationIndex = tournamentStations.indexOf(station);
         
-        // Winners move up (lower index), losers move down (higher index)
-        const winners = match.winner_team === 'A' ? match.team_a_players : match.team_b_players;
-        const losers = match.winner_team === 'A' ? match.team_b_players : match.team_a_players;
+        // Determine winners and losers
+        const winnersTeam = match.winner_team === 'A' ? match.team_a_players : match.team_b_players;
+        const losersTeam = match.winner_team === 'A' ? match.team_b_players : match.team_a_players;
         
-        // Determine winner pair's new station (move up, but not above Basket 1)
+        // Winners move up (lower index = higher basket), losers move down
         const winnerStationIndex = Math.max(0, currentStationIndex - 1);
-        const winnerStation = tournamentStations[winnerStationIndex];
-        
-        // Determine loser pair's new station (move down, but not below last basket)
         const loserStationIndex = Math.min(tournamentStations.length - 1, currentStationIndex + 1);
-        const loserStation = tournamentStations[loserStationIndex];
         
-        // Add pairs (previous partners now play against each other)
-        pairs.push({
-          players: winners,
-          station: winnerStation,
-          stationIndex: winnerStationIndex
+        // Split teams: previous teammates become opponents
+        // Winners split
+        newMatches.push({
+          station_id: tournamentStations[winnerStationIndex].id,
+          players: winnersTeam,
+          was_winner: true
         });
         
-        pairs.push({
-          players: losers,
-          station: loserStation,
-          stationIndex: loserStationIndex
+        // Losers split
+        newMatches.push({
+          station_id: tournamentStations[loserStationIndex].id,
+          players: losersTeam,
+          was_winner: false
         });
       }
       
-      // Group pairs by station
-      const stationPairs = {};
-      pairs.forEach(pair => {
-        if (!stationPairs[pair.station.id]) {
-          stationPairs[pair.station.id] = [];
+      // Group by station
+      const stationGroups = {};
+      newMatches.forEach(m => {
+        if (!stationGroups[m.station_id]) {
+          stationGroups[m.station_id] = [];
         }
-        stationPairs[pair.station.id].push(pair);
+        stationGroups[m.station_id].push(m);
       });
       
-      // Create matches for each station
-      for (const stationId in stationPairs) {
-        const stationPairsList = stationPairs[stationId];
+      // Create matches for each station (2 groups = 4 players)
+      for (const stationId in stationGroups) {
+        const groups = stationGroups[stationId];
         
-        // Need exactly 2 pairs (4 players) per station
-        if (stationPairsList.length === 2) {
-          const [pair1, pair2] = stationPairsList;
+        if (groups.length === 2) {
+          const [group1, group2] = groups;
           
-          // Previous partners now become opponents
-          const teamA = pair1.players;
-          const teamB = pair2.players;
+          // Split: take one from each previous team to form new teams
+          const teamA = [group1.players[0], group2.players[0]];
+          const teamB = [group1.players[1], group2.players[1]];
           
           const match = await base44.entities.PuttingKingMatch.create({
             tournament_id: tournament.id,
@@ -459,7 +456,6 @@ export default function PuttingKingOverview() {
           for (const email of allMatchPlayers) {
             const player = players.find(p => p.user_email === email);
             if (player) {
-              // Partner is now the other person in your team
               const partner = teamA.includes(email) 
                 ? teamA.find(e => e !== email)
                 : teamB.find(e => e !== email);

@@ -20,7 +20,6 @@ export default function PuttingKingRules({ tournament }) {
 
         <div className="space-y-2">
           <p><strong>Eesmärkpunktisumma:</strong> {tournament?.target_score || 21} punkti</p>
-          <p><strong>Raundide arv:</strong> {tournament?.total_rounds || 6} raundi (seadistatav vahemikus 1–20)</p>
           <p><strong>Võit:</strong> mängu võidab meeskond, kes jõuab esimesena täpselt {tournament?.target_score || 21} punktini</p>
         </div>
 

@@ -105,8 +105,8 @@ export default function PuttingKingOverview() {
   // Check if all current round matches are finished
   const currentRoundMatches = matches.filter(m => m.round_number === tournament?.current_round);
   const allMatchesFinished = currentRoundMatches.length > 0 && currentRoundMatches.every(m => m.status === 'finished');
-  const canStartNextRound = allMatchesFinished && tournament?.current_round < tournament?.total_rounds;
-  const isTournamentFinished = tournament?.current_round === tournament?.total_rounds && allMatchesFinished;
+  const canStartNextRound = allMatchesFinished;
+  const isTournamentFinished = tournament?.status === 'finished';
   const displayStatus = isTournamentFinished ? 'finished' : tournament?.status;
 
   const scoreMutation = useMutation({
@@ -480,7 +480,19 @@ export default function PuttingKingOverview() {
       queryClient.invalidateQueries();
       toast.success(`Round ${tournament.current_round + 1} started!`);
     }
-  });
+    });
+
+    const finishTournamentMutation = useMutation({
+    mutationFn: async () => {
+      await base44.entities.PuttingKingTournament.update(tournament.id, {
+        status: 'finished'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success('Tournament finished!');
+    }
+    });
 
   if (!tournament) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -519,7 +531,7 @@ export default function PuttingKingOverview() {
               {displayStatus}
             </div>
             <div className="inline-block px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold">
-              Round {tournament.current_round} / {tournament.total_rounds}
+              Round {tournament.current_round}
             </div>
           </div>
 
@@ -542,7 +554,7 @@ export default function PuttingKingOverview() {
             </div>
           ) : canManage && allMatchesFinished && (
             <div className="flex flex-col items-center gap-2">
-              {canStartNextRound ? (
+              {canStartNextRound && !isTournamentFinished && (
                 <Button
                   onClick={() => startNextRoundMutation.mutate()}
                   disabled={startNextRoundMutation.isPending}
@@ -551,7 +563,19 @@ export default function PuttingKingOverview() {
                   <Play className="w-4 h-4 mr-2" />
                   Start Round {tournament.current_round + 1}
                 </Button>
-              ) : (
+              )}
+              {!isTournamentFinished && tournament.status === 'active' && (
+                <Button
+                  onClick={() => finishTournamentMutation.mutate()}
+                  disabled={finishTournamentMutation.isPending}
+                  variant="destructive"
+                  className="mt-2"
+                >
+                  <Trophy className="w-4 h-4 mr-2" />
+                  Finish Tournament
+                </Button>
+              )}
+              {isTournamentFinished && (
                 <div className="px-4 py-2 bg-amber-100 text-amber-700 rounded-full text-sm font-semibold">
                   Tournament Complete!
                 </div>

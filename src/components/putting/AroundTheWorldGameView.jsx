@@ -28,23 +28,28 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       const games = await base44.entities.Game.list();
       return games.find(g => g.id === gameId);
     },
-    refetchInterval: 2000
+    refetchInterval: isSolo ? false : 5000
   });
+
+  const defaultPlayerState = {
+    current_distance_index: 0,
+    direction: 'UP',
+    laps_completed: 0,
+    turns_played: 0,
+    total_makes: 0,
+    total_putts: 0,
+    current_round_draft: { attempts: [], is_finalized: false },
+    history: [],
+    best_score: 0,
+    best_laps: 0,
+    best_accuracy: 0,
+    attempts_count: 0
+  };
 
   const submitTurnMutation = useMutation({
     mutationFn: async ({ madePutts, showDialog }) => {
       const config = game.atw_config;
-      const playerState = game.atw_state?.[playerName] || {
-        current_distance_index: 0,
-        direction: 'UP',
-        laps_completed: 0,
-        turns_played: 0,
-        total_makes: 0,
-        total_putts: 0,
-        current_round_draft: { attempts: [], is_finalized: false },
-        history: [],
-        best_score: 0
-      };
+      const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
 
       const currentIndex = playerState.current_distance_index;
       const direction = playerState.direction;
@@ -136,7 +141,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const handleRetry = async () => {
     setShowConfirmDialog(false);
 
-    const playerState = game.atw_state[playerName];
+    const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
     const currentScore = game.total_points?.[playerName] || 0;
     const bestScore = game.atw_state[playerName]?.best_score || 0;
 
@@ -176,7 +181,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const completeGameMutation = useMutation({
     mutationFn: async () => {
-      const playerState = game.atw_state[playerName];
+      const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
       const currentScore = game.total_points?.[playerName] || 0;
       const bestScore = Math.max(playerState.best_score || 0, currentScore);
 
@@ -227,7 +232,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   };
 
   const handlePlayAgain = async () => {
-    const playerState = game.atw_state[playerName];
+    const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
     const currentScore = game.total_points?.[playerName] || 0;
     const bestScore = Math.max(playerState.best_score || 0, currentScore);
 
@@ -259,7 +264,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const undoMutation = useMutation({
     mutationFn: async () => {
-      const playerState = game.atw_state[playerName];
+      const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
       
       if (!playerState.history || playerState.history.length === 0) {
         throw new Error('Pole midagi tagasi võtta');
@@ -322,15 +327,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   }
 
   const config = game.atw_config;
-  const playerState = game.atw_state?.[playerName] || {
-    current_distance_index: 0,
-    direction: 'UP',
-    laps_completed: 0,
-    turns_played: 0,
-    total_makes: 0,
-    total_putts: 0,
-    history: []
-  };
+  const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
 
   const currentDistance = config.distances[playerState.current_distance_index];
   const totalScore = game.total_points?.[playerName] || 0;

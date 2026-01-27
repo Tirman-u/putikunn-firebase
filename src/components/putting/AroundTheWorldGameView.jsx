@@ -404,7 +404,27 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                 Vaata edetabelit
               </Button>
               <Button
-                onClick={() => {
+                onClick={async () => {
+                  // Save best score before exiting
+                  const currentScore = game.total_points?.[playerName] || 0;
+                  const bestScore = playerState.best_score || 0;
+                  const currentAccuracy = playerState.total_putts > 0 
+                    ? ((playerState.total_makes / playerState.total_putts) * 100) 
+                    : 0;
+                  const bestAccuracy = playerState.best_accuracy || 0;
+
+                  await base44.entities.Game.update(gameId, {
+                    atw_state: {
+                      ...game.atw_state,
+                      [playerName]: {
+                        ...playerState,
+                        best_score: Math.max(bestScore, currentScore),
+                        best_laps: Math.max(playerState.best_laps || 0, playerState.laps_completed || 0),
+                        best_accuracy: Math.max(bestAccuracy, currentAccuracy)
+                      }
+                    }
+                  });
+
                   if (isSolo) {
                     handleCompleteGame();
                   } else {

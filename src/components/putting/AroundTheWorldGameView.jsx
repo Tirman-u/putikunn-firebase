@@ -140,6 +140,11 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     const currentScore = game.total_points?.[playerName] || 0;
     const bestScore = game.atw_state[playerName]?.best_score || 0;
 
+    const currentAccuracy = playerState.total_putts > 0 
+      ? ((playerState.total_makes / playerState.total_putts) * 100) 
+      : 0;
+    const bestAccuracy = playerState.best_accuracy || 0;
+
     const resetState = {
       current_distance_index: 0,
       direction: 'UP',
@@ -149,7 +154,9 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       total_putts: 0,
       current_round_draft: { attempts: [], is_finalized: false },
       history: [],
-      best_score: Math.max(bestScore, currentScore)
+      best_score: Math.max(bestScore, currentScore),
+      best_laps: Math.max(playerState.best_laps || 0, playerState.laps_completed || 0),
+      best_accuracy: Math.max(bestAccuracy, currentAccuracy)
     };
 
     await base44.entities.Game.update(gameId, {

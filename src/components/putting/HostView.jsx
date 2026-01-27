@@ -43,10 +43,10 @@ export default function HostView({ gameId, onExit }) {
       
       for (const playerName of game.players || []) {
         const playerState = game.atw_state?.[playerName];
-        const score = game.total_points?.[playerName] || 0;
+        const score = playerState?.best_score || 0;
         const totalPutts = playerState?.total_putts || 0;
         const madePutts = playerState?.total_makes || 0;
-        const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+        const accuracy = playerState?.best_accuracy || 0;
 
         const existingEntries = await base44.entities.LeaderboardEntry.filter({
           player_name: playerName,
@@ -141,19 +141,25 @@ export default function HostView({ gameId, onExit }) {
   // Calculate player stats for ATW
   const playerStats = (game.players || []).map(playerName => {
     const playerState = game.atw_state?.[playerName] || {};
-    const score = game.total_points?.[playerName] || 0;
-    const laps = playerState.laps_completed || 0;
+    const currentScore = game.total_points?.[playerName] || 0;
+    const bestScore = playerState.best_score || 0;
+    const currentLaps = playerState.laps_completed || 0;
+    const bestLaps = playerState.best_laps || 0;
     const totalPutts = playerState.total_putts || 0;
     const madePutts = playerState.total_makes || 0;
-    const accuracy = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
+    const currentAccuracy = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
+    const bestAccuracy = (playerState.best_accuracy || 0).toFixed(1);
 
     return {
       name: playerName,
-      score,
-      laps,
-      accuracy
+      currentScore,
+      bestScore,
+      currentLaps,
+      bestLaps,
+      currentAccuracy,
+      bestAccuracy
     };
-  }).sort((a, b) => b.score - a.score);
+  }).sort((a, b) => b.bestScore - a.bestScore);
 
   const bestPlayer = playerStats[0];
 
@@ -205,12 +211,12 @@ export default function HostView({ gameId, onExit }) {
                 <Trophy className="w-5 h-5 text-amber-500" />
                 <div className="text-sm text-slate-600">Best Score</div>
               </div>
-              <div className="text-3xl font-bold text-emerald-600">{bestPlayer.score}</div>
+              <div className="text-3xl font-bold text-emerald-600">{bestPlayer.bestScore}</div>
               <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
               <div className="text-sm text-slate-600 mb-2">Most Laps</div>
-              <div className="text-3xl font-bold text-blue-600">{bestPlayer.laps}</div>
+              <div className="text-3xl font-bold text-blue-600">{bestPlayer.bestLaps}</div>
               <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
@@ -218,7 +224,7 @@ export default function HostView({ gameId, onExit }) {
                 <Target className="w-5 h-5 text-purple-500" />
                 <div className="text-sm text-slate-600">Best Accuracy</div>
               </div>
-              <div className="text-3xl font-bold text-purple-600">{bestPlayer.accuracy}%</div>
+              <div className="text-3xl font-bold text-purple-600">{bestPlayer.bestAccuracy}%</div>
               <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
             </div>
           </div>
@@ -233,7 +239,8 @@ export default function HostView({ gameId, onExit }) {
                   <tr className="border-b border-slate-200 bg-slate-50">
                     <th className="text-left p-4 font-semibold text-slate-700">#</th>
                     <th className="text-left p-4 font-semibold text-slate-700">Player</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Score</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Best Score</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Current</th>
                     <th className="text-center p-4 font-semibold text-slate-700">Laps</th>
                     <th className="text-center p-4 font-semibold text-slate-700">Accuracy</th>
                   </tr>
@@ -250,13 +257,22 @@ export default function HostView({ gameId, onExit }) {
                       </td>
                       <td className="p-4 font-medium text-slate-800">{player.name}</td>
                       <td className="p-4 text-center">
-                        <div className="text-lg font-bold text-emerald-600">{player.score}</div>
+                        <div className="text-lg font-bold text-emerald-600">{player.bestScore}</div>
                       </td>
                       <td className="p-4 text-center">
-                        <div className="text-lg font-bold text-blue-600">{player.laps}</div>
+                        <div className="text-sm text-slate-500">{player.currentScore}</div>
                       </td>
                       <td className="p-4 text-center">
-                        <div className="text-lg font-bold text-purple-600">{player.accuracy}%</div>
+                        <div className="flex flex-col items-center">
+                          <div className="text-sm font-bold text-blue-600">{player.bestLaps}</div>
+                          <div className="text-xs text-slate-400">{player.currentLaps}</div>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="flex flex-col items-center">
+                          <div className="text-sm font-bold text-purple-600">{player.bestAccuracy}%</div>
+                          <div className="text-xs text-slate-400">{player.currentAccuracy}%</div>
+                        </div>
                       </td>
                     </tr>
                   ))}

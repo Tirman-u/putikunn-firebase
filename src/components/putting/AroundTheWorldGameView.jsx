@@ -599,7 +599,29 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       <div className="max-w-md mx-auto px-4 pt-8">
         <div className="flex items-center justify-between mb-6">
           <button
-            onClick={() => window.location.href = createPageUrl('Home')}
+            onClick={async () => {
+              const latestPlayerState = game.atw_state?.[playerName] || {};
+              const currentScore = game.total_points?.[playerName] || 0;
+              const bestScore = latestPlayerState.best_score || 0;
+              const currentAccuracy = latestPlayerState.total_putts > 0 
+                ? ((latestPlayerState.total_makes / latestPlayerState.total_putts) * 100) 
+                : 0;
+              const bestAccuracy = latestPlayerState.best_accuracy || 0;
+
+              await base44.entities.Game.update(gameId, {
+                atw_state: {
+                  ...game.atw_state,
+                  [playerName]: {
+                    ...latestPlayerState,
+                    best_score: Math.max(bestScore, currentScore),
+                    best_laps: Math.max(latestPlayerState.best_laps || 0, latestPlayerState.laps_completed || 0),
+                    best_accuracy: Math.max(bestAccuracy, currentAccuracy)
+                  }
+                }
+              });
+
+              window.location.href = createPageUrl('Home');
+            }}
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
           >
             <ArrowLeft className="w-5 h-5" />

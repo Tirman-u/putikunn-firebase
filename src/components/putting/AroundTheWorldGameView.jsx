@@ -22,6 +22,16 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const pendingUpdateRef = React.useRef([]);
   const updateTimeoutRef = React.useRef(null);
   const updateThrottleRef = React.useRef({ timer: null, latest: null });
+  const localSeqRef = React.useRef(0);
+
+  const bumpLocalSeq = useCallback(() => {
+    localSeqRef.current += 1;
+    return localSeqRef.current;
+  }, []);
+
+  const getLatestGame = useCallback(() => {
+    return queryClient.getQueryData(['game', gameId]) || game;
+  }, [game, gameId, queryClient]);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -45,7 +55,27 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       if (event.id === gameId && (event.type === 'update' || event.type === 'delete')) {
         const throttle = updateThrottleRef.current;
         const applyEvent = (evt) => {
-          queryClient.setQueryData(['game', gameId], evt.data);
+          let nextData = evt.data;
+          const localGame = queryClient.getQueryData(['game', gameId]);
+          const localPlayerState = localGame?.atw_state?.[playerName];
+          const localSeq = localPlayerState?.client_seq ?? localSeqRef.current ?? 0;
+          const incomingSeq = nextData?.atw_state?.[playerName]?.client_seq ?? 0;
+
+          if (localPlayerState && incomingSeq < localSeq) {
+            nextData = {
+              ...nextData,
+              atw_state: {
+                ...(nextData.atw_state || {}),
+                [playerName]: localPlayerState
+              },
+              total_points: {
+                ...(nextData.total_points || {}),
+                [playerName]: localGame?.total_points?.[playerName] ?? nextData?.total_points?.[playerName] ?? 0
+              }
+            };
+          }
+
+          queryClient.setQueryData(['game', gameId], nextData);
         };
 
         if (!throttle.timer) {
@@ -70,7 +100,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       updateThrottleRef.current.latest = null;
       unsubscribe();
     };
-  }, [gameId, isSolo, queryClient]);
+  }, [gameId, isSolo, playerName, queryClient]);
 
   const defaultPlayerState = useMemo(() => ({
     current_distance_index: 0,
@@ -124,9 +154,10 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     pendingUpdateRef.current = [];
     setPendingUpdates([]);
 
-    const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
-    const currentScore = game.total_points?.[playerName] || 0;
-    const bestScore = game.atw_state[playerName]?.best_score || 0;
+    const latestGame = getLatestGame();
+    const playerState = { ...defaultPlayerState, ...(latestGame.atw_state?.[playerName] || {}) };
+    const currentScore = latestGame.total_points?.[playerName] || 0;
+    const bestScore = latestGame.atw_state[playerName]?.best_score || 0;
 
     const currentAccuracy = playerState.total_putts > 0 
       ? ((playerState.total_makes / playerState.total_putts) * 100) 
@@ -144,16 +175,17 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       history: [],
       best_score: Math.max(bestScore, currentScore),
       best_laps: Math.max(playerState.best_laps || 0, playerState.laps_completed || 0),
-      best_accuracy: Math.max(bestAccuracy, currentAccuracy)
+      best_accuracy: Math.max(bestAccuracy, currentAccuracy),
+      client_seq: bumpLocalSeq()
     };
 
     const nextAtwState = {
-      ...game.atw_state,
+      ...latestGame.atw_state,
       [playerName]: resetState
     };
 
     const nextTotalPoints = {
-      ...game.total_points,
+      ...latestGame.total_points,
       [playerName]: 0
     };
 
@@ -172,12 +204,13 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     });
     queryClient.invalidateQueries({ queryKey: ['game', gameId] });
     toast.success('Alustad uuesti 5m pealt!');
-  }, [defaultPlayerState, game, gameId, playerName, queryClient]);
+  }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, playerName, queryClient]);
 
   const handleSubmitPutts = useCallback((madePutts) => {
     // Immediate local update for instant feedback
-    const config = game.atw_config;
-    const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
+    const latestGame = getLatestGame();
+    const config = latestGame.atw_config;
+    const playerState = { ...defaultPlayerState, ...(latestGame.atw_state?.[playerName] || {}) };
     
     const currentIndex = playerState.current_distance_index;
     const direction = playerState.direction;
@@ -227,19 +260,20 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         failed_to_advance: actualMakes > 0 && actualMakes < threshold,
         missed_all: actualMakes === 0
       }],
-      best_score: playerState.best_score
+      best_score: playerState.best_score,
+      client_seq: bumpLocalSeq()
     };
 
     // Immediate UI update
     queryClient.setQueryData(['game', gameId], {
-      ...game,
+      ...latestGame,
       atw_state: {
-        ...game.atw_state,
+        ...latestGame.atw_state,
         [playerName]: updatedState
       },
       total_points: {
-        ...game.total_points,
-        [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
+        ...latestGame.total_points,
+        [playerName]: (latestGame.total_points?.[playerName] || 0) + pointsAwarded
       }
     });
 
@@ -273,7 +307,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       pendingUpdateRef.current = [];
       setPendingUpdates([]);
     }, delay);
-  }, [defaultPlayerState, game, gameId, isSolo, playerName, queryClient, submitTurnMutation]);
+  }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, isSolo, playerName, queryClient, submitTurnMutation]);
 
   const completeGameMutation = useMutation({
     mutationFn: async () => {
@@ -328,35 +362,59 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   }, [completeGameMutation]);
 
   const handlePlayAgain = useCallback(async () => {
-    const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
-    const currentScore = game.total_points?.[playerName] || 0;
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    pendingUpdateRef.current = [];
+    setPendingUpdates([]);
+
+    const latestGame = getLatestGame();
+    const playerState = { ...defaultPlayerState, ...(latestGame.atw_state?.[playerName] || {}) };
+    const currentScore = latestGame.total_points?.[playerName] || 0;
     const bestScore = Math.max(playerState.best_score || 0, currentScore);
+
+    const resetState = {
+      current_distance_index: 0,
+      direction: 'UP',
+      laps_completed: 0,
+      turns_played: 0,
+      total_makes: 0,
+      total_putts: 0,
+      current_round_draft: { attempts: [], is_finalized: false },
+      history: [],
+      best_score: bestScore,
+      attempts_count: (playerState.attempts_count || 0) + 1,
+      client_seq: bumpLocalSeq()
+    };
+
+    const nextAtwState = {
+      ...latestGame.atw_state,
+      [playerName]: resetState
+    };
+
+    const nextTotalPoints = {
+      ...latestGame.total_points,
+      [playerName]: 0
+    };
+
+    queryClient.setQueryData(['game', gameId], prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        status: 'active',
+        atw_state: nextAtwState,
+        total_points: nextTotalPoints
+      };
+    });
 
     await base44.entities.Game.update(gameId, {
       status: 'active',
-      atw_state: {
-        ...game.atw_state,
-        [playerName]: {
-          current_distance_index: 0,
-          direction: 'UP',
-          laps_completed: 0,
-          turns_played: 0,
-          total_makes: 0,
-          total_putts: 0,
-          current_round_draft: { attempts: [], is_finalized: false },
-          history: [],
-          best_score: bestScore,
-          attempts_count: (playerState.attempts_count || 0) + 1
-        }
-      },
-      total_points: {
-        ...game.total_points,
-        [playerName]: 0
-      }
+      atw_state: nextAtwState,
+      total_points: nextTotalPoints
     });
 
     queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-  }, [game, gameId, playerName, queryClient]);
+  }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, playerName, queryClient]);
 
   const handleViewLeaderboard = useCallback(() => {
     setShowConfirmDialog(false);
@@ -393,8 +451,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const config = game?.atw_config;
 
-  const buildUndoPayload = useCallback(() => {
-    const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
+  const buildUndoPayload = useCallback((gameState) => {
+    const playerState = { ...defaultPlayerState, ...(gameState.atw_state?.[playerName] || {}) };
 
     if (!playerState.history || playerState.history.length === 0) {
       throw new Error('Pole midagi tagasi võtta');
@@ -428,18 +486,20 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       current_round_draft: { attempts: [], is_finalized: false }
     };
 
+    updatedState.client_seq = bumpLocalSeq();
+
     const nextAtwState = {
-      ...game.atw_state,
+      ...gameState.atw_state,
       [playerName]: updatedState
     };
 
     const nextTotalPoints = {
-      ...game.total_points,
-      [playerName]: Math.max(0, (game.total_points?.[playerName] || 0) - lastTurn.points_awarded)
+      ...gameState.total_points,
+      [playerName]: Math.max(0, (gameState.total_points?.[playerName] || 0) - lastTurn.points_awarded)
     };
 
     return { nextAtwState, nextTotalPoints };
-  }, [config, defaultPlayerState, game, playerName]);
+  }, [bumpLocalSeq, config, defaultPlayerState, playerName]);
 
   const undoMutation = useMutation({
     mutationFn: async ({ nextAtwState, nextTotalPoints }) => {
@@ -458,7 +518,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   });
 
   const handleUndo = useCallback(() => {
-    if (!config || !game) return;
+    const latestGame = getLatestGame();
+    if (!config || !latestGame) return;
 
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
@@ -468,7 +529,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
     let payload;
     try {
-      payload = buildUndoPayload();
+      payload = buildUndoPayload(latestGame);
     } catch (error) {
       toast.error(error.message || 'Viga tagasivõtmisel');
       return;
@@ -484,7 +545,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     });
 
     undoMutation.mutate(payload);
-  }, [buildUndoPayload, config, game, gameId, queryClient, undoMutation]);
+  }, [buildUndoPayload, config, gameId, getLatestGame, queryClient, undoMutation]);
 
   // Cleanup timeout on unmount
   React.useEffect(() => {

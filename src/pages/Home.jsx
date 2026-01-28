@@ -56,16 +56,15 @@ export default function Home() {
     } else if (urlMode === 'atw-game' && urlGameId) {
       // Continue ATW game from profile
       setGameId(urlGameId);
-      base44.entities.Game.list().then(games => {
-        const game = games.find(g => g.id === urlGameId);
-        if (game) {
-          setIsSoloATW(game.pin === '0000');
-          base44.auth.me().then(user => {
-            const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
-            setPlayerName(playerName);
-            setMode('atw-game');
-          });
-        }
+      base44.entities.Game.filter({ id: urlGameId }).then(games => {
+        const game = games?.[0];
+        if (!game) return;
+        setIsSoloATW(game.pin === '0000');
+        base44.auth.me().then(user => {
+          const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
+          setPlayerName(playerName);
+          setMode('atw-game');
+        });
       });
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);

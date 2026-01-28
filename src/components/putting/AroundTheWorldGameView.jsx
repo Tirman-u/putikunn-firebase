@@ -35,7 +35,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   // Real-time subscription
   useEffect(() => {
-    if (!gameId) return;
+    if (!gameId || isSolo) return;
 
     const unsubscribe = base44.entities.Game.subscribe((event) => {
       if (event.id === gameId && (event.type === 'update' || event.type === 'delete')) {
@@ -44,7 +44,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     });
 
     return unsubscribe;
-  }, [gameId, queryClient]);
+  }, [gameId, isSolo, queryClient]);
 
   const defaultPlayerState = useMemo(() => ({
     current_distance_index: 0,
@@ -355,6 +355,39 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     queryClient.invalidateQueries({ queryKey: ['game', gameId] });
   }, [game, gameId, playerName, queryClient]);
 
+  const handleViewLeaderboard = useCallback(() => {
+    setShowConfirmDialog(false);
+    setShowLeaderboard(true);
+  }, []);
+
+  const handleExit = useCallback(async () => {
+    const latestPlayerState = game.atw_state?.[playerName] || {};
+    const currentScore = game.total_points?.[playerName] || 0;
+    const bestScore = latestPlayerState.best_score || 0;
+    const currentAccuracy = latestPlayerState.total_putts > 0
+      ? ((latestPlayerState.total_makes / latestPlayerState.total_putts) * 100)
+      : 0;
+    const bestAccuracy = latestPlayerState.best_accuracy || 0;
+
+    await base44.entities.Game.update(gameId, {
+      atw_state: {
+        ...game.atw_state,
+        [playerName]: {
+          ...latestPlayerState,
+          best_score: Math.max(bestScore, currentScore),
+          best_laps: Math.max(latestPlayerState.best_laps || 0, latestPlayerState.laps_completed || 0),
+          best_accuracy: Math.max(bestAccuracy, currentAccuracy)
+        }
+      }
+    });
+
+    if (isSolo) {
+      handleCompleteGame();
+    } else {
+      window.location.href = createPageUrl('Home');
+    }
+  }, [game, gameId, handleCompleteGame, isSolo, playerName]);
+
   const undoMutation = useMutation({
     mutationFn: async () => {
       const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
@@ -415,6 +448,15 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     undoMutation.mutate();
   }, [undoMutation]);
 
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const config = game?.atw_config;
   const playerState = useMemo(
     () => ({ ...defaultPlayerState, ...(game?.atw_state?.[playerName] || {}) }),
@@ -449,15 +491,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   if (isLoading || !game || !config) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
-
-  // Cleanup timeout on unmount
-  React.useEffect(() => {
-    return () => {
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Leaderboard view
   if (showLeaderboard) {
@@ -497,6 +530,9 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       handleFinish={handleFinish}
       handleRetry={handleRetry}
       handleCompleteGame={handleCompleteGame}
+      handlePlayAgain={handlePlayAgain}
+      onViewLeaderboard={handleViewLeaderboard}
+      onExit={handleExit}
       setShowConfirmDialog={setShowConfirmDialog}
       gameId={gameId}
       submitToLeaderboardMutation={submitToLeaderboardMutation}
@@ -522,6 +558,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       showConfirmDialog={showConfirmDialog}
       handleFinish={handleFinish}
       handleRetry={handleRetry}
+      onViewLeaderboard={handleViewLeaderboard}
+      onExit={handleExit}
       setShowConfirmDialog={setShowConfirmDialog}
       gameId={gameId}
       submitTurnMutation={submitTurnMutation}
@@ -530,7 +568,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 }
 
 // Memoized dialog component
-const ConfirmRoundDialog = React.memo(({ isOpen, onFinish, onRetry, onComplete }) => {
+const ConfirmRoundDialog = React.memo(({ isOpen, onFinish, onRetry, onComplete, onViewLeaderboard, onExit }) => {
       if (!isOpen) return null;
 
       return (
@@ -551,10 +589,7 @@ const ConfirmRoundDialog = React.memo(({ isOpen, onFinish, onRetry, onComplete }
                 Proovi uuesti
               </Button>
               <Button
-                onClick={() => {
-                  setShowConfirmDialog(false);
-                  setShowLeaderboard(true);
-                }}
+                onClick={onViewLeaderboard}
                 variant="outline"
                 className="w-full h-12"
               >
@@ -562,34 +597,7 @@ const ConfirmRoundDialog = React.memo(({ isOpen, onFinish, onRetry, onComplete }
                 Vaata edetabelit
               </Button>
               <Button
-                onClick={async () => {
-                  // Save best score before exiting
-                  const latestPlayerState = game.atw_state?.[playerName] || {};
-                  const currentScore = game.total_points?.[playerName] || 0;
-                  const bestScore = latestPlayerState.best_score || 0;
-                  const currentAccuracy = latestPlayerState.total_putts > 0 
-                    ? ((latestPlayerState.total_makes / latestPlayerState.total_putts) * 100) 
-                    : 0;
-                  const bestAccuracy = latestPlayerState.best_accuracy || 0;
-
-                  await base44.entities.Game.update(gameId, {
-                    atw_state: {
-                      ...game.atw_state,
-                      [playerName]: {
-                        ...latestPlayerState,
-                        best_score: Math.max(bestScore, currentScore),
-                        best_laps: Math.max(latestPlayerState.best_laps || 0, latestPlayerState.laps_completed || 0),
-                        best_accuracy: Math.max(bestAccuracy, currentAccuracy)
-                      }
-                    }
-                  });
-
-                  if (isSolo) {
-                    handleCompleteGame();
-                  } else {
-                    window.location.href = createPageUrl('Home');
-                  }
-                }}
+                onClick={onExit}
                 variant="outline"
                 className="w-full h-12 text-red-600 hover:text-red-700 hover:bg-red-50"
               >
@@ -605,6 +613,7 @@ const ConfirmRoundDialog = React.memo(({ isOpen, onFinish, onRetry, onComplete }
         const CompletedGameView = React.memo(({ 
         game, playerState, playerName, totalScore, bestScore, makeRate, difficultyLabel, 
         config, isSolo, showConfirmDialog, handleFinish, handleRetry, handleCompleteGame,
+        handlePlayAgain, onViewLeaderboard, onExit,
         setShowConfirmDialog, gameId, submitToLeaderboardMutation, user 
         }) => {
         const attemptsCount = (playerState.attempts_count || 0) + 1;
@@ -620,6 +629,8 @@ const ConfirmRoundDialog = React.memo(({ isOpen, onFinish, onRetry, onComplete }
           onFinish={handleFinish}
           onRetry={handleRetry}
           onComplete={handleCompleteGame}
+          onViewLeaderboard={onViewLeaderboard}
+          onExit={onExit}
         />
 
         <div className="max-w-md mx-auto px-4 pt-8">
@@ -754,8 +765,8 @@ const ConfirmRoundDialog = React.memo(({ isOpen, onFinish, onRetry, onComplete }
 const ActiveGameView = React.memo(({ 
   game, playerState, playerName, currentDistance, totalScore, bestScore, makeRate, 
   difficultyLabel, config, isSolo, hideScore, setHideScore, handleSubmitPutts, 
-  handleUndo, undoMutation, showConfirmDialog, handleFinish, handleRetry, 
-  setShowConfirmDialog, gameId, submitTurnMutation 
+  handleUndo, undoMutation, showConfirmDialog, handleFinish, handleRetry,
+  onViewLeaderboard, onExit, setShowConfirmDialog, gameId, submitTurnMutation 
 }) => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -763,7 +774,8 @@ const ActiveGameView = React.memo(({
         isOpen={showConfirmDialog}
         onFinish={handleFinish}
         onRetry={handleRetry}
-        onComplete={handleCompleteGame}
+        onViewLeaderboard={onViewLeaderboard}
+        onExit={onExit}
       />
 
       <div className="max-w-md mx-auto px-4 pt-8">

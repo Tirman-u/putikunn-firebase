@@ -415,22 +415,20 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     undoMutation.mutate();
   }, [undoMutation]);
 
-  if (isLoading || !game || !game.atw_config) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  const config = game.atw_config;
-  const playerState = useMemo(() => 
-    ({ ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) }),
-    [game.atw_state, playerName, defaultPlayerState]
+  const config = game?.atw_config;
+  const playerState = useMemo(
+    () => ({ ...defaultPlayerState, ...(game?.atw_state?.[playerName] || {}) }),
+    [game?.atw_state, playerName, defaultPlayerState]
   );
 
   const gameStats = useMemo(() => {
-    const currentDistance = config.distances[playerState.current_distance_index || 0];
-    const totalScore = game.total_points?.[playerName] || 0;
+    if (!config) return null;
+
+    const currentDistance = config.distances?.[playerState.current_distance_index || 0];
+    const totalScore = game?.total_points?.[playerName] || 0;
     const bestScore = playerState.best_score || 0;
-    const makeRate = playerState.total_putts > 0 
-      ? ((playerState.total_makes / playerState.total_putts) * 100).toFixed(0) 
+    const makeRate = playerState.total_putts > 0
+      ? ((playerState.total_makes / playerState.total_putts) * 100).toFixed(0)
       : 0;
 
     const difficultyLabels = {
@@ -442,11 +440,15 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     };
 
     const difficultyLabel = difficultyLabels[config.difficulty] || 'Medium';
-    
+
     return { currentDistance, totalScore, bestScore, makeRate, difficultyLabel };
-  }, [game, config, playerState, playerName]);
+  }, [config, playerState, game?.total_points, playerName]);
 
   const { currentDistance, totalScore, bestScore, makeRate, difficultyLabel } = gameStats || {};
+
+  if (isLoading || !game || !config) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   // Cleanup timeout on unmount
   React.useEffect(() => {

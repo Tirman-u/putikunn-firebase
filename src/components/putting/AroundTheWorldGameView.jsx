@@ -182,6 +182,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         [playerName]: 0
       }
     });
+  }, [defaultPlayerState, game, gameId, playerName]);
 
   const handleSubmitPutts = useCallback((madePutts) => {
     // Immediate local update for instant feedback

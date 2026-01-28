@@ -47,6 +47,19 @@ export default function PuttingRecords() {
     refetchInterval: 30000
   });
 
+  const { data: discgolfEntries = [] } = useQuery({
+    queryKey: ['leaderboard-entries-discgolf', currentView?.leaderboardType],
+    queryFn: async () => {
+      if (!currentView || currentView.leaderboardType !== 'general') return [];
+      return base44.entities.LeaderboardEntry.filter(
+        { leaderboard_type: 'discgolf_ee', game_type: 'classic' },
+        '-score',
+        500
+      );
+    },
+    refetchInterval: 30000
+  });
+
   const userRole = user?.app_role || 'user';
   const canDelete = ['admin', 'super_admin'].includes(userRole);
 
@@ -99,7 +112,7 @@ export default function PuttingRecords() {
   // Helper to check if a general entry has a corresponding DG.ee entry
   const hasDiscgolfEntry = (entry) => {
     if (entry.leaderboard_type !== 'general') return false;
-    return leaderboardEntries.some(e => 
+    return discgolfEntries.some(e => 
       e.leaderboard_type === 'discgolf_ee' && 
       e.game_id === entry.game_id &&
       e.player_name === entry.player_name

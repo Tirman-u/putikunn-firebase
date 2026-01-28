@@ -276,10 +276,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     }, ATW_SYNC_DELAY_MS);
   }, [game, gameId, playerName, queryClient, defaultPlayerState, submitTurnMutation]);
 
-    queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-    toast.success('Alustad uuesti 5m pealt!');
-  }, [game, gameId, playerName, queryClient]);
-
   const completeGameMutation = useMutation({
     mutationFn: async () => {
       const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };

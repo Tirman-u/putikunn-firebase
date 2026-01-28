@@ -29,10 +29,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     return localSeqRef.current;
   }, []);
 
-  const getLatestGame = useCallback(() => {
-    return queryClient.getQueryData(['game', gameId]) || game;
-  }, [game, gameId, queryClient]);
-
   const { data: user } = useQuery({
     queryKey: ['user'],
     queryFn: () => base44.auth.me()
@@ -46,6 +42,10 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     },
     refetchInterval: false
   });
+
+  const getLatestGame = useCallback(() => {
+    return queryClient.getQueryData(['game', gameId]) || game;
+  }, [game, gameId, queryClient]);
 
   // Real-time subscription
   useEffect(() => {

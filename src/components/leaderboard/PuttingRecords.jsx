@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -60,6 +60,34 @@ export default function PuttingRecords() {
     refetchInterval: 30000
   });
 
+  const leaderboardGameIds = useMemo(() => {
+    return Array.from(new Set(leaderboardEntries.map(entry => entry.game_id).filter(Boolean)));
+  }, [leaderboardEntries]);
+
+  const { data: gamesById = {} } = useQuery({
+    queryKey: ['leaderboard-games', leaderboardGameIds.join('|')],
+    queryFn: async () => {
+      if (leaderboardGameIds.length === 0) return {};
+      const results = await Promise.all(
+        leaderboardGameIds.map(async (id) => {
+          try {
+            const games = await base44.entities.Game.filter({ id });
+            return games?.[0] || null;
+          } catch {
+            return null;
+          }
+        })
+      );
+      const map = {};
+      results.forEach(game => {
+        if (game?.id) map[game.id] = game;
+      });
+      return map;
+    },
+    enabled: leaderboardGameIds.length > 0,
+    staleTime: 60000
+  });
+
   const userRole = user?.app_role || 'user';
   const canDelete = ['admin', 'super_admin'].includes(userRole);
 
@@ -117,6 +145,12 @@ export default function PuttingRecords() {
       e.game_id === entry.game_id &&
       e.player_name === entry.player_name
     );
+  };
+
+  const isHostedGame = (entry) => {
+    if (!entry?.game_id) return false;
+    const game = gamesById[entry.game_id];
+    return !!(game?.pin && game.pin !== '0000');
   };
 
   return (
@@ -205,7 +239,7 @@ export default function PuttingRecords() {
                                     {entry.player_gender}
                                   </span>
                                 )}
-                                {hasDiscgolfEntry(entry) && (
+                                {(isHostedGame(entry) || hasDiscgolfEntry(entry)) && (
                                   <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
                                     <Award className="w-3 h-3" />
                                     DG.ee

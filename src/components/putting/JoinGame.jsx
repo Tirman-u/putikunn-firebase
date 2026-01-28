@@ -92,12 +92,34 @@ export default function JoinGame({ onJoin, onBack }) {
         const updatedPutts = { ...game.player_putts, [playerName.trim()]: [] };
         const updatedPoints = { ...game.total_points, [playerName.trim()]: 0 };
 
-        const updatedGame = await base44.entities.Game.update(game.id, {
+        const updateData = {
           players: updatedPlayers,
           player_distances: updatedDistances,
           player_putts: updatedPutts,
           total_points: updatedPoints
-        });
+        };
+
+        // For ATW games, initialize player state
+        if (gameType === 'around_the_world') {
+          updateData.atw_state = {
+            ...game.atw_state,
+            [playerName.trim()]: {
+              current_distance_index: 0,
+              direction: 'UP',
+              laps_completed: 0,
+              turns_played: 0,
+              total_makes: 0,
+              total_putts: 0,
+              current_round_draft: { attempts: [], is_finalized: false },
+              history: [],
+              best_score: 0,
+              best_laps: 0,
+              best_accuracy: 0
+            }
+          };
+        }
+
+        const updatedGame = await base44.entities.Game.update(game.id, updateData);
 
         onJoin({ game: updatedGame, playerName: playerName.trim() });
       }

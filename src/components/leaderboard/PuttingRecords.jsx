@@ -13,6 +13,16 @@ export default function PuttingRecords() {
   const [selectedGender, setSelectedGender] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
 
+  const viewTypes = [
+    { id: 'general_classic', label: 'Classic', leaderboardType: 'general', gameType: 'classic' },
+    { id: 'general_back_and_forth', label: 'Back & Forth', leaderboardType: 'general', gameType: 'back_and_forth' },
+    { id: 'general_short', label: 'Short', leaderboardType: 'general', gameType: 'short' },
+    { id: 'general_streak_challenge', label: 'Streak', leaderboardType: 'general', gameType: 'streak_challenge' },
+    { id: 'general_random_distance', label: 'Random', leaderboardType: 'general', gameType: 'random_distance' },
+    { id: 'general_around_the_world', label: 'Around World', leaderboardType: 'general', gameType: 'around_the_world' },
+    { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'discgolf_ee', gameType: 'classic' }
+  ];
+
   const { data: user } = useQuery({
     queryKey: ['current-user'],
     queryFn: () => base44.auth.me()
@@ -40,16 +50,6 @@ export default function PuttingRecords() {
   const userRole = user?.app_role || 'user';
   const canDelete = ['admin', 'super_admin'].includes(userRole);
 
-  const viewTypes = [
-    { id: 'general_classic', label: 'Classic', leaderboardType: 'general', gameType: 'classic' },
-    { id: 'general_back_and_forth', label: 'Back & Forth', leaderboardType: 'general', gameType: 'back_and_forth' },
-    { id: 'general_short', label: 'Short', leaderboardType: 'general', gameType: 'short' },
-    { id: 'general_streak_challenge', label: 'Streak', leaderboardType: 'general', gameType: 'streak_challenge' },
-    { id: 'general_random_distance', label: 'Random', leaderboardType: 'general', gameType: 'random_distance' },
-    { id: 'general_around_the_world', label: 'Around World', leaderboardType: 'general', gameType: 'around_the_world' },
-    { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'discgolf_ee', gameType: 'classic' }
-  ];
-
   // Generate last 6 months for filter
   const monthOptions = [];
   for (let i = 0; i < 6; i++) {
@@ -62,6 +62,7 @@ export default function PuttingRecords() {
   }
 
   const filteredEntries = leaderboardEntries.filter(entry => {
+    if (!currentView) return false;
     if (entry.leaderboard_type !== currentView.leaderboardType) return false;
     
     if (currentView.leaderboardType === 'discgolf_ee') {

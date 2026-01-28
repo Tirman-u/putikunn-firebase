@@ -63,98 +63,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     attempts_count: 0
   }), []);
 
-  const handleSubmitPutts = useCallback((madePutts) => {
-    // Immediate local update for instant feedback
-    const config = game.atw_config;
-    const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
-    
-    const currentIndex = playerState.current_distance_index;
-    const direction = playerState.direction;
-    const threshold = config.advance_threshold;
-    const distances = config.distances;
-    const actualMakes = madePutts === 1 ? config.discs_per_turn : 0;
-
-    let newIndex = currentIndex;
-    let newDirection = direction;
-    let lapEvent = false;
-
-    if (actualMakes >= threshold) {
-      if (direction === 'UP') {
-        newIndex = Math.min(currentIndex + 1, distances.length - 1);
-        if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
-          newDirection = 'DOWN';
-        }
-      } else {
-        newIndex = Math.max(currentIndex - 1, 0);
-        if (newIndex === 0 && currentIndex > 0) {
-          newDirection = 'UP';
-          lapEvent = true;
-        }
-      }
-    } else if (actualMakes === 0) {
-      newIndex = 0;
-    }
-
-    const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * config.discs_per_turn : 0;
-
-    const updatedState = {
-      current_distance_index: newIndex,
-      direction: newDirection,
-      laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
-      turns_played: playerState.turns_played + 1,
-      total_makes: playerState.total_makes + actualMakes,
-      total_putts: playerState.total_putts + config.discs_per_turn,
-      current_round_draft: { attempts: [], is_finalized: false },
-      history: [...playerState.history, {
-        turn_number: playerState.turns_played + 1,
-        distance: distances[currentIndex],
-        direction: direction,
-        made_putts: actualMakes,
-        moved_to_distance: distances[newIndex],
-        points_awarded: pointsAwarded,
-        lap_event: lapEvent,
-        failed_to_advance: actualMakes > 0 && actualMakes < threshold,
-        missed_all: actualMakes === 0
-      }],
-      best_score: playerState.best_score
-    };
-
-    // Immediate UI update
-    queryClient.setQueryData(['game', gameId], {
-      ...game,
-      atw_state: {
-        ...game.atw_state,
-        [playerName]: updatedState
-      },
-      total_points: {
-        ...game.total_points,
-        [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
-      }
-    });
-
-    // Show dialog immediately if missed
-    if (madePutts === 0) {
-      setShowConfirmDialog(true);
-    }
-
-    // Debounced DB sync
-    const pending = { madePutts, showDialog: madePutts === 0 };
-    pendingUpdateRef.current = pending;
-    setPendingUpdates(prev => [...prev, pending]);
-    
-    if (updateTimeoutRef.current) {
-      clearTimeout(updateTimeoutRef.current);
-    }
-    
-    updateTimeoutRef.current = setTimeout(() => {
-      if (pendingUpdateRef.current) {
-        submitTurnMutation.mutate(pendingUpdateRef.current);
-      }
-      pendingUpdateRef.current = null;
-      setPendingUpdates([]);
-    }, ATW_SYNC_DELAY_MS);
-  }, [game, gameId, playerName, queryClient, defaultPlayerState, submitTurnMutation]);
-
   const submitTurnMutation = useMutation({
     mutationFn: async ({ madePutts }) => {
       const config = game.atw_config;
@@ -274,6 +182,98 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         [playerName]: 0
       }
     });
+
+  const handleSubmitPutts = useCallback((madePutts) => {
+    // Immediate local update for instant feedback
+    const config = game.atw_config;
+    const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
+    
+    const currentIndex = playerState.current_distance_index;
+    const direction = playerState.direction;
+    const threshold = config.advance_threshold;
+    const distances = config.distances;
+    const actualMakes = madePutts === 1 ? config.discs_per_turn : 0;
+
+    let newIndex = currentIndex;
+    let newDirection = direction;
+    let lapEvent = false;
+
+    if (actualMakes >= threshold) {
+      if (direction === 'UP') {
+        newIndex = Math.min(currentIndex + 1, distances.length - 1);
+        if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
+          newDirection = 'DOWN';
+        }
+      } else {
+        newIndex = Math.max(currentIndex - 1, 0);
+        if (newIndex === 0 && currentIndex > 0) {
+          newDirection = 'UP';
+          lapEvent = true;
+        }
+      }
+    } else if (actualMakes === 0) {
+      newIndex = 0;
+    }
+
+    const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * config.discs_per_turn : 0;
+
+    const updatedState = {
+      current_distance_index: newIndex,
+      direction: newDirection,
+      laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
+      turns_played: playerState.turns_played + 1,
+      total_makes: playerState.total_makes + actualMakes,
+      total_putts: playerState.total_putts + config.discs_per_turn,
+      current_round_draft: { attempts: [], is_finalized: false },
+      history: [...playerState.history, {
+        turn_number: playerState.turns_played + 1,
+        distance: distances[currentIndex],
+        direction: direction,
+        made_putts: actualMakes,
+        moved_to_distance: distances[newIndex],
+        points_awarded: pointsAwarded,
+        lap_event: lapEvent,
+        failed_to_advance: actualMakes > 0 && actualMakes < threshold,
+        missed_all: actualMakes === 0
+      }],
+      best_score: playerState.best_score
+    };
+
+    // Immediate UI update
+    queryClient.setQueryData(['game', gameId], {
+      ...game,
+      atw_state: {
+        ...game.atw_state,
+        [playerName]: updatedState
+      },
+      total_points: {
+        ...game.total_points,
+        [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
+      }
+    });
+
+    // Show dialog immediately if missed
+    if (madePutts === 0) {
+      setShowConfirmDialog(true);
+    }
+
+    // Debounced DB sync
+    const pending = { madePutts, showDialog: madePutts === 0 };
+    pendingUpdateRef.current = pending;
+    setPendingUpdates(prev => [...prev, pending]);
+    
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    
+    updateTimeoutRef.current = setTimeout(() => {
+      if (pendingUpdateRef.current) {
+        submitTurnMutation.mutate(pendingUpdateRef.current);
+      }
+      pendingUpdateRef.current = null;
+      setPendingUpdates([]);
+    }, ATW_SYNC_DELAY_MS);
+  }, [game, gameId, playerName, queryClient, defaultPlayerState, submitTurnMutation]);
 
     queryClient.invalidateQueries({ queryKey: ['game', gameId] });
     toast.success('Alustad uuesti 5m pealt!');

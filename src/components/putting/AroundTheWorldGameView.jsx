@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     return unsubscribe;
   }, [gameId, queryClient]);
 
-  const defaultPlayerState = {
+  const defaultPlayerState = useMemo(() => ({
     current_distance_index: 0,
     direction: 'UP',
     laps_completed: 0,
@@ -57,7 +57,11 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     best_laps: 0,
     best_accuracy: 0,
     attempts_count: 0
-  };
+  }), []);
+
+  const handleSubmitPutts = useCallback((madePutts) => {
+    submitTurnMutation.mutate({ madePutts, showDialog: madePutts === 0 });
+  }, []);
 
   const submitTurnMutation = useMutation({
     onMutate: async ({ madePutts }) => {
@@ -224,16 +228,11 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
 
 
-  const handleSubmitPutts = (madePutts) => {
-    // Made (1) = just update, Missed (0) = update AND show dialog
-    submitTurnMutation.mutate({ madePutts, showDialog: madePutts === 0 });
-  };
-
-  const handleFinish = () => {
+  const handleFinish = useCallback(() => {
     setShowConfirmDialog(false);
-  };
+  }, []);
 
-  const handleRetry = async () => {
+  const handleRetry = useCallback(async () => {
     setShowConfirmDialog(false);
 
     const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
@@ -272,7 +271,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
     queryClient.invalidateQueries({ queryKey: ['game', gameId] });
     toast.success('Alustad uuesti 5m pealt!');
-  };
+  }, [game, gameId, playerName, queryClient]);
 
   const completeGameMutation = useMutation({
     mutationFn: async () => {
@@ -322,11 +321,11 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     }
   });
 
-  const handleCompleteGame = () => {
+  const handleCompleteGame = useCallback(() => {
     completeGameMutation.mutate();
-  };
+  }, [completeGameMutation]);
 
-  const handlePlayAgain = async () => {
+  const handlePlayAgain = useCallback(async () => {
     const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
     const currentScore = game.total_points?.[playerName] || 0;
     const bestScore = Math.max(playerState.best_score || 0, currentScore);
@@ -355,7 +354,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     });
 
     queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-  };
+  }, [game, gameId, playerName, queryClient]);
 
   const undoMutation = useMutation({
     mutationFn: async () => {
@@ -413,33 +412,44 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     }
   });
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     undoMutation.mutate();
-  };
+  }, [undoMutation]);
 
-  if (isLoading || !game) {
+  const config = game?.atw_config;
+  const playerState = useMemo(() => 
+    ({ ...defaultPlayerState, ...(game?.atw_state?.[playerName] || {}) }),
+    [game?.atw_state, playerName, defaultPlayerState]
+  );
+
+  const gameStats = useMemo(() => {
+    if (!game || !config) return null;
+    
+    const currentDistance = config.distances[playerState.current_distance_index];
+    const totalScore = game.total_points?.[playerName] || 0;
+    const bestScore = playerState.best_score || 0;
+    const makeRate = playerState.total_putts > 0 
+      ? ((playerState.total_makes / playerState.total_putts) * 100).toFixed(0) 
+      : 0;
+
+    const difficultyLabels = {
+      easy: 'Easy',
+      medium: 'Medium',
+      hard: 'Hard',
+      ultra_hard: 'Ultra Hard',
+      impossible: 'Impossible'
+    };
+
+    const difficultyLabel = difficultyLabels[config.difficulty] || 'Medium';
+    
+    return { currentDistance, totalScore, bestScore, makeRate, difficultyLabel };
+  }, [game, config, playerState, playerName]);
+
+  if (isLoading || !game || !gameStats) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  const config = game.atw_config;
-  const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
-
-  const currentDistance = config.distances[playerState.current_distance_index];
-  const totalScore = game.total_points?.[playerName] || 0;
-  const bestScore = playerState.best_score || 0;
-  const makeRate = playerState.total_putts > 0 
-    ? ((playerState.total_makes / playerState.total_putts) * 100).toFixed(0) 
-    : 0;
-
-  const difficultyLabels = {
-    easy: 'Easy',
-    medium: 'Medium',
-    hard: 'Hard',
-    ultra_hard: 'Ultra Hard',
-    impossible: 'Impossible'
-  };
-
-  const difficultyLabel = difficultyLabels[config.difficulty] || 'Medium';
+  const { currentDistance, totalScore, bestScore, makeRate, difficultyLabel } = gameStats;
 
   // Leaderboard view
   if (showLeaderboard) {
@@ -464,7 +474,55 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     );
   }
 
-  const ConfirmRoundDialog = ({ isOpen, onFinish, onRetry, onComplete }) => {
+  return game.status === 'completed' ? (
+    <CompletedGameView 
+      game={game}
+      playerState={playerState}
+      playerName={playerName}
+      totalScore={totalScore}
+      bestScore={bestScore}
+      makeRate={makeRate}
+      difficultyLabel={difficultyLabel}
+      config={config}
+      isSolo={isSolo}
+      showConfirmDialog={showConfirmDialog}
+      handleFinish={handleFinish}
+      handleRetry={handleRetry}
+      handleCompleteGame={handleCompleteGame}
+      setShowConfirmDialog={setShowConfirmDialog}
+      gameId={gameId}
+      submitToLeaderboardMutation={submitToLeaderboardMutation}
+      user={user}
+    />
+  ) : (
+    <ActiveGameView 
+      game={game}
+      playerState={playerState}
+      playerName={playerName}
+      currentDistance={currentDistance}
+      totalScore={totalScore}
+      bestScore={bestScore}
+      makeRate={makeRate}
+      difficultyLabel={difficultyLabel}
+      config={config}
+      isSolo={isSolo}
+      hideScore={hideScore}
+      setHideScore={setHideScore}
+      handleSubmitPutts={handleSubmitPutts}
+      handleUndo={handleUndo}
+      undoMutation={undoMutation}
+      showConfirmDialog={showConfirmDialog}
+      handleFinish={handleFinish}
+      handleRetry={handleRetry}
+      setShowConfirmDialog={setShowConfirmDialog}
+      gameId={gameId}
+      submitTurnMutation={submitTurnMutation}
+    />
+  );
+}
+
+// Memoized dialog component
+const ConfirmRoundDialog = React.memo(({ isOpen, onFinish, onRetry, onComplete }) => {
       if (!isOpen) return null;
 
       return (
@@ -532,15 +590,20 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
             </div>
           </div>
         </div>
-      );
-    };
+        );
+        });
 
-  // Completed game view
-  if (game.status === 'completed') {
-    const attemptsCount = (playerState.attempts_count || 0) + 1;
-
-    // Get failed turns
-    const failedTurns = playerState.history.filter(turn => turn.failed_to_advance || turn.missed_all);
+        // Memoized completed game view
+        const CompletedGameView = React.memo(({ 
+        game, playerState, playerName, totalScore, bestScore, makeRate, difficultyLabel, 
+        config, isSolo, showConfirmDialog, handleFinish, handleRetry, handleCompleteGame,
+        setShowConfirmDialog, gameId, submitToLeaderboardMutation, user 
+        }) => {
+        const attemptsCount = (playerState.attempts_count || 0) + 1;
+        const failedTurns = useMemo(() => 
+        playerState.history.filter(turn => turn.failed_to_advance || turn.missed_all),
+        [playerState.history]
+        );
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -677,8 +740,15 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         </div>
       </div>
     );
-  }
+});
 
+// Memoized active game view
+const ActiveGameView = React.memo(({ 
+  game, playerState, playerName, currentDistance, totalScore, bestScore, makeRate, 
+  difficultyLabel, config, isSolo, hideScore, setHideScore, handleSubmitPutts, 
+  handleUndo, undoMutation, showConfirmDialog, handleFinish, handleRetry, 
+  setShowConfirmDialog, gameId, submitTurnMutation 
+}) => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <ConfirmRoundDialog
@@ -838,4 +908,4 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       </div>
     </div>
   );
-}
+});

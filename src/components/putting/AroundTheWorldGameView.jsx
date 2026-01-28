@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import ATWLeaderboard from './ATWLeaderboard';
 
+
+
 export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -59,46 +61,11 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     attempts_count: 0
   }), []);
 
-  /**
-   * IMPORTANT:
-   * Hooks (useMemo etc.) must always run before any early return,
-   * otherwise React can crash with a white screen (hooks order mismatch).
-   */
-  const config = game?.atw_config;
-
-  const playerState = useMemo(() =>
-    ({ ...defaultPlayerState, ...(game?.atw_state?.[playerName] || {}) }),
-    [game?.atw_state, playerName, defaultPlayerState]
-  );
-
-  const gameStats = useMemo(() => {
-    if (!config) return null;
-
-    const currentDistance = config.distances[playerState.current_distance_index || 0];
-    const totalScore = game?.total_points?.[playerName] || 0;
-    const bestScore = playerState.best_score || 0;
-    const makeRate = playerState.total_putts > 0
-      ? ((playerState.total_makes / playerState.total_putts) * 100).toFixed(0)
-      : 0;
-
-    const difficultyLabels = {
-      easy: 'Easy',
-      medium: 'Medium',
-      hard: 'Hard',
-      ultra_hard: 'Ultra Hard',
-      impossible: 'Impossible'
-    };
-
-    const difficultyLabel = difficultyLabels[config.difficulty] || 'Medium';
-
-    return { currentDistance, totalScore, bestScore, makeRate, difficultyLabel };
-  }, [game, config, playerState, playerName]);
-
   const handleSubmitPutts = useCallback((madePutts) => {
     // Immediate local update for instant feedback
     const config = game.atw_config;
     const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
-
+    
     const currentIndex = playerState.current_distance_index;
     const direction = playerState.direction;
     const threshold = config.advance_threshold;
@@ -109,66 +76,76 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     let newDirection = direction;
     let lapEvent = false;
 
-    // Movement logic: determine whether player advances based on threshold (madePutts param)
-    if (madePutts >= threshold) {
+    if (actualMakes >= threshold) {
       if (direction === 'UP') {
-        if (currentIndex < distances.length - 1) {
-          newIndex = currentIndex + 1;
-        } else {
-          // reached top -> start going down, lap completed
+        newIndex = Math.min(currentIndex + 1, distances.length - 1);
+        if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
           newDirection = 'DOWN';
-          lapEvent = true;
         }
       } else {
-        if (currentIndex > 0) {
-          newIndex = currentIndex - 1;
-        } else {
-          // reached bottom -> start going up, lap completed
+        newIndex = Math.max(currentIndex - 1, 0);
+        if (newIndex === 0 && currentIndex > 0) {
           newDirection = 'UP';
           lapEvent = true;
         }
       }
+    } else if (actualMakes === 0) {
+      newIndex = 0;
     }
 
     const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * config.discs_per_turn : 0;
 
-    const newTurn = {
-      timestamp: new Date().toISOString(),
-      distance: distances[currentIndex],
-      made_putts: actualMakes,
-      direction: direction,
-      moved_to_distance: distances[newIndex],
-      lap_event: lapEvent,
-      points_awarded: pointsAwarded
-    };
-
     const updatedState = {
-      ...playerState,
       current_distance_index: newIndex,
       direction: newDirection,
       laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
       turns_played: playerState.turns_played + 1,
       total_makes: playerState.total_makes + actualMakes,
       total_putts: playerState.total_putts + config.discs_per_turn,
-      history: [...(playerState.history || []), newTurn],
-      current_round_draft: { attempts: [], is_finalized: false }
+      current_round_draft: { attempts: [], is_finalized: false },
+      history: [...playerState.history, {
+        turn_number: playerState.turns_played + 1,
+        distance: distances[currentIndex],
+        direction: direction,
+        made_putts: actualMakes,
+        moved_to_distance: distances[newIndex],
+        points_awarded: pointsAwarded,
+        lap_event: lapEvent,
+        failed_to_advance: actualMakes > 0 && actualMakes < threshold,
+        missed_all: actualMakes === 0
+      }],
+      best_score: playerState.best_score
     };
 
-    // Local optimistic update
+    // Immediate UI update
     queryClient.setQueryData(['game', gameId], {
       ...game,
       atw_state: {
-        ...(game.atw_state || {}),
+        ...game.atw_state,
         [playerName]: updatedState
       },
       total_points: {
-        ...(game.total_points || {}),
+        ...game.total_points,
         [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
       }
     });
 
-    // Batch updates to avoid spamming writes
-    setPendingUpdates(prev => [...prev, { madePutts }]);
+    // Show dialog immediately if missed
+    if (madePutts === 0) {
+      setShowConfirmDialog(true);
+    }
+
+    // Debounced DB sync
+    setPendingUpdates(prev => [...prev, { madePutts, showDialog: madePutts === 0 }]);
+    
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    
+    updateTimeoutRef.current = setTimeout(() => {
+      submitTurnMutation.mutate({ madePutts, showDialog: madePutts === 0 });
+      setPendingUpdates([]);
+    }, 300);
   }, [game, gameId, playerName, queryClient, defaultPlayerState]);
 
   const submitTurnMutation = useMutation({
@@ -180,52 +157,55 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       const direction = playerState.direction;
       const threshold = config.advance_threshold;
       const distances = config.distances;
+
+      // For Made button - assume all discs made
       const actualMakes = madePutts === 1 ? config.discs_per_turn : 0;
 
       let newIndex = currentIndex;
       let newDirection = direction;
       let lapEvent = false;
 
-      if (madePutts >= threshold) {
+      if (actualMakes >= threshold) {
+        // Advance
         if (direction === 'UP') {
-          if (currentIndex < distances.length - 1) {
-            newIndex = currentIndex + 1;
-          } else {
+          newIndex = Math.min(currentIndex + 1, distances.length - 1);
+          if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
             newDirection = 'DOWN';
-            lapEvent = true;
           }
         } else {
-          if (currentIndex > 0) {
-            newIndex = currentIndex - 1;
-          } else {
+          newIndex = Math.max(currentIndex - 1, 0);
+          if (newIndex === 0 && currentIndex > 0) {
             newDirection = 'UP';
             lapEvent = true;
           }
         }
+      } else if (actualMakes === 0) {
+        // Missed all - reset to 5m
+        newIndex = 0;
       }
 
       const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * config.discs_per_turn : 0;
 
-      const newTurn = {
-        timestamp: new Date().toISOString(),
-        distance: distances[currentIndex],
-        made_putts: actualMakes,
-        direction: direction,
-        moved_to_distance: distances[newIndex],
-        lap_event: lapEvent,
-        points_awarded: pointsAwarded
-      };
-
       const updatedState = {
-        ...playerState,
         current_distance_index: newIndex,
         direction: newDirection,
         laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
         turns_played: playerState.turns_played + 1,
         total_makes: playerState.total_makes + actualMakes,
         total_putts: playerState.total_putts + config.discs_per_turn,
-        history: [...(playerState.history || []), newTurn],
-        current_round_draft: { attempts: [], is_finalized: false }
+        current_round_draft: { attempts: [], is_finalized: false },
+        history: [...playerState.history, {
+          turn_number: playerState.turns_played + 1,
+          distance: distances[currentIndex],
+          direction: direction,
+          made_putts: actualMakes,
+          moved_to_distance: distances[newIndex],
+          points_awarded: pointsAwarded,
+          lap_event: lapEvent,
+          failed_to_advance: actualMakes > 0 && actualMakes < threshold,
+          missed_all: actualMakes === 0
+        }],
+        best_score: playerState.best_score
       };
 
       await base44.entities.Game.update(gameId, {
@@ -239,47 +219,104 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         }
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-    },
-    onError: () => {
+    onError: (err) => {
       toast.error('Viga tulemuse salvestamisel');
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
     }
   });
 
-  // Debounce saving pending updates
-  useEffect(() => {
-    if (!pendingUpdates.length) return;
 
-    if (updateTimeoutRef.current) {
-      clearTimeout(updateTimeoutRef.current);
-    }
 
-    updateTimeoutRef.current = setTimeout(async () => {
-      const updatesToSave = pendingUpdates[pendingUpdates.length - 1];
-      setPendingUpdates([]);
+  const handleFinish = useCallback(() => {
+    setShowConfirmDialog(false);
+  }, []);
 
-      try {
-        await submitTurnMutation.mutateAsync(updatesToSave);
-      } catch (e) {
-        // error handled in mutation
+  const handleRetry = useCallback(async () => {
+    setShowConfirmDialog(false);
+
+    const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
+    const currentScore = game.total_points?.[playerName] || 0;
+    const bestScore = game.atw_state[playerName]?.best_score || 0;
+
+    const currentAccuracy = playerState.total_putts > 0 
+      ? ((playerState.total_makes / playerState.total_putts) * 100) 
+      : 0;
+    const bestAccuracy = playerState.best_accuracy || 0;
+
+    const resetState = {
+      current_distance_index: 0,
+      direction: 'UP',
+      laps_completed: 0,
+      turns_played: 0,
+      total_makes: 0,
+      total_putts: 0,
+      current_round_draft: { attempts: [], is_finalized: false },
+      history: [],
+      best_score: Math.max(bestScore, currentScore),
+      best_laps: Math.max(playerState.best_laps || 0, playerState.laps_completed || 0),
+      best_accuracy: Math.max(bestAccuracy, currentAccuracy)
+    };
+
+    await base44.entities.Game.update(gameId, {
+      atw_state: {
+        ...game.atw_state,
+        [playerName]: resetState
+      },
+      total_points: {
+        ...game.total_points,
+        [playerName]: 0
       }
-    }, 350);
+    });
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingUpdates]);
+    queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+    toast.success('Alustad uuesti 5m pealt!');
+  }, [game, gameId, playerName, queryClient]);
 
   const completeGameMutation = useMutation({
     mutationFn: async () => {
-      await base44.entities.Game.update(gameId, { status: 'completed' });
+      const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
+      const currentScore = game.total_points?.[playerName] || 0;
+      const bestScore = Math.max(playerState.best_score || 0, currentScore);
+
+      await base44.entities.Game.update(gameId, {
+        status: 'completed',
+        atw_state: {
+          ...game.atw_state,
+          [playerName]: {
+            ...playerState,
+            best_score: bestScore
+          }
+        }
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-      toast.success('Mäng lõpetatud');
+      setShowConfirmDialog(false);
+    }
+  });
+
+  const submitToLeaderboardMutation = useMutation({
+    mutationFn: async () => {
+      const madePutts = playerState.total_makes;
+      const totalPutts = playerState.total_putts;
+      const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+
+      return await base44.entities.LeaderboardEntry.create({
+        game_id: game.id,
+        player_email: user?.email || 'unknown',
+        player_name: playerName,
+        game_type: 'around_the_world',
+        score: totalScore,
+        accuracy: Math.round(accuracy * 10) / 10,
+        made_putts: madePutts,
+        total_putts: totalPutts,
+        leaderboard_type: 'general',
+        player_gender: user?.gender || 'M',
+        date: new Date().toISOString()
+      });
     },
-    onError: () => {
-      toast.error('Viga mängu lõpetamisel');
+    onSuccess: () => {
+      toast.success('Result submitted to leaderboard!');
     }
   });
 
@@ -316,34 +353,31 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     });
 
     queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-  }, [game, gameId, playerName, queryClient, defaultPlayerState]);
+  }, [game, gameId, playerName, queryClient]);
 
   const undoMutation = useMutation({
     mutationFn: async () => {
       const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
-
+      
       if (!playerState.history || playerState.history.length === 0) {
         throw new Error('Pole midagi tagasi võtta');
       }
 
       const lastTurn = playerState.history[playerState.history.length - 1];
       const newHistory = playerState.history.slice(0, -1);
-
+      
       // Find previous state
       let previousIndex = 0;
       let previousDirection = 'UP';
       let previousLaps = 0;
-
+      
       if (newHistory.length > 0) {
         const prevTurn = newHistory[newHistory.length - 1];
-        const cfg = game.atw_config; // ensure config exists in this scope
-        const distances = cfg.distances;
+        const distances = config.distances;
         previousIndex = distances.indexOf(prevTurn.moved_to_distance);
         previousDirection = prevTurn.direction;
         previousLaps = playerState.laps_completed - (lastTurn.lap_event ? 1 : 0);
       }
-
-      const cfg2 = game.atw_config;
 
       const updatedState = {
         ...playerState,
@@ -352,7 +386,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         laps_completed: previousLaps,
         turns_played: playerState.turns_played - 1,
         total_makes: playerState.total_makes - lastTurn.made_putts,
-        total_putts: playerState.total_putts - cfg2.discs_per_turn,
+        total_putts: playerState.total_putts - config.discs_per_turn,
         history: newHistory,
         current_round_draft: { attempts: [], is_finalized: false }
       };
@@ -381,10 +415,36 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     undoMutation.mutate();
   }, [undoMutation]);
 
-  // Early return MUST be after hooks
   if (isLoading || !game || !game.atw_config) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
+
+  const config = game.atw_config;
+  const playerState = useMemo(() => 
+    ({ ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) }),
+    [game.atw_state, playerName, defaultPlayerState]
+  );
+
+  const gameStats = useMemo(() => {
+    const currentDistance = config.distances[playerState.current_distance_index || 0];
+    const totalScore = game.total_points?.[playerName] || 0;
+    const bestScore = playerState.best_score || 0;
+    const makeRate = playerState.total_putts > 0 
+      ? ((playerState.total_makes / playerState.total_putts) * 100).toFixed(0) 
+      : 0;
+
+    const difficultyLabels = {
+      easy: 'Easy',
+      medium: 'Medium',
+      hard: 'Hard',
+      ultra_hard: 'Ultra Hard',
+      impossible: 'Impossible'
+    };
+
+    const difficultyLabel = difficultyLabels[config.difficulty] || 'Medium';
+    
+    return { currentDistance, totalScore, bestScore, makeRate, difficultyLabel };
+  }, [game, config, playerState, playerName]);
 
   const { currentDistance, totalScore, bestScore, makeRate, difficultyLabel } = gameStats || {};
 
@@ -400,11 +460,23 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   // Leaderboard view
   if (showLeaderboard) {
     return (
-      <ATWLeaderboard
-        game={game}
-        playerName={playerName}
-        onBack={() => setShowLeaderboard(false)}
-      />
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+        <div className="max-w-4xl mx-auto px-4 pt-8 pb-12">
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={() => setShowLeaderboard(false)}
+              className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span className="font-medium">Tagasi</span>
+            </button>
+            <h1 className="text-2xl font-bold text-slate-800">{game.name}</h1>
+            <div className="w-16" />
+          </div>
+          
+          <ATWLeaderboard game={game} />
+        </div>
+      </div>
     );
   }
 

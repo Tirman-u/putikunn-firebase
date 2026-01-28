@@ -435,65 +435,98 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     }
   }, [game, gameId, handleCompleteGame, isSolo, playerName]);
 
+  const buildUndoPayload = useCallback(() => {
+    const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
+
+    if (!playerState.history || playerState.history.length === 0) {
+      throw new Error('Pole midagi tagasi võtta');
+    }
+
+    const lastTurn = playerState.history[playerState.history.length - 1];
+    const newHistory = playerState.history.slice(0, -1);
+
+    // Find previous state
+    let previousIndex = 0;
+    let previousDirection = 'UP';
+    let previousLaps = 0;
+
+    if (newHistory.length > 0) {
+      const prevTurn = newHistory[newHistory.length - 1];
+      const distances = config.distances;
+      previousIndex = distances.indexOf(prevTurn.moved_to_distance);
+      previousDirection = prevTurn.direction;
+      previousLaps = playerState.laps_completed - (lastTurn.lap_event ? 1 : 0);
+    }
+
+    const updatedState = {
+      ...playerState,
+      current_distance_index: previousIndex,
+      direction: previousDirection,
+      laps_completed: previousLaps,
+      turns_played: playerState.turns_played - 1,
+      total_makes: playerState.total_makes - lastTurn.made_putts,
+      total_putts: playerState.total_putts - config.discs_per_turn,
+      history: newHistory,
+      current_round_draft: { attempts: [], is_finalized: false }
+    };
+
+    const nextAtwState = {
+      ...game.atw_state,
+      [playerName]: updatedState
+    };
+
+    const nextTotalPoints = {
+      ...game.total_points,
+      [playerName]: Math.max(0, (game.total_points?.[playerName] || 0) - lastTurn.points_awarded)
+    };
+
+    return { nextAtwState, nextTotalPoints };
+  }, [config, defaultPlayerState, game, playerName]);
+
   const undoMutation = useMutation({
-    mutationFn: async () => {
-      const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
-      
-      if (!playerState.history || playerState.history.length === 0) {
-        throw new Error('Pole midagi tagasi võtta');
-      }
-
-      const lastTurn = playerState.history[playerState.history.length - 1];
-      const newHistory = playerState.history.slice(0, -1);
-      
-      // Find previous state
-      let previousIndex = 0;
-      let previousDirection = 'UP';
-      let previousLaps = 0;
-      
-      if (newHistory.length > 0) {
-        const prevTurn = newHistory[newHistory.length - 1];
-        const distances = config.distances;
-        previousIndex = distances.indexOf(prevTurn.moved_to_distance);
-        previousDirection = prevTurn.direction;
-        previousLaps = playerState.laps_completed - (lastTurn.lap_event ? 1 : 0);
-      }
-
-      const updatedState = {
-        ...playerState,
-        current_distance_index: previousIndex,
-        direction: previousDirection,
-        laps_completed: previousLaps,
-        turns_played: playerState.turns_played - 1,
-        total_makes: playerState.total_makes - lastTurn.made_putts,
-        total_putts: playerState.total_putts - config.discs_per_turn,
-        history: newHistory,
-        current_round_draft: { attempts: [], is_finalized: false }
-      };
-
+    mutationFn: async ({ nextAtwState, nextTotalPoints }) => {
       await base44.entities.Game.update(gameId, {
-        atw_state: {
-          ...game.atw_state,
-          [playerName]: updatedState
-        },
-        total_points: {
-          ...game.total_points,
-          [playerName]: Math.max(0, (game.total_points?.[playerName] || 0) - lastTurn.points_awarded)
-        }
+        atw_state: nextAtwState,
+        total_points: nextTotalPoints
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
       toast.success('Viimane käik tühistatud');
     },
     onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
       toast.error(error.message || 'Viga tagasivõtmisel');
     }
   });
 
   const handleUndo = useCallback(() => {
-    undoMutation.mutate();
-  }, [undoMutation]);
+    if (!config || !game) return;
+
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    pendingUpdateRef.current = null;
+    setPendingUpdates([]);
+
+    let payload;
+    try {
+      payload = buildUndoPayload();
+    } catch (error) {
+      toast.error(error.message || 'Viga tagasivõtmisel');
+      return;
+    }
+
+    queryClient.setQueryData(['game', gameId], prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        atw_state: payload.nextAtwState,
+        total_points: payload.nextTotalPoints
+      };
+    });
+
+    undoMutation.mutate(payload);
+  }, [buildUndoPayload, config, game, gameId, queryClient, undoMutation]);
 
   // Cleanup timeout on unmount
   React.useEffect(() => {

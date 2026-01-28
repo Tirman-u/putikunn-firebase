@@ -23,23 +23,25 @@ export default function JoinGame({ onJoin, onBack }) {
   const { data: recentGames = [] } = useQuery({
     queryKey: ['recent-games'],
     queryFn: async () => {
-      const allGames = await base44.entities.Game.list();
-      const activeGames = allGames
-        .filter(g => (g.status === 'setup' || g.status === 'active') && g.pin !== null && g.pin !== '0000')
-        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-        .slice(0, 10);
-      return activeGames;
+      const activeGames = await base44.entities.Game.filter({
+        status: { $in: ['setup', 'active'] }
+      }, '-date', 10);
+      return activeGames.filter(g => g.pin !== null && g.pin !== '0000');
     },
     enabled: !!user,
-    refetchInterval: 2000
+    refetchInterval: false
   });
 
   React.useEffect(() => {
+    if (!user) return;
+
     const unsubscribe = base44.entities.Game.subscribe((event) => {
-      queryClient.invalidateQueries({ queryKey: ['recent-games'] });
+      if (event.type === 'create' || event.type === 'update') {
+        queryClient.invalidateQueries({ queryKey: ['recent-games'] });
+      }
     });
     return unsubscribe;
-  }, [queryClient]);
+  }, [queryClient, user]);
 
   const getGameTypeName = (type) => {
     const names = {

@@ -38,13 +38,25 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],
-    queryFn: () => base44.entities.Game.list().then(games => games.find(g => g.id === gameId)),
-    refetchInterval: (data) => {
-      // Only refetch for multiplayer games
-      if (data?.pin === '0000') return false;
-      return 2000;
-    }
+    queryFn: async () => {
+      const games = await base44.entities.Game.filter({ id: gameId });
+      return games[0];
+    },
+    refetchInterval: false
   });
+
+  // Real-time subscription for multiplayer games
+  React.useEffect(() => {
+    if (!gameId || game?.pin === '0000') return;
+
+    const unsubscribe = base44.entities.Game.subscribe((event) => {
+      if (event.id === gameId && (event.type === 'update' || event.type === 'delete')) {
+        queryClient.setQueryData(['game', gameId], event.data);
+      }
+    });
+
+    return unsubscribe;
+  }, [gameId, game?.pin, queryClient]);
 
   const isSoloGame = game?.pin === '0000';
 

@@ -18,9 +18,25 @@ export default function HostView({ gameId, onExit }) {
 
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],
-    queryFn: () => base44.entities.Game.list().then(games => games.find(g => g.id === gameId)),
-    refetchInterval: 2000
+    queryFn: async () => {
+      const games = await base44.entities.Game.filter({ id: gameId });
+      return games[0];
+    },
+    refetchInterval: false
   });
+
+  // Real-time subscription
+  useEffect(() => {
+    if (!gameId) return;
+
+    const unsubscribe = base44.entities.Game.subscribe((event) => {
+      if (event.id === gameId && (event.type === 'update' || event.type === 'delete')) {
+        queryClient.setQueryData(['game', gameId], event.data);
+      }
+    });
+
+    return unsubscribe;
+  }, [gameId, queryClient]);
 
   const userRole = user?.app_role || 'user';
   const canSubmitDiscgolf = ['trainer', 'admin', 'super_admin'].includes(userRole);

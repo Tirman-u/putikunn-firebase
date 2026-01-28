@@ -16,6 +16,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [hideScore, setHideScore] = useState(false);
+  const [pendingUpdates, setPendingUpdates] = useState([]);
+  const updateTimeoutRef = React.useRef(null);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -60,87 +62,94 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   }), []);
 
   const handleSubmitPutts = useCallback((madePutts) => {
-    submitTurnMutation.mutate({ madePutts, showDialog: madePutts === 0 });
-  }, []);
+    // Immediate local update for instant feedback
+    const config = game.atw_config;
+    const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
+    
+    const currentIndex = playerState.current_distance_index;
+    const direction = playerState.direction;
+    const threshold = config.advance_threshold;
+    const distances = config.distances;
+    const actualMakes = madePutts === 1 ? config.discs_per_turn : 0;
+
+    let newIndex = currentIndex;
+    let newDirection = direction;
+    let lapEvent = false;
+
+    if (actualMakes >= threshold) {
+      if (direction === 'UP') {
+        newIndex = Math.min(currentIndex + 1, distances.length - 1);
+        if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
+          newDirection = 'DOWN';
+        }
+      } else {
+        newIndex = Math.max(currentIndex - 1, 0);
+        if (newIndex === 0 && currentIndex > 0) {
+          newDirection = 'UP';
+          lapEvent = true;
+        }
+      }
+    } else if (actualMakes === 0) {
+      newIndex = 0;
+    }
+
+    const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * config.discs_per_turn : 0;
+
+    const updatedState = {
+      current_distance_index: newIndex,
+      direction: newDirection,
+      laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
+      turns_played: playerState.turns_played + 1,
+      total_makes: playerState.total_makes + actualMakes,
+      total_putts: playerState.total_putts + config.discs_per_turn,
+      current_round_draft: { attempts: [], is_finalized: false },
+      history: [...playerState.history, {
+        turn_number: playerState.turns_played + 1,
+        distance: distances[currentIndex],
+        direction: direction,
+        made_putts: actualMakes,
+        moved_to_distance: distances[newIndex],
+        points_awarded: pointsAwarded,
+        lap_event: lapEvent,
+        failed_to_advance: actualMakes > 0 && actualMakes < threshold,
+        missed_all: actualMakes === 0
+      }],
+      best_score: playerState.best_score
+    };
+
+    // Immediate UI update
+    queryClient.setQueryData(['game', gameId], {
+      ...game,
+      atw_state: {
+        ...game.atw_state,
+        [playerName]: updatedState
+      },
+      total_points: {
+        ...game.total_points,
+        [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
+      }
+    });
+
+    // Show dialog immediately if missed
+    if (madePutts === 0) {
+      setShowConfirmDialog(true);
+    }
+
+    // Debounced DB sync
+    setPendingUpdates(prev => [...prev, { madePutts, showDialog: madePutts === 0 }]);
+    
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    
+    updateTimeoutRef.current = setTimeout(() => {
+      submitTurnMutation.mutate({ madePutts, showDialog: madePutts === 0 });
+      setPendingUpdates([]);
+    }, 300);
+  }, [game, gameId, playerName, queryClient, defaultPlayerState]);
 
   const submitTurnMutation = useMutation({
-    onMutate: async ({ madePutts }) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['game', gameId] });
-
-      // Snapshot previous value
-      const previousGame = queryClient.getQueryData(['game', gameId]);
-
-      // Optimistically update to the new value
-      const config = game.atw_config;
-      const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
-      
-      const currentIndex = playerState.current_distance_index;
-      const direction = playerState.direction;
-      const threshold = config.advance_threshold;
-      const distances = config.distances;
-      const actualMakes = madePutts === 1 ? config.discs_per_turn : 0;
-
-      let newIndex = currentIndex;
-      let newDirection = direction;
-      let lapEvent = false;
-
-      if (actualMakes >= threshold) {
-        if (direction === 'UP') {
-          newIndex = Math.min(currentIndex + 1, distances.length - 1);
-          if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
-            newDirection = 'DOWN';
-          }
-        } else {
-          newIndex = Math.max(currentIndex - 1, 0);
-          if (newIndex === 0 && currentIndex > 0) {
-            newDirection = 'UP';
-            lapEvent = true;
-          }
-        }
-      } else if (actualMakes === 0) {
-        newIndex = 0;
-      }
-
-      const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * config.discs_per_turn : 0;
-
-      const updatedState = {
-        current_distance_index: newIndex,
-        direction: newDirection,
-        laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
-        turns_played: playerState.turns_played + 1,
-        total_makes: playerState.total_makes + actualMakes,
-        total_putts: playerState.total_putts + config.discs_per_turn,
-        current_round_draft: { attempts: [], is_finalized: false },
-        history: [...playerState.history, {
-          turn_number: playerState.turns_played + 1,
-          distance: distances[currentIndex],
-          direction: direction,
-          made_putts: actualMakes,
-          moved_to_distance: distances[newIndex],
-          points_awarded: pointsAwarded,
-          lap_event: lapEvent,
-          failed_to_advance: actualMakes > 0 && actualMakes < threshold,
-          missed_all: actualMakes === 0
-        }],
-        best_score: playerState.best_score
-      };
-
-      queryClient.setQueryData(['game', gameId], {
-        ...game,
-        atw_state: {
-          ...game.atw_state,
-          [playerName]: updatedState
-        },
-        total_points: {
-          ...game.total_points,
-          [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
-        }
-      });
-
-      return { previousGame };
-    },
-    mutationFn: async ({ madePutts, showDialog }) => {
+    mutationFn: async ({ madePutts }) => {
       const config = game.atw_config;
       const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
 
@@ -209,20 +218,10 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
           [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
         }
       });
-
-      return { showDialog };
     },
-    onSuccess: (data) => {
-      if (data.showDialog) {
-        setShowConfirmDialog(true);
-      }
-    },
-    onError: (err, variables, context) => {
-      // Rollback on error
-      if (context?.previousGame) {
-        queryClient.setQueryData(['game', gameId], context.previousGame);
-      }
+    onError: (err) => {
       toast.error('Viga tulemuse salvestamisel');
+      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
     }
   });
 
@@ -880,15 +879,13 @@ const ActiveGameView = React.memo(({
             <div className="grid grid-cols-2 gap-3 mb-3">
               <button
                 onClick={() => handleSubmitPutts(0)}
-                disabled={submitTurnMutation.isPending}
-                className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all disabled:opacity-50"
+                className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 active:scale-95 transition-all"
               >
                 Missed
               </button>
               <button
                 onClick={() => handleSubmitPutts(1)}
-                disabled={submitTurnMutation.isPending}
-                className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all disabled:opacity-50"
+                className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 transition-all"
               >
                 Made
               </button>

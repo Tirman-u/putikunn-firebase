@@ -25,11 +25,24 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],
     queryFn: async () => {
-      const games = await base44.entities.Game.list();
-      return games.find(g => g.id === gameId);
+      const games = await base44.entities.Game.filter({ id: gameId });
+      return games[0];
     },
-    refetchInterval: isSolo ? false : 5000
+    refetchInterval: false
   });
+
+  // Real-time subscription
+  useEffect(() => {
+    if (!gameId) return;
+
+    const unsubscribe = base44.entities.Game.subscribe((event) => {
+      if (event.id === gameId && (event.type === 'update' || event.type === 'delete')) {
+        queryClient.setQueryData(['game', gameId], event.data);
+      }
+    });
+
+    return unsubscribe;
+  }, [gameId, queryClient]);
 
   const defaultPlayerState = {
     current_distance_index: 0,
@@ -47,6 +60,82 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   };
 
   const submitTurnMutation = useMutation({
+    onMutate: async ({ madePutts }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['game', gameId] });
+
+      // Snapshot previous value
+      const previousGame = queryClient.getQueryData(['game', gameId]);
+
+      // Optimistically update to the new value
+      const config = game.atw_config;
+      const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
+      
+      const currentIndex = playerState.current_distance_index;
+      const direction = playerState.direction;
+      const threshold = config.advance_threshold;
+      const distances = config.distances;
+      const actualMakes = madePutts === 1 ? config.discs_per_turn : 0;
+
+      let newIndex = currentIndex;
+      let newDirection = direction;
+      let lapEvent = false;
+
+      if (actualMakes >= threshold) {
+        if (direction === 'UP') {
+          newIndex = Math.min(currentIndex + 1, distances.length - 1);
+          if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
+            newDirection = 'DOWN';
+          }
+        } else {
+          newIndex = Math.max(currentIndex - 1, 0);
+          if (newIndex === 0 && currentIndex > 0) {
+            newDirection = 'UP';
+            lapEvent = true;
+          }
+        }
+      } else if (actualMakes === 0) {
+        newIndex = 0;
+      }
+
+      const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * config.discs_per_turn : 0;
+
+      const updatedState = {
+        current_distance_index: newIndex,
+        direction: newDirection,
+        laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
+        turns_played: playerState.turns_played + 1,
+        total_makes: playerState.total_makes + actualMakes,
+        total_putts: playerState.total_putts + config.discs_per_turn,
+        current_round_draft: { attempts: [], is_finalized: false },
+        history: [...playerState.history, {
+          turn_number: playerState.turns_played + 1,
+          distance: distances[currentIndex],
+          direction: direction,
+          made_putts: actualMakes,
+          moved_to_distance: distances[newIndex],
+          points_awarded: pointsAwarded,
+          lap_event: lapEvent,
+          failed_to_advance: actualMakes > 0 && actualMakes < threshold,
+          missed_all: actualMakes === 0
+        }],
+        best_score: playerState.best_score
+      };
+
+      queryClient.setQueryData(['game', gameId], {
+        ...game,
+        atw_state: {
+          ...game.atw_state,
+          [playerName]: updatedState
+        },
+        total_points: {
+          ...game.total_points,
+          [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
+        }
+      });
+
+      return { previousGame };
+    },
     mutationFn: async ({ madePutts, showDialog }) => {
       const config = game.atw_config;
       const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
@@ -120,10 +209,16 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       return { showDialog };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
       if (data.showDialog) {
         setShowConfirmDialog(true);
       }
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousGame) {
+        queryClient.setQueryData(['game', gameId], context.previousGame);
+      }
+      toast.error('Viga tulemuse salvestamisel');
     }
   });
 

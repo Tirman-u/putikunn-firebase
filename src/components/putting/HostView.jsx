@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { createPageUrl } from '@/utils';
 
 export default function HostView({ gameId, onExit }) {
   const [copied, setCopied] = useState(false);
+  const updateThrottleRef = useRef({ timer: null, latest: null });
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -31,11 +32,33 @@ export default function HostView({ gameId, onExit }) {
 
     const unsubscribe = base44.entities.Game.subscribe((event) => {
       if (event.id === gameId && (event.type === 'update' || event.type === 'delete')) {
-        queryClient.setQueryData(['game', gameId], event.data);
+        const throttle = updateThrottleRef.current;
+        const applyEvent = (evt) => {
+          queryClient.setQueryData(['game', gameId], evt.data);
+        };
+
+        if (!throttle.timer) {
+          applyEvent(event);
+          throttle.timer = setTimeout(() => {
+            if (throttle.latest) {
+              applyEvent(throttle.latest);
+              throttle.latest = null;
+            }
+            throttle.timer = null;
+          }, 1000);
+        } else {
+          throttle.latest = event;
+        }
       }
     });
 
-    return unsubscribe;
+    return () => {
+      if (updateThrottleRef.current.timer) {
+        clearTimeout(updateThrottleRef.current.timer);
+      }
+      updateThrottleRef.current.latest = null;
+      unsubscribe();
+    };
   }, [gameId, queryClient]);
 
   const userRole = user?.app_role || 'user';

@@ -18,10 +18,23 @@ export default function PuttingRecords() {
     queryFn: () => base44.auth.me()
   });
 
+  const currentView = viewTypes.find(v => v.id === selectedView);
+
   const { data: leaderboardEntries = [] } = useQuery({
-    queryKey: ['leaderboard-entries'],
-    queryFn: () => base44.entities.LeaderboardEntry.list(),
-    refetchInterval: 10000
+    queryKey: ['leaderboard-entries', selectedView],
+    queryFn: async () => {
+      if (!currentView) return [];
+      const filter = {
+        leaderboard_type: currentView.leaderboardType,
+      };
+      if (currentView.leaderboardType === 'discgolf_ee') {
+        filter.game_type = 'classic';
+      } else {
+        filter.game_type = currentView.gameType;
+      }
+      return base44.entities.LeaderboardEntry.filter(filter, '-score', 500);
+    },
+    refetchInterval: 30000
   });
 
   const userRole = user?.app_role || 'user';
@@ -48,8 +61,6 @@ export default function PuttingRecords() {
     });
   }
 
-  const currentView = viewTypes.find(v => v.id === selectedView);
-  
   const filteredEntries = leaderboardEntries.filter(entry => {
     if (entry.leaderboard_type !== currentView.leaderboardType) return false;
     

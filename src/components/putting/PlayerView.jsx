@@ -33,6 +33,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const pendingUpdateRef = React.useRef(null);
   const updateTimeoutRef = React.useRef(null);
   const gameIdRef = React.useRef(gameId);
+  const updateThrottleRef = React.useRef({ timer: null, latest: null });
   const queryClient = useQueryClient();
 
   React.useEffect(() => {
@@ -59,11 +60,33 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
     const unsubscribe = base44.entities.Game.subscribe((event) => {
       if (event.id === gameId && (event.type === 'update' || event.type === 'delete')) {
-        queryClient.setQueryData(['game', gameId], event.data);
+        const throttle = updateThrottleRef.current;
+        const applyEvent = (evt) => {
+          queryClient.setQueryData(['game', gameId], evt.data);
+        };
+
+        if (!throttle.timer) {
+          applyEvent(event);
+          throttle.timer = setTimeout(() => {
+            if (throttle.latest) {
+              applyEvent(throttle.latest);
+              throttle.latest = null;
+            }
+            throttle.timer = null;
+          }, 1000);
+        } else {
+          throttle.latest = event;
+        }
       }
     });
 
-    return unsubscribe;
+    return () => {
+      if (updateThrottleRef.current.timer) {
+        clearTimeout(updateThrottleRef.current.timer);
+      }
+      updateThrottleRef.current.latest = null;
+      unsubscribe();
+    };
   }, [gameId, game?.pin, queryClient]);
 
   const isSoloGame = game?.pin === '0000';

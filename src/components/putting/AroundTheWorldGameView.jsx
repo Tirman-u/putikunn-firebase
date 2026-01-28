@@ -20,6 +20,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const ATW_SYNC_DELAY_MS = 1500;
   const pendingUpdateRef = React.useRef(null);
   const updateTimeoutRef = React.useRef(null);
+  const updateThrottleRef = React.useRef({ timer: null, latest: null });
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -41,11 +42,33 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
     const unsubscribe = base44.entities.Game.subscribe((event) => {
       if (event.id === gameId && (event.type === 'update' || event.type === 'delete')) {
-        queryClient.setQueryData(['game', gameId], event.data);
+        const throttle = updateThrottleRef.current;
+        const applyEvent = (evt) => {
+          queryClient.setQueryData(['game', gameId], evt.data);
+        };
+
+        if (!throttle.timer) {
+          applyEvent(event);
+          throttle.timer = setTimeout(() => {
+            if (throttle.latest) {
+              applyEvent(throttle.latest);
+              throttle.latest = null;
+            }
+            throttle.timer = null;
+          }, 1000);
+        } else {
+          throttle.latest = event;
+        }
       }
     });
 
-    return unsubscribe;
+    return () => {
+      if (updateThrottleRef.current.timer) {
+        clearTimeout(updateThrottleRef.current.timer);
+      }
+      updateThrottleRef.current.latest = null;
+      unsubscribe();
+    };
   }, [gameId, isSolo, queryClient]);
 
   const defaultPlayerState = useMemo(() => ({

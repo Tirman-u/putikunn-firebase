@@ -415,16 +415,18 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     undoMutation.mutate();
   }, [undoMutation]);
 
-  const config = game?.atw_config;
+  if (isLoading || !game || !game.atw_config) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  const config = game.atw_config;
   const playerState = useMemo(() => 
-    ({ ...defaultPlayerState, ...(game?.atw_state?.[playerName] || {}) }),
-    [game?.atw_state, playerName, defaultPlayerState]
+    ({ ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) }),
+    [game.atw_state, playerName, defaultPlayerState]
   );
 
   const gameStats = useMemo(() => {
-    if (!game || !config) return null;
-    
-    const currentDistance = config.distances[playerState.current_distance_index];
+    const currentDistance = config.distances[playerState.current_distance_index || 0];
     const totalScore = game.total_points?.[playerName] || 0;
     const bestScore = playerState.best_score || 0;
     const makeRate = playerState.total_putts > 0 
@@ -444,11 +446,16 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     return { currentDistance, totalScore, bestScore, makeRate, difficultyLabel };
   }, [game, config, playerState, playerName]);
 
-  if (isLoading || !game || !gameStats) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
+  const { currentDistance, totalScore, bestScore, makeRate, difficultyLabel } = gameStats || {};
 
-  const { currentDistance, totalScore, bestScore, makeRate, difficultyLabel } = gameStats;
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Leaderboard view
   if (showLeaderboard) {

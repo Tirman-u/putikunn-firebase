@@ -36,6 +36,11 @@ export default class ErrorBoundary extends React.Component {
           <div className="rounded bg-slate-50 p-3 text-xs text-slate-700 break-words">
             {String(error)}
           </div>
+          {error?.stack && (
+            <pre className="mt-3 max-h-60 overflow-auto rounded bg-slate-50 p-3 text-[11px] text-slate-600 whitespace-pre-wrap">
+              {error.stack}
+            </pre>
+          )}
           <button
             onClick={this.handleReload}
             className="mt-4 rounded-lg bg-slate-900 text-white px-4 py-2 text-sm"

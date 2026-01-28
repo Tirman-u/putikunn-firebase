@@ -17,6 +17,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [hideScore, setHideScore] = useState(false);
   const [pendingUpdates, setPendingUpdates] = useState([]);
+  const ATW_SYNC_DELAY_MS = 1500;
+  const pendingUpdateRef = React.useRef(null);
   const updateTimeoutRef = React.useRef(null);
 
   const { data: user } = useQuery({
@@ -136,17 +138,22 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     }
 
     // Debounced DB sync
-    setPendingUpdates(prev => [...prev, { madePutts, showDialog: madePutts === 0 }]);
+    const pending = { madePutts, showDialog: madePutts === 0 };
+    pendingUpdateRef.current = pending;
+    setPendingUpdates(prev => [...prev, pending]);
     
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
     
     updateTimeoutRef.current = setTimeout(() => {
-      submitTurnMutation.mutate({ madePutts, showDialog: madePutts === 0 });
+      if (pendingUpdateRef.current) {
+        submitTurnMutation.mutate(pendingUpdateRef.current);
+      }
+      pendingUpdateRef.current = null;
       setPendingUpdates([]);
-    }, 300);
-  }, [game, gameId, playerName, queryClient, defaultPlayerState]);
+    }, ATW_SYNC_DELAY_MS);
+  }, [game, gameId, playerName, queryClient, defaultPlayerState, submitTurnMutation]);
 
   const submitTurnMutation = useMutation({
     mutationFn: async ({ madePutts }) => {
@@ -229,7 +236,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const handleFinish = useCallback(() => {
     setShowConfirmDialog(false);
-  }, []);
+  }, [submitTurnMutation]);
 
   const handleRetry = useCallback(async () => {
     setShowConfirmDialog(false);
@@ -453,6 +460,10 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     return () => {
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
+      }
+      if (pendingUpdateRef.current) {
+        submitTurnMutation.mutate(pendingUpdateRef.current);
+        pendingUpdateRef.current = null;
       }
     };
   }, []);

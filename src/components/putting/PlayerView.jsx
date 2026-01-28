@@ -29,7 +29,15 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const [streakDistanceSelected, setStreakDistanceSelected] = React.useState(false);
   const [hideScore, setHideScore] = React.useState(false);
   const [localGameState, setLocalGameState] = React.useState(null);
+  const MULTIPLAYER_SYNC_DELAY_MS = 1500;
+  const pendingUpdateRef = React.useRef(null);
+  const updateTimeoutRef = React.useRef(null);
+  const gameIdRef = React.useRef(gameId);
   const queryClient = useQueryClient();
+
+  React.useEffect(() => {
+    gameIdRef.current = gameId;
+  }, [gameId]);
 
   const { data: user } = useQuery({
     queryKey: ['current-user'],
@@ -91,13 +99,47 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         ...data
       }));
     } else {
-      // For multiplayer games, update DB as before
-      updateGameMutation.mutate({
-        id: game.id,
-        data
+      if (!game?.id) return;
+      // For multiplayer games, update local cache immediately and debounce DB writes
+      queryClient.setQueryData(['game', gameId], prev => {
+        if (!prev) return prev;
+        return { ...prev, ...data };
       });
+
+      pendingUpdateRef.current = {
+        ...(pendingUpdateRef.current || {}),
+        ...data
+      };
+
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+
+      updateTimeoutRef.current = setTimeout(() => {
+        if (!pendingUpdateRef.current) return;
+        updateGameMutation.mutate({
+          id: game.id,
+          data: pendingUpdateRef.current
+        });
+        pendingUpdateRef.current = null;
+      }, MULTIPLAYER_SYNC_DELAY_MS);
     }
   };
+
+  React.useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+      if (pendingUpdateRef.current && gameIdRef.current) {
+        updateGameMutation.mutate({
+          id: gameIdRef.current,
+          data: pendingUpdateRef.current
+        });
+        pendingUpdateRef.current = null;
+      }
+    };
+  }, [updateGameMutation]);
 
   // Save solo game to DB when completed
   const saveSoloGameMutation = useMutation({

@@ -144,10 +144,15 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
   const handleFinish = useCallback(() => {
     setShowConfirmDialog(false);
-  }, [submitTurnMutation]);
+  }, []);
 
   const handleRetry = useCallback(async () => {
     setShowConfirmDialog(false);
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    pendingUpdateRef.current = null;
+    setPendingUpdates([]);
 
     const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
     const currentScore = game.total_points?.[playerName] || 0;
@@ -172,17 +177,32 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       best_accuracy: Math.max(bestAccuracy, currentAccuracy)
     };
 
-    await base44.entities.Game.update(gameId, {
-      atw_state: {
-        ...game.atw_state,
-        [playerName]: resetState
-      },
-      total_points: {
-        ...game.total_points,
-        [playerName]: 0
-      }
+    const nextAtwState = {
+      ...game.atw_state,
+      [playerName]: resetState
+    };
+
+    const nextTotalPoints = {
+      ...game.total_points,
+      [playerName]: 0
+    };
+
+    queryClient.setQueryData(['game', gameId], prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        atw_state: nextAtwState,
+        total_points: nextTotalPoints
+      };
     });
-  }, [defaultPlayerState, game, gameId, playerName]);
+
+    await base44.entities.Game.update(gameId, {
+      atw_state: nextAtwState,
+      total_points: nextTotalPoints
+    });
+    queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+    toast.success('Alustad uuesti 5m pealt!');
+  }, [defaultPlayerState, game, gameId, playerName, queryClient]);
 
   const handleSubmitPutts = useCallback((madePutts) => {
     // Immediate local update for instant feedback

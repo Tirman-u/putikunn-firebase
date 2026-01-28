@@ -435,6 +435,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     }
   }, [game, gameId, handleCompleteGame, isSolo, playerName]);
 
+  const config = game?.atw_config;
+
   const buildUndoPayload = useCallback(() => {
     const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
 
@@ -541,7 +543,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     };
   }, []);
 
-  const config = game?.atw_config;
   const playerState = useMemo(
     () => ({ ...defaultPlayerState, ...(game?.atw_state?.[playerName] || {}) }),
     [game?.atw_state, playerName, defaultPlayerState]

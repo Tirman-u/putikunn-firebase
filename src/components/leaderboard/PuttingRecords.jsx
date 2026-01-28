@@ -34,7 +34,7 @@ export default function PuttingRecords() {
     { id: 'general_streak_challenge', label: 'Streak', leaderboardType: 'general', gameType: 'streak_challenge' },
     { id: 'general_random_distance', label: 'Random', leaderboardType: 'general', gameType: 'random_distance' },
     { id: 'general_around_the_world', label: 'Around World', leaderboardType: 'general', gameType: 'around_the_world' },
-    { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'discgolf_ee', gameType: null }
+    { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'discgolf_ee', gameType: 'classic' }
   ];
 
   // Generate last 6 months for filter
@@ -53,9 +53,9 @@ export default function PuttingRecords() {
   const filteredEntries = leaderboardEntries.filter(entry => {
     if (entry.leaderboard_type !== currentView.leaderboardType) return false;
     
-    // For DG.ee view, show all game types
     if (currentView.leaderboardType === 'discgolf_ee') {
-      // No game type filter
+      // DG.ee view: only classic records
+      if (entry.game_type !== 'classic') return false;
     } else {
       if (entry.game_type !== currentView.gameType) return false;
     }

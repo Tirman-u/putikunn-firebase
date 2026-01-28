@@ -17,8 +17,9 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [hideScore, setHideScore] = useState(false);
   const [pendingUpdates, setPendingUpdates] = useState([]);
-  const ATW_SYNC_DELAY_MS = 1500;
-  const pendingUpdateRef = React.useRef(null);
+  const ATW_SYNC_DELAY_MS_SOLO = 1500;
+  const ATW_SYNC_DELAY_MS_MULTI = 250;
+  const pendingUpdateRef = React.useRef([]);
   const updateTimeoutRef = React.useRef(null);
   const updateThrottleRef = React.useRef({ timer: null, latest: null });
 
@@ -87,73 +88,19 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   }), []);
 
   const submitTurnMutation = useMutation({
-    mutationFn: async ({ madePutts }) => {
-      const config = game.atw_config;
-      const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
-
-      const currentIndex = playerState.current_distance_index;
-      const direction = playerState.direction;
-      const threshold = config.advance_threshold;
-      const distances = config.distances;
-
-      // For Made button - assume all discs made
-      const actualMakes = madePutts === 1 ? config.discs_per_turn : 0;
-
-      let newIndex = currentIndex;
-      let newDirection = direction;
-      let lapEvent = false;
-
-      if (actualMakes >= threshold) {
-        // Advance
-        if (direction === 'UP') {
-          newIndex = Math.min(currentIndex + 1, distances.length - 1);
-          if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
-            newDirection = 'DOWN';
-          }
-        } else {
-          newIndex = Math.max(currentIndex - 1, 0);
-          if (newIndex === 0 && currentIndex > 0) {
-            newDirection = 'UP';
-            lapEvent = true;
-          }
-        }
-      } else if (actualMakes === 0) {
-        // Missed all - reset to 5m
-        newIndex = 0;
-      }
-
-      const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * config.discs_per_turn : 0;
-
-      const updatedState = {
-        current_distance_index: newIndex,
-        direction: newDirection,
-        laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
-        turns_played: playerState.turns_played + 1,
-        total_makes: playerState.total_makes + actualMakes,
-        total_putts: playerState.total_putts + config.discs_per_turn,
-        current_round_draft: { attempts: [], is_finalized: false },
-        history: [...playerState.history, {
-          turn_number: playerState.turns_played + 1,
-          distance: distances[currentIndex],
-          direction: direction,
-          made_putts: actualMakes,
-          moved_to_distance: distances[newIndex],
-          points_awarded: pointsAwarded,
-          lap_event: lapEvent,
-          failed_to_advance: actualMakes > 0 && actualMakes < threshold,
-          missed_all: actualMakes === 0
-        }],
-        best_score: playerState.best_score
-      };
+    mutationFn: async ({ updatedState, updatedPoints }) => {
+      const games = await base44.entities.Game.filter({ id: gameId });
+      const latestGame = games?.[0];
+      if (!latestGame) return;
 
       await base44.entities.Game.update(gameId, {
         atw_state: {
-          ...game.atw_state,
+          ...(latestGame.atw_state || {}),
           [playerName]: updatedState
         },
         total_points: {
-          ...game.total_points,
-          [playerName]: (game.total_points?.[playerName] || 0) + pointsAwarded
+          ...(latestGame.total_points || {}),
+          [playerName]: updatedPoints
         }
       });
     },
@@ -174,7 +121,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
-    pendingUpdateRef.current = null;
+    pendingUpdateRef.current = [];
     setPendingUpdates([]);
 
     const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
@@ -303,21 +250,30 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
     // Debounced DB sync
     const pending = { madePutts, showDialog: madePutts === 0 };
-    pendingUpdateRef.current = pending;
+    pendingUpdateRef.current = [...pendingUpdateRef.current, pending];
     setPendingUpdates(prev => [...prev, pending]);
     
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
     
+    const delay = isSolo ? ATW_SYNC_DELAY_MS_SOLO : ATW_SYNC_DELAY_MS_MULTI;
     updateTimeoutRef.current = setTimeout(() => {
-      if (pendingUpdateRef.current) {
-        submitTurnMutation.mutate(pendingUpdateRef.current);
+      if (pendingUpdateRef.current.length) {
+        const latestGame = queryClient.getQueryData(['game', gameId]);
+        const latestState = latestGame?.atw_state?.[playerName];
+        const latestPoints = latestGame?.total_points?.[playerName] || 0;
+        if (latestState) {
+          submitTurnMutation.mutate({
+            updatedState: latestState,
+            updatedPoints: latestPoints
+          });
+        }
       }
-      pendingUpdateRef.current = null;
+      pendingUpdateRef.current = [];
       setPendingUpdates([]);
-    }, ATW_SYNC_DELAY_MS);
-  }, [game, gameId, playerName, queryClient, defaultPlayerState, submitTurnMutation]);
+    }, delay);
+  }, [defaultPlayerState, game, gameId, isSolo, playerName, queryClient, submitTurnMutation]);
 
   const completeGameMutation = useMutation({
     mutationFn: async () => {
@@ -507,7 +463,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
-    pendingUpdateRef.current = null;
+    pendingUpdateRef.current = [];
     setPendingUpdates([]);
 
     let payload;
@@ -536,12 +492,20 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
       }
-      if (pendingUpdateRef.current) {
-        submitTurnMutation.mutate(pendingUpdateRef.current);
-        pendingUpdateRef.current = null;
+      if (pendingUpdateRef.current.length) {
+        const latestGame = queryClient.getQueryData(['game', gameId]);
+        const latestState = latestGame?.atw_state?.[playerName];
+        const latestPoints = latestGame?.total_points?.[playerName] || 0;
+        if (latestState) {
+          submitTurnMutation.mutate({
+            updatedState: latestState,
+            updatedPoints: latestPoints
+          });
+        }
+        pendingUpdateRef.current = [];
       }
     };
-  }, []);
+  }, [gameId, playerName, queryClient, submitTurnMutation]);
 
   const playerState = useMemo(
     () => ({ ...defaultPlayerState, ...(game?.atw_state?.[playerName] || {}) }),

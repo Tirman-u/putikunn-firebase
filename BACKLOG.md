@@ -22,12 +22,13 @@ Done = ✅, Osaline = ⏳, Open = ☐
 - ✅ My Profile: ATW mängud ei tule välja
 - ✅ Missed = auto‑restart + eraldi karika/exit nupud
 - ☐ Unikaalne mängu URL (pin vms) jagamiseks
-- ☐ 3+ raskus: UI “täpikeste” järgi per‑disc sisestus
-- ☐ 3+ raskus: 1 miss ei reseti, rohkem miss = reset
+- ✅ 3+ raskus: UI “täpikeste” järgi per‑disc sisestus
+- ✅ 3+ raskus: 1 miss ei reseti, rohkem miss = reset
+- ✅ Join Game: nime väli üles + prefill + eemaldada “Join Jyly Game”
 
 ## 🟢 Low
-- ☐ ATW tabelis eemaldada Accuracy + Putts (jätta Score)
-- ☐ ATW stats: Accuracy → Attempts (restart count)
+- ✅ ATW tabelis eemaldada Accuracy + Putts (jätta Score)
+- ✅ ATW stats: Accuracy → Attempts (restart count)
 - ☐ Loading/skeleton unify (standard loading/empty states)
 - ☐ ATW/PlayerView split (state hook + UI components)
 - ☐ Score/transition utils (shared gameRules)

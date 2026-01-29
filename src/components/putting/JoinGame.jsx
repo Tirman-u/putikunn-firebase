@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowRight, LogIn, ArrowLeft, Clock } from 'lucide-react';
@@ -42,6 +42,13 @@ export default function JoinGame({ onJoin, onBack }) {
       queryClient.invalidateQueries({ queryKey: ['recent-games'] });
     }
   });
+
+  useEffect(() => {
+    if (!user) return;
+    if (!playerName.trim()) {
+      setPlayerName(user?.display_name || user?.full_name || user?.email || '');
+    }
+  }, [playerName, user]);
 
   const getGameTypeName = (type) => {
     const names = {
@@ -157,7 +164,7 @@ export default function JoinGame({ onJoin, onBack }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
-      <div className="max-w-lg mx-auto pt-8">
+      <div className="max-w-lg mx-auto pt-4">
         {/* Back Button */}
         <div className="mb-6">
           <button
@@ -169,12 +176,19 @@ export default function JoinGame({ onJoin, onBack }) {
           </button>
         </div>
 
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-800 mb-1">Join Jyly Game</h1>
-          <p className="text-sm text-slate-500">Enter PIN to join the session</p>
-        </div>
-
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Your Name
+            </label>
+            <Input
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              placeholder="Enter your name"
+              className="h-14 rounded-xl border-slate-200 text-lg"
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">
               Game PIN
@@ -185,18 +199,6 @@ export default function JoinGame({ onJoin, onBack }) {
               placeholder="Enter 4-digit PIN"
               className="h-14 rounded-xl border-slate-200 text-center text-2xl tracking-widest font-bold"
               maxLength={4}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Your Name
-            </label>
-            <Input
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="Enter your name"
-              className="h-14 rounded-xl border-slate-200 text-lg"
             />
           </div>
 

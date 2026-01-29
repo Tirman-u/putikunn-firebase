@@ -142,6 +142,8 @@ export default function PuttingRecords() {
     return true;
   });
 
+  const isATWView = currentView?.gameType === 'around_the_world';
+
   const getPlayerKey = (entry) => {
     const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
     const mappedUid = entry?.player_name ? game?.player_uids?.[entry.player_name] : null;
@@ -253,8 +255,14 @@ export default function PuttingRecords() {
                         <th className="text-left py-3 px-2 text-slate-600 font-semibold">#</th>
                         <th className="text-left py-3 px-2 text-slate-600 font-semibold">Player</th>
                         <th className="text-center py-3 px-2 text-slate-600 font-semibold">Score</th>
-                        <th className="text-center py-3 px-2 text-slate-600 font-semibold">{currentView.gameType === 'streak_challenge' ? 'Distance' : 'Accuracy'}</th>
-                        <th className="text-center py-3 px-2 text-slate-600 font-semibold">Putts</th>
+                        {!isATWView && (
+                          <th className="text-center py-3 px-2 text-slate-600 font-semibold">
+                            {currentView.gameType === 'streak_challenge' ? 'Distance' : 'Accuracy'}
+                          </th>
+                        )}
+                        {!isATWView && (
+                          <th className="text-center py-3 px-2 text-slate-600 font-semibold">Putts</th>
+                        )}
                         <th className="text-right py-3 px-2 text-slate-600 font-semibold">Date</th>
                       </tr>
                     </thead>
@@ -294,19 +302,23 @@ export default function PuttingRecords() {
                               <span className="text-lg font-bold text-emerald-600">{entry.score}</span>
                             </Link>
                           </td>
-                          <td className="py-3 px-2 text-center text-slate-700">
-                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
-                              {currentView.gameType === 'streak_challenge' 
-                                ? `${entry.streak_distance || 0}m` 
-                                : (entry.accuracy ? `${entry.accuracy.toFixed(1)}%` : '-')
-                              }
-                            </Link>
-                          </td>
-                          <td className="py-3 px-2 text-center text-slate-600">
-                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
-                              {entry.made_putts}/{entry.total_putts}
-                            </Link>
-                          </td>
+                          {!isATWView && (
+                            <td className="py-3 px-2 text-center text-slate-700">
+                              <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                                {currentView.gameType === 'streak_challenge' 
+                                  ? `${entry.streak_distance || 0}m` 
+                                  : (entry.accuracy ? `${entry.accuracy.toFixed(1)}%` : '-')
+                                }
+                              </Link>
+                            </td>
+                          )}
+                          {!isATWView && (
+                            <td className="py-3 px-2 text-center text-slate-600">
+                              <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                                {entry.made_putts}/{entry.total_putts}
+                              </Link>
+                            </td>
+                          )}
                           <td className="py-3 px-2 text-right text-slate-500 text-xs">
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
                               {entry.date ? format(new Date(entry.date), 'MMM d, yyyy') : '-'}

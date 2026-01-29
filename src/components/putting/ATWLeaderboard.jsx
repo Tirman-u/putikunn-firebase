@@ -4,27 +4,23 @@ import { Trophy, Target } from 'lucide-react';
 export default function ATWLeaderboard({ game }) {
   const playerStats = Object.entries(game.atw_state || {}).map(([playerName, state]) => {
     const totalScore = game.total_points?.[playerName] || 0;
-    const accuracy = state.total_putts > 0 
-      ? ((state.total_makes / state.total_putts) * 100).toFixed(1)
-      : 0;
+    const attemptsCount = state.attempts_count || 0;
     
     return {
       name: playerName,
       score: totalScore,
       laps: state.laps_completed || 0,
-      accuracy: parseFloat(accuracy),
-      totalPutts: state.total_putts || 0,
-      totalMakes: state.total_makes || 0
+      attempts: attemptsCount
     };
   }).sort((a, b) => b.score - a.score);
 
   const bestScore = Math.max(...playerStats.map(p => p.score), 0);
   const bestLaps = Math.max(...playerStats.map(p => p.laps), 0);
-  const bestAccuracy = Math.max(...playerStats.map(p => p.accuracy), 0);
+  const bestAttempts = Math.max(...playerStats.map(p => p.attempts), 0);
   
   const bestScorePlayer = playerStats.find(p => p.score === bestScore);
   const bestLapsPlayer = playerStats.find(p => p.laps === bestLaps);
-  const bestAccuracyPlayer = playerStats.find(p => p.accuracy === bestAccuracy);
+  const bestAttemptsPlayer = playerStats.find(p => p.attempts === bestAttempts);
 
   return (
     <div className="space-y-6">
@@ -56,10 +52,10 @@ export default function ATWLeaderboard({ game }) {
           <div className="flex justify-center mb-2">
             <Target className="w-5 h-5 text-purple-500" />
           </div>
-          <div className="text-2xl font-bold text-purple-600">{bestAccuracy}%</div>
-          <div className="text-xs text-slate-500 mt-1">Best Accuracy</div>
+          <div className="text-2xl font-bold text-purple-600">{bestAttempts}</div>
+          <div className="text-xs text-slate-500 mt-1">Attempts</div>
           <div className="text-xs text-slate-600 font-medium mt-1">
-            {bestAccuracyPlayer?.name}
+            {bestAttemptsPlayer?.name}
           </div>
         </div>
       </div>
@@ -73,7 +69,7 @@ export default function ATWLeaderboard({ game }) {
               <th className="text-left p-4 font-semibold text-slate-700">Player</th>
               <th className="text-center p-4 font-semibold text-slate-700">Score</th>
               <th className="text-center p-4 font-semibold text-slate-700">Laps</th>
-              <th className="text-center p-4 font-semibold text-slate-700">Accuracy</th>
+              <th className="text-center p-4 font-semibold text-slate-700">Attempts</th>
             </tr>
           </thead>
           <tbody>
@@ -97,8 +93,7 @@ export default function ATWLeaderboard({ game }) {
                   <div className="font-bold text-lg text-blue-600">{player.laps}</div>
                 </td>
                 <td className="p-4 text-center">
-                  <div className="font-bold text-lg text-purple-600">{player.accuracy}%</div>
-                  <div className="text-xs text-slate-500">{player.totalMakes}/{player.totalPutts}</div>
+                  <div className="font-bold text-lg text-purple-600">{player.attempts}</div>
                 </td>
               </tr>
             ))}

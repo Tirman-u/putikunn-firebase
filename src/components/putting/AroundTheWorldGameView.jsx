@@ -163,6 +163,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       best_score: Math.max(bestScore, currentScore),
       best_laps: Math.max(playerState.best_laps || 0, playerState.laps_completed || 0),
       best_accuracy: Math.max(bestAccuracy, currentAccuracy),
+      attempts_count: (playerState.attempts_count || 0) + 1,
       client_seq: bumpLocalSeq()
     };
 
@@ -206,32 +207,55 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     const direction = playerState.direction;
     const threshold = config.advance_threshold;
     const distances = config.distances;
-    const actualMakes = madePutts === 1 ? config.discs_per_turn : 0;
+    const discsPerTurn = config.discs_per_turn || 1;
+    const actualMakes = Math.max(0, Math.min(Number(madePutts) || 0, discsPerTurn));
+    const misses = discsPerTurn - actualMakes;
 
     let newIndex = currentIndex;
     let newDirection = direction;
     let lapEvent = false;
 
-    if (actualMakes >= threshold) {
-      if (direction === 'UP') {
-        newIndex = Math.min(currentIndex + 1, distances.length - 1);
-        if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
-          newDirection = 'DOWN';
-          lapEvent = true;
+    if (discsPerTurn >= 3) {
+      if (misses === 0) {
+        if (direction === 'UP') {
+          newIndex = Math.min(currentIndex + 1, distances.length - 1);
+          if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
+            newDirection = 'DOWN';
+            lapEvent = true;
+          }
+        } else {
+          newIndex = Math.max(currentIndex - 1, 0);
+          if (newIndex === 0 && currentIndex > 0) {
+            newDirection = 'UP';
+            lapEvent = true;
+          }
         }
-      } else {
-        newIndex = Math.max(currentIndex - 1, 0);
-        if (newIndex === 0 && currentIndex > 0) {
-          newDirection = 'UP';
-          lapEvent = true;
-        }
+      } else if (misses >= 2) {
+        newIndex = 0;
+        newDirection = 'UP';
       }
-    } else if (actualMakes === 0) {
-      newIndex = 0;
-      newDirection = 'UP';
+    } else {
+      if (actualMakes >= threshold) {
+        if (direction === 'UP') {
+          newIndex = Math.min(currentIndex + 1, distances.length - 1);
+          if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
+            newDirection = 'DOWN';
+            lapEvent = true;
+          }
+        } else {
+          newIndex = Math.max(currentIndex - 1, 0);
+          if (newIndex === 0 && currentIndex > 0) {
+            newDirection = 'UP';
+            lapEvent = true;
+          }
+        }
+      } else if (actualMakes === 0) {
+        newIndex = 0;
+        newDirection = 'UP';
+      }
     }
 
-    const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * config.discs_per_turn : 0;
+    const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * actualMakes : 0;
 
     const updatedState = {
       current_distance_index: newIndex,
@@ -239,7 +263,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
       turns_played: playerState.turns_played + 1,
       total_makes: playerState.total_makes + actualMakes,
-      total_putts: playerState.total_putts + config.discs_per_turn,
+      total_putts: playerState.total_putts + discsPerTurn,
       current_round_draft: { attempts: [], is_finalized: false },
       history: [...playerState.history, {
         turn_number: playerState.turns_played + 1,
@@ -249,7 +273,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         moved_to_distance: distances[newIndex],
         points_awarded: pointsAwarded,
         lap_event: lapEvent,
-        failed_to_advance: actualMakes > 0 && actualMakes < threshold,
+        failed_to_advance: actualMakes > 0 && (discsPerTurn >= 3 ? misses >= 1 : actualMakes < threshold),
         missed_all: actualMakes === 0
       }],
       best_score: playerState.best_score,
@@ -269,13 +293,13 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       }
     });
 
-    if (madePutts === 0) {
+    if (actualMakes === 0) {
       handleRetry({ silent: true });
       return;
     }
 
     // Debounced DB sync
-    const pending = { madePutts, showDialog: madePutts === 0 };
+    const pending = { madePutts: actualMakes, showDialog: actualMakes === 0 };
     pendingUpdateRef.current = [...pendingUpdateRef.current, pending];
     setPendingUpdates(prev => [...prev, pending]);
     
@@ -808,6 +832,14 @@ const ActiveGameView = React.memo(({
   handleUndo, undoMutation,
   onViewLeaderboard, onExit 
 }) => {
+  const discsPerTurn = config.discs_per_turn || 1;
+  const usePerDiscInput = discsPerTurn >= 3;
+  const [madeCount, setMadeCount] = React.useState(0);
+
+  React.useEffect(() => {
+    setMadeCount(0);
+  }, [playerState.turns_played, currentDistance, discsPerTurn]);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <div className="max-w-md mx-auto px-4 pt-8">
@@ -907,25 +939,68 @@ const ActiveGameView = React.memo(({
 
           {/* Quick Input */}
           <div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <button
-                onClick={() => handleSubmitPutts(0)}
-                className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 active:scale-95 transition-all"
-              >
-                Missed
-              </button>
-              <button
-                onClick={() => handleSubmitPutts(1)}
-                className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 transition-all"
-              >
-                Made
-              </button>
-            </div>
+            {usePerDiscInput ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm text-slate-600">
+                  <span>Sisse</span>
+                  <span className="font-semibold text-slate-800">{madeCount}/{discsPerTurn}</span>
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {Array.from({ length: discsPerTurn }).map((_, idx) => {
+                    const isMade = idx < madeCount;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setMadeCount(idx + 1)}
+                        className={`h-10 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
+                          isMade
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {idx + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleSubmitPutts(0)}
+                    className="h-14 rounded-xl font-bold text-base bg-red-100 text-red-700 hover:bg-red-200 active:scale-95 transition-all"
+                  >
+                    Missed
+                  </button>
+                  <button
+                    onClick={() => handleSubmitPutts(madeCount)}
+                    disabled={madeCount === 0}
+                    className="h-14 rounded-xl font-bold text-base bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    Kinnita
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <button
+                  onClick={() => handleSubmitPutts(0)}
+                  className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 active:scale-95 transition-all"
+                >
+                  Missed
+                </button>
+                <button
+                  onClick={() => handleSubmitPutts(1)}
+                  className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 transition-all"
+                >
+                  Made
+                </button>
+              </div>
+            )}
             {playerState.history && playerState.history.length > 0 && (
               <button
                 onClick={handleUndo}
                 disabled={undoMutation.isPending}
-                className="w-full h-16 rounded-xl font-bold text-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all disabled:opacity-50"
+                className="w-full h-16 rounded-xl font-bold text-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all disabled:opacity-50 mt-3"
               >
                 <Undo2 className="w-4 h-4 mr-2 inline" />
                 Võta tagasi
@@ -965,10 +1040,7 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
     const bestScore = playerState.best_score || 0;
     const currentLaps = playerState.laps_completed || 0;
     const bestLaps = playerState.best_laps || 0;
-    const totalPutts = playerState.total_putts || 0;
-    const madePutts = playerState.total_makes || 0;
-    const currentAccuracy = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
-    const bestAccuracy = (playerState.best_accuracy || 0).toFixed(1);
+    const attemptsCount = playerState.attempts_count || 0;
 
     return {
       name: playerName,
@@ -976,12 +1048,13 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
       bestScore,
       currentLaps,
       bestLaps,
-      currentAccuracy,
-      bestAccuracy
+      attemptsCount
     };
   }).sort((a, b) => b.bestScore - a.bestScore);
 
   const bestPlayer = playerStats[0];
+  const mostAttempts = Math.max(...playerStats.map(p => p.attemptsCount || 0), 0);
+  const mostAttemptsPlayer = playerStats.find(p => p.attemptsCount === mostAttempts);
   const isCompleted = game.status === 'completed';
 
   return (
@@ -1018,10 +1091,10 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
           <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <Target className="w-5 h-5 text-purple-500" />
-              <div className="text-sm text-slate-600">Best Accuracy</div>
+              <div className="text-sm text-slate-600">Attempts</div>
             </div>
-            <div className="text-3xl font-bold text-purple-600">{bestPlayer.bestAccuracy}%</div>
-            <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
+            <div className="text-3xl font-bold text-purple-600">{mostAttempts}</div>
+            <div className="text-xs text-slate-500 mt-1">{mostAttemptsPlayer?.name}</div>
           </div>
         </div>
       )}
@@ -1036,7 +1109,7 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
                 <th className="text-center p-4 font-semibold text-slate-700">Best Score</th>
                 <th className="text-center p-4 font-semibold text-slate-700">Current</th>
                 <th className="text-center p-4 font-semibold text-slate-700">Laps</th>
-                <th className="text-center p-4 font-semibold text-slate-700">Accuracy</th>
+                <th className="text-center p-4 font-semibold text-slate-700">Attempts</th>
               </tr>
             </thead>
             <tbody>
@@ -1063,10 +1136,7 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
                     </div>
                   </td>
                   <td className="p-4 text-center">
-                    <div className="flex flex-col items-center">
-                      <div className="text-sm font-bold text-purple-600">{player.bestAccuracy}%</div>
-                      <div className="text-xs text-slate-400">{player.currentAccuracy}%</div>
-                    </div>
+                    <div className="text-sm font-bold text-purple-600">{player.attemptsCount}</div>
                   </td>
                 </tr>
               ))}

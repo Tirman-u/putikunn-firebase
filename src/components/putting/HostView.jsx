@@ -165,10 +165,7 @@ export default function HostView({ gameId, onExit }) {
     const bestScore = playerState.best_score || 0;
     const currentLaps = playerState.laps_completed || 0;
     const bestLaps = playerState.best_laps || 0;
-    const totalPutts = playerState.total_putts || 0;
-    const madePutts = playerState.total_makes || 0;
-    const currentAccuracy = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
-    const bestAccuracy = (playerState.best_accuracy || 0).toFixed(1);
+    const attemptsCount = playerState.attempts_count || 0;
 
     return {
       name: playerName,
@@ -176,12 +173,13 @@ export default function HostView({ gameId, onExit }) {
       bestScore,
       currentLaps,
       bestLaps,
-      currentAccuracy,
-      bestAccuracy
+      attemptsCount
     };
   }).sort((a, b) => b.bestScore - a.bestScore);
 
   const bestPlayer = playerStats[0];
+  const mostAttempts = Math.max(...playerStats.map(p => p.attemptsCount || 0), 0);
+  const mostAttemptsPlayer = playerStats.find(p => p.attemptsCount === mostAttempts);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -242,10 +240,10 @@ export default function HostView({ gameId, onExit }) {
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Target className="w-5 h-5 text-purple-500" />
-                <div className="text-sm text-slate-600">Best Accuracy</div>
+                <div className="text-sm text-slate-600">Attempts</div>
               </div>
-              <div className="text-3xl font-bold text-purple-600">{bestPlayer.bestAccuracy}%</div>
-              <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
+              <div className="text-3xl font-bold text-purple-600">{mostAttempts}</div>
+              <div className="text-xs text-slate-500 mt-1">{mostAttemptsPlayer?.name}</div>
             </div>
           </div>
         )}
@@ -262,7 +260,7 @@ export default function HostView({ gameId, onExit }) {
                     <th className="text-center p-4 font-semibold text-slate-700">Best Score</th>
                     <th className="text-center p-4 font-semibold text-slate-700">Current</th>
                     <th className="text-center p-4 font-semibold text-slate-700">Laps</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Accuracy</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Attempts</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -289,10 +287,7 @@ export default function HostView({ gameId, onExit }) {
                         </div>
                       </td>
                       <td className="p-4 text-center">
-                        <div className="flex flex-col items-center">
-                          <div className="text-sm font-bold text-purple-600">{player.bestAccuracy}%</div>
-                          <div className="text-xs text-slate-400">{player.currentAccuracy}%</div>
-                        </div>
+                        <div className="text-sm font-bold text-purple-600">{player.attemptsCount}</div>
                       </td>
                     </tr>
                   ))}

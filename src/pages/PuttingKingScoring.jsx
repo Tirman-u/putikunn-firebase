@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import LoadingState from '@/components/ui/loading-state';
 
 export default function PuttingKingScoring() {
   const navigate = useNavigate();
@@ -130,7 +131,7 @@ export default function PuttingKingScoring() {
   };
 
   if (!match || !tournament) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return <LoadingState />;
   }
 
   if (match.status === 'finished') {

@@ -133,3 +133,63 @@ export function getCurrentRound(puttCount, puttsPerRound) {
 export function getPuttsInCurrentRound(puttCount, puttsPerRound) {
   return puttCount % puttsPerRound;
 }
+
+// Around the World helpers
+export function shouldATWRestart(discsPerTurn, madeCount) {
+  const misses = Math.max(0, discsPerTurn - madeCount);
+  return madeCount === 0 || (discsPerTurn >= 3 && misses >= 2);
+}
+
+export function getATWMovement({
+  currentIndex,
+  direction,
+  distances,
+  threshold,
+  discsPerTurn,
+  madeCount
+}) {
+  let newIndex = currentIndex;
+  let newDirection = direction;
+  let lapEvent = false;
+  const misses = Math.max(0, discsPerTurn - madeCount);
+
+  if (discsPerTurn >= 3) {
+    if (misses === 0) {
+      if (direction === 'UP') {
+        newIndex = Math.min(currentIndex + 1, distances.length - 1);
+        if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
+          newDirection = 'DOWN';
+          lapEvent = true;
+        }
+      } else {
+        newIndex = Math.max(currentIndex - 1, 0);
+        if (newIndex === 0 && currentIndex > 0) {
+          newDirection = 'UP';
+          lapEvent = true;
+        }
+      }
+    }
+  } else {
+    if (madeCount >= threshold) {
+      if (direction === 'UP') {
+        newIndex = Math.min(currentIndex + 1, distances.length - 1);
+        if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
+          newDirection = 'DOWN';
+          lapEvent = true;
+        }
+      } else {
+        newIndex = Math.max(currentIndex - 1, 0);
+        if (newIndex === 0 && currentIndex > 0) {
+          newDirection = 'UP';
+          lapEvent = true;
+        }
+      }
+    }
+  }
+
+  return { newIndex, newDirection, lapEvent };
+}
+
+export function isATWRoundComplete({ lapEvent, newIndex, newDirection }) {
+  return lapEvent && newIndex === 0 && newDirection === 'UP';
+}

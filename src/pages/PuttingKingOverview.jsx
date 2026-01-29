@@ -10,6 +10,7 @@ import PuttingKingScoreInput from '@/components/putting/PuttingKingScoreInput';
 import SuddenDeathDialog from '@/components/putting/SuddenDeathDialog';
 import PuttingKingRules from '@/components/putting/PuttingKingRules';
 import TournamentRulesDialog from '@/components/putting/TournamentRulesDialog';
+import LoadingState from '@/components/ui/loading-state';
 
 export default function PuttingKingOverview() {
   const navigate = useNavigate();
@@ -495,7 +496,7 @@ export default function PuttingKingOverview() {
     });
 
   if (!tournament) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return <LoadingState />;
   }
 
   const distances = tournament.distances.filter(d => d.enabled).sort((a, b) => a.order - b.order);

@@ -13,7 +13,7 @@ Done = ✅, Osaline = ⏳, Open = ☐
 ## 🟡 Keskmine
 - ✅ Leaderboard pagination + limit 50
 - ☐ Leaderboard server‑filter (gender + month)
-- ☐ Leaderboard: admin/super‑admin manual merge (duplicate aliases)
+- ✅ Leaderboard: admin/super‑admin manual merge (duplicate aliases)
 - ✅ ATW/Player round‑commit batch (DB write ainult roundi lõpus)
 - ✅ ErrorBoundary prod‑log + user‑friendly retry
 - ✅ Ühtne realtime hook (subscribe + throttle + cleanup + retry)
@@ -29,8 +29,8 @@ Done = ✅, Osaline = ⏳, Open = ☐
 ## 🟢 Low
 - ✅ ATW tabelis eemaldada Accuracy + Putts (jätta Score)
 - ✅ ATW stats: Accuracy → Attempts (restart count)
-- ☐ Loading/skeleton unify (standard loading/empty states)
-- ☐ ATW/PlayerView split (state hook + UI components)
-- ☐ Score/transition utils (shared gameRules)
-- ☐ Tests (gameRules unit + ATW integration)
-- ☐ Observability (error logs + sync latency metrics)
+- ✅ Loading/skeleton unify (standard loading/empty states)
+- ✅ ATW/PlayerView split (state hook + UI components)
+- ✅ Score/transition utils (shared gameRules)
+- ✅ Tests (gameRules unit + ATW integration)
+- ✅ Observability (error logs + sync latency metrics)

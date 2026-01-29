@@ -7,6 +7,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
+import LoadingState from '@/components/ui/loading-state';
 
 export default function GroupResult() {
   const [searchParams] = useSearchParams();
@@ -32,11 +33,7 @@ export default function GroupResult() {
   });
 
   if (groupLoading || gamesLoading || !group) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center">
-        <div className="text-slate-400">Loading...</div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   // Calculate group statistics

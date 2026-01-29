@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trophy, Target, Award } from 'lucide-react';
@@ -9,9 +9,11 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
 export default function PuttingRecords() {
+  const queryClient = useQueryClient();
   const [selectedView, setSelectedView] = useState('general_classic');
   const [selectedGender, setSelectedGender] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
+  const [adminSearch, setAdminSearch] = useState('');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 50;
   const MAX_FETCH = 500;
@@ -100,6 +102,25 @@ export default function PuttingRecords() {
 
   const userRole = user?.app_role || 'user';
   const canDelete = ['admin', 'super_admin'].includes(userRole);
+  const canAdminTools = canDelete;
+
+  const deleteEntryMutation = useMutation({
+    mutationFn: async (entryId) => base44.entities.LeaderboardEntry.delete(entryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries-discgolf'] });
+    }
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (entryIds) => {
+      await Promise.all(entryIds.map(id => base44.entities.LeaderboardEntry.delete(id)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries-discgolf'] });
+    }
+  });
 
   // Generate last 6 months for filter
   const monthOptions = [];
@@ -143,6 +164,65 @@ export default function PuttingRecords() {
   });
 
   const isATWView = currentView?.gameType === 'around_the_world';
+
+  const duplicateGroups = useMemo(() => {
+    if (!canAdminTools) return [];
+    const grouped = {};
+    filteredEntries.forEach(entry => {
+      if (!entry?.player_email || entry.player_email === 'unknown') return;
+      const key = entry.player_email.trim().toLowerCase();
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(entry);
+    });
+
+    const groups = Object.entries(grouped)
+      .map(([email, entries]) => {
+        const uniqueNames = Array.from(
+          new Set(entries.map(e => (e.player_name || '').trim()).filter(Boolean))
+        );
+        return { email, entries, uniqueNames };
+      })
+      .filter(group => group.entries.length > 1 || group.uniqueNames.length > 1)
+      .sort((a, b) => b.entries.length - a.entries.length);
+
+    if (!adminSearch.trim()) return groups;
+    const needle = adminSearch.trim().toLowerCase();
+    return groups.filter(group => {
+      if (group.email.includes(needle)) return true;
+      return group.uniqueNames.some(name => name.toLowerCase().includes(needle));
+    });
+  }, [adminSearch, canAdminTools, filteredEntries]);
+
+  const handleDeleteEntry = (entryId) => {
+    if (!entryId) return;
+    if (!confirm('Kustutan selle rekordi?')) return;
+    deleteEntryMutation.mutate(entryId);
+  };
+
+  const handleMergeKeepBest = (group) => {
+    const sorted = [...group.entries].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+    });
+    const keep = sorted[0];
+    const toDelete = sorted.slice(1).map(entry => entry.id).filter(Boolean);
+    if (toDelete.length === 0) return;
+    if (!confirm(`Jätan alles: ${keep.player_name} (${keep.score}). Kustutan ${toDelete.length} kirjet?`)) {
+      return;
+    }
+    bulkDeleteMutation.mutate(toDelete);
+  };
+
+  const handleDeleteLowest = (group) => {
+    const sorted = [...group.entries].sort((a, b) => {
+      if (a.score !== b.score) return a.score - b.score;
+      return new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime();
+    });
+    const target = sorted[0];
+    if (!target?.id) return;
+    if (!confirm(`Kustutan väikseima: ${target.player_name} (${target.score})?`)) return;
+    deleteEntryMutation.mutate(target.id);
+  };
 
   const getPlayerKey = (entry) => {
     const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
@@ -241,6 +321,86 @@ export default function PuttingRecords() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {canAdminTools && (
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-amber-900">Admin: duplicate cleanup</div>
+                      <div className="text-xs text-amber-700">
+                        Otsib duplikaate sama emaili järgi (kehtivad praegused filtrid).
+                      </div>
+                    </div>
+                    <input
+                      value={adminSearch}
+                      onChange={(e) => setAdminSearch(e.target.value)}
+                      placeholder="Otsi emaili või nime"
+                      className="h-9 rounded-lg border border-amber-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                    />
+                  </div>
+
+                  {duplicateGroups.length === 0 ? (
+                    <div className="text-sm text-amber-700">Duplikaate ei leitud.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {duplicateGroups.map(group => {
+                        const entriesSorted = [...group.entries].sort((a, b) => b.score - a.score);
+                        return (
+                          <div key={group.email} className="rounded-xl border border-amber-100 bg-white p-3 space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <div className="text-sm font-semibold text-slate-800">{group.email}</div>
+                                <div className="text-xs text-slate-500">
+                                  Aliased: {group.uniqueNames.join(', ') || '-'}
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMergeKeepBest(group)}
+                                  className="px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                  disabled={bulkDeleteMutation.isPending}
+                                >
+                                  Merge (keep best)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteLowest(group)}
+                                  className="px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 hover:bg-rose-200"
+                                  disabled={deleteEntryMutation.isPending}
+                                >
+                                  Delete lowest
+                                </button>
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              {entriesSorted.map(entry => (
+                                <div key={entry.id} className="flex items-center justify-between text-xs text-slate-600">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-slate-700">{entry.player_name}</span>
+                                    <span>{entry.score}</span>
+                                    <span className="text-slate-400">
+                                      {entry.date ? format(new Date(entry.date), 'MMM d, yyyy') : '-'}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteEntry(entry.id)}
+                                    className="text-rose-600 hover:text-rose-700"
+                                    disabled={deleteEntryMutation.isPending}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {sortedEntries.length === 0 ? (
                 <div className="text-center py-12 text-slate-400">

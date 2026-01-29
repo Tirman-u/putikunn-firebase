@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import useRealtimeGame from '@/hooks/use-realtime-game';
+import LoadingState from '@/components/ui/loading-state';
 
 export default function HostView({ gameId, onExit }) {
   const [copied, setCopied] = useState(false);
@@ -148,11 +149,7 @@ export default function HostView({ gameId, onExit }) {
   };
 
   if (isLoading || !game) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center">
-        <div className="text-slate-400">Loading...</div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   const isATWGame = game.game_type === 'around_the_world';

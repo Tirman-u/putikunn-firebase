@@ -1,6 +1,6 @@
 import React from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Upload, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,6 +15,9 @@ import MobileLeaderboard from './MobileLeaderboard';
 import PuttTypeSelector from './PuttTypeSelector';
 import PerformanceAnalysis from './PerformanceAnalysis';
 import useRealtimeGame from '@/hooks/use-realtime-game';
+import LoadingState from '@/components/ui/loading-state';
+import { logSyncMetric } from '@/lib/metrics';
+import usePlayerGameState from '@/hooks/use-player-game-state';
 import { 
   GAME_FORMATS, 
   getNextDistanceFromMade, 
@@ -40,19 +43,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     gameIdRef.current = gameId;
   }, [gameId]);
 
-  const { data: user } = useQuery({
-    queryKey: ['current-user'],
-    queryFn: () => base44.auth.me()
-  });
-
-  const { data: game, isLoading } = useQuery({
-    queryKey: ['game', gameId],
-    queryFn: async () => {
-      const games = await base44.entities.Game.filter({ id: gameId });
-      return games[0];
-    },
-    refetchInterval: false
-  });
+  const { user, game, isLoading, isSoloGame } = usePlayerGameState({ gameId });
 
   useRealtimeGame({
     gameId,
@@ -63,8 +54,6 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       queryClient.setQueryData(['game', gameId], event.data);
     }
   });
-
-  const isSoloGame = game?.pin === '0000';
 
   // Initialize local state for solo games
   React.useEffect(() => {
@@ -81,7 +70,15 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   }, [game, isSoloGame, localGameState]);
 
   const updateGameMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Game.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      const startedAt = performance.now();
+      const updated = await base44.entities.Game.update(id, data);
+      logSyncMetric('player_sync', performance.now() - startedAt, {
+        game_id: id,
+        game_type: game?.game_type || 'unknown'
+      });
+      return updated;
+    },
     onSuccess: (updatedGame) => {
       // Update cache immediately with the response
       queryClient.setQueryData(['game', gameId], updatedGame);
@@ -141,7 +138,15 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
   // Save solo game to DB when completed
   const saveSoloGameMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Game.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      const startedAt = performance.now();
+      const updated = await base44.entities.Game.update(id, data);
+      logSyncMetric('player_sync_solo', performance.now() - startedAt, {
+        game_id: id,
+        game_type: game?.game_type || 'unknown'
+      });
+      return updated;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['game', gameId]);
     }
@@ -434,11 +439,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   };
 
   if (isLoading || !game) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center">
-        <div className="text-slate-400">Loading...</div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   // Use local state for solo games, otherwise use game data

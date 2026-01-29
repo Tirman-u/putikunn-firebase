@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import AIInsights from '@/components/profile/AIInsights';
 import AchievementsList, { getAchievements } from '@/components/profile/AchievementsList';
+import LoadingState from '@/components/ui/loading-state';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -94,11 +95,7 @@ export default function Profile() {
   };
 
   if (userLoading || gamesLoading || tournamentsLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center">
-        <div className="text-slate-400">Loading...</div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   const myDisplayName = user?.display_name || user?.full_name || user?.email;

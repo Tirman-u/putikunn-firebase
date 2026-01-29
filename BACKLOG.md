@@ -20,7 +20,7 @@ Done = ✅, Osaline = ⏳, Open = ☐
 - ✅ Putting Records: osad tulemused ei ilmu (nt Sigmar)
 - ✅ Leaderboard ATW skoori klikk crash + peaks avama hostitud mängu
 - ✅ My Profile: ATW mängud ei tule välja
-- ☐ Missed = auto‑restart + eraldi karika/exit nupud
+- ✅ Missed = auto‑restart + eraldi karika/exit nupud
 - ☐ Unikaalne mängu URL (pin vms) jagamiseks
 - ☐ 3+ raskus: UI “täpikeste” järgi per‑disc sisestus
 - ☐ 3+ raskus: 1 miss ei reseti, rohkem miss = reset

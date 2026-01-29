@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowUp, ArrowDown, CheckCircle2, X, Undo2, Trophy, RotateCcw, Share2, Eye, EyeOff, Upload } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, Undo2, Trophy, Eye, EyeOff, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import ATWLeaderboard from './ATWLeaderboard';
 import useRealtimeGame from '@/hooks/use-realtime-game';
@@ -12,9 +11,7 @@ import useRealtimeGame from '@/hooks/use-realtime-game';
 
 
 export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [hideScore, setHideScore] = useState(false);
   const [pendingUpdates, setPendingUpdates] = useState([]);
@@ -136,13 +133,9 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
 
 
-  const handleFinish = useCallback(() => {
-    setShowConfirmDialog(false);
-  }, []);
-
-  const handleRetry = useCallback(async () => {
+  const handleRetry = useCallback(async (options = {}) => {
+    const { silent = false } = options;
     lastActionRef.current = { type: 'retry', at: Date.now() };
-    setShowConfirmDialog(false);
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
@@ -198,7 +191,9 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       updatedPoints: 0
     });
     queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-    toast.success('Alustad uuesti 5m pealt!');
+    if (!silent) {
+      toast.success('Alustad uuesti 5m pealt!');
+    }
   }, [bumpLocalSeq, defaultPlayerState, getLatestGame, playerName, queryClient, updateGameWithLatest]);
 
   const handleSubmitPutts = useCallback((madePutts) => {
@@ -275,9 +270,9 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       }
     });
 
-    // Show dialog immediately if missed
     if (madePutts === 0) {
-      setShowConfirmDialog(true);
+      handleRetry({ silent: true });
+      return;
     }
 
     // Debounced DB sync
@@ -305,7 +300,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       pendingUpdateRef.current = [];
       setPendingUpdates([]);
     }, delay);
-  }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, isSolo, playerName, queryClient, submitTurnMutation]);
+  }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, handleRetry, isSolo, playerName, queryClient, submitTurnMutation]);
 
   const completeGameMutation = useMutation({
     mutationFn: async () => {
@@ -326,7 +321,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-      setShowConfirmDialog(false);
     }
   });
 
@@ -417,7 +411,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   }, [bumpLocalSeq, defaultPlayerState, getLatestGame, playerName, queryClient, updateGameWithLatest]);
 
   const handleViewLeaderboard = useCallback(() => {
-    setShowConfirmDialog(false);
     setShowLeaderboard(true);
   }, []);
 
@@ -637,14 +630,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       difficultyLabel={difficultyLabel}
       config={config}
       isSolo={isSolo}
-      showConfirmDialog={showConfirmDialog}
-      handleFinish={handleFinish}
-      handleRetry={handleRetry}
       handleCompleteGame={handleCompleteGame}
       handlePlayAgain={handlePlayAgain}
-      onViewLeaderboard={handleViewLeaderboard}
-      onExit={handleExit}
-      setShowConfirmDialog={setShowConfirmDialog}
       gameId={gameId}
       submitToLeaderboardMutation={submitToLeaderboardMutation}
       user={user}
@@ -666,66 +653,18 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       handleSubmitPutts={handleSubmitPutts}
       handleUndo={handleUndo}
       undoMutation={undoMutation}
-      showConfirmDialog={showConfirmDialog}
-      handleFinish={handleFinish}
-      handleRetry={handleRetry}
       onViewLeaderboard={handleViewLeaderboard}
       onExit={handleExit}
-      setShowConfirmDialog={setShowConfirmDialog}
-      gameId={gameId}
-      submitTurnMutation={submitTurnMutation}
     />
   );
 }
 
-// Memoized dialog component
-const ConfirmRoundDialog = React.memo(({ isOpen, onFinish, onRetry, onComplete, onViewLeaderboard, onExit }) => {
-      if (!isOpen) return null;
-
-      return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-            <div className="text-center mb-6">
-              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Ring salvestatud</h3>
-              <p className="text-slate-600">Mida teha edasi?</p>
-            </div>
-            <div className="space-y-3">
-              <Button
-                onClick={onRetry}
-                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
-              >
-                Proovi uuesti
-              </Button>
-              <Button
-                onClick={onViewLeaderboard}
-                variant="outline"
-                className="w-full h-12"
-              >
-                <Trophy className="w-4 h-4 mr-2" />
-                Vaata edetabelit
-              </Button>
-              <Button
-                onClick={onExit}
-                variant="outline"
-                className="w-full h-12 text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                Välju mängust
-              </Button>
-            </div>
-          </div>
-        </div>
-        );
-        });
-
         // Memoized completed game view
         const CompletedGameView = React.memo(({ 
         game, playerState, playerName, totalScore, bestScore, makeRate, difficultyLabel, 
-        config, isSolo, showConfirmDialog, handleFinish, handleRetry, handleCompleteGame,
-        handlePlayAgain, onViewLeaderboard, onExit,
-        setShowConfirmDialog, gameId, submitToLeaderboardMutation, user 
+        config, isSolo, handleCompleteGame,
+        handlePlayAgain,
+        gameId, submitToLeaderboardMutation, user 
         }) => {
         const attemptsCount = (playerState.attempts_count || 0) + 1;
         const failedTurns = useMemo(() => 
@@ -735,15 +674,6 @@ const ConfirmRoundDialog = React.memo(({ isOpen, onFinish, onRetry, onComplete, 
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
-        <ConfirmRoundDialog
-          isOpen={showConfirmDialog}
-          onFinish={handleFinish}
-          onRetry={handleRetry}
-          onComplete={handleCompleteGame}
-          onViewLeaderboard={onViewLeaderboard}
-          onExit={onExit}
-        />
-
         <div className="max-w-md mx-auto px-4 pt-8">
           <div className="flex items-center justify-between mb-6">
             <button
@@ -876,45 +806,15 @@ const ConfirmRoundDialog = React.memo(({ isOpen, onFinish, onRetry, onComplete, 
 const ActiveGameView = React.memo(({ 
   game, playerState, playerName, currentDistance, totalScore, bestScore, makeRate, 
   difficultyLabel, config, isSolo, hideScore, setHideScore, handleSubmitPutts, 
-  handleUndo, undoMutation, showConfirmDialog, handleFinish, handleRetry,
-  onViewLeaderboard, onExit, setShowConfirmDialog, gameId, submitTurnMutation 
+  handleUndo, undoMutation,
+  onViewLeaderboard, onExit 
 }) => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
-      <ConfirmRoundDialog
-        isOpen={showConfirmDialog}
-        onFinish={handleFinish}
-        onRetry={handleRetry}
-        onViewLeaderboard={onViewLeaderboard}
-        onExit={onExit}
-      />
-
       <div className="max-w-md mx-auto px-4 pt-8">
         <div className="flex items-center justify-between mb-6">
           <button
-            onClick={async () => {
-              const latestPlayerState = game.atw_state?.[playerName] || {};
-              const currentScore = game.total_points?.[playerName] || 0;
-              const bestScore = latestPlayerState.best_score || 0;
-              const currentAccuracy = latestPlayerState.total_putts > 0 
-                ? ((latestPlayerState.total_makes / latestPlayerState.total_putts) * 100) 
-                : 0;
-              const bestAccuracy = latestPlayerState.best_accuracy || 0;
-
-              await base44.entities.Game.update(gameId, {
-                atw_state: {
-                  ...game.atw_state,
-                  [playerName]: {
-                    ...latestPlayerState,
-                    best_score: Math.max(bestScore, currentScore),
-                    best_laps: Math.max(latestPlayerState.best_laps || 0, latestPlayerState.laps_completed || 0),
-                    best_accuracy: Math.max(bestAccuracy, currentAccuracy)
-                  }
-                }
-              });
-
-              window.location.href = createPageUrl('Home');
-            }}
+            onClick={onExit}
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -1032,6 +932,22 @@ const ActiveGameView = React.memo(({
                 Võta tagasi
               </button>
             )}
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <button
+                onClick={onViewLeaderboard}
+                className="h-12 rounded-xl font-semibold text-sm bg-white border border-slate-200 text-slate-700 hover:border-emerald-300 hover:text-emerald-700 transition-all"
+              >
+                <Trophy className="w-4 h-4 mr-2 inline" />
+                Edetabel
+              </button>
+              <button
+                onClick={onExit}
+                className="h-12 rounded-xl font-semibold text-sm bg-white border border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50 transition-all"
+              >
+                <LogOut className="w-4 h-4 mr-2 inline" />
+                Välju
+              </button>
+            </div>
           </div>
         </div>
       </div>

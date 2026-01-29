@@ -134,6 +134,12 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     const latestGame = games?.[0];
     if (!latestGame) return;
 
+    const latestSeq = latestGame.atw_state?.[playerName]?.client_seq;
+    const incomingSeq = updatedState?.client_seq;
+    if (typeof latestSeq === 'number' && typeof incomingSeq === 'number' && incomingSeq < latestSeq) {
+      return;
+    }
+
     const payload = mergePlayerUpdate(latestGame, updatedState, updatedPoints);
     const updatePayload = status ? { ...payload, status } : payload;
     await base44.entities.Game.update(gameId, updatePayload);

@@ -4,7 +4,7 @@ Legend: 🔴 Kriitiline, 🟡 Keskmine, 🟢 Low.
 Done = ✅, Osaline = ⏳, Open = ☐
 
 ## 🔴 Kriitiline
-- ⏳ ATW multi‑player race fix (server‑side merge + per‑player seq/version)
+- ✅ ATW multi‑player race fix (client‑side merge + per‑player seq guard)
 - ☐ ATW “Made/Undo/Retry” konfliktide lukustus (200–300ms action lock) — *rejected, tekitas LAGi*
 - ☐ ATW anomaalia: mäng jääb 5m peale (mitme mängija ajal)
 - ☐ ATW rapid UNDO: harv “stuck” (player jääb 5m peale)

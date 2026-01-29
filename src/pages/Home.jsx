@@ -46,13 +46,13 @@ export default function Home() {
       if (urlPuttType) {
         setAtwPuttType(urlPuttType);
       }
-      // Clean URL
-      window.history.replaceState({}, '', window.location.pathname);
+      // Keep URL for shareable setup state
     } else if (urlMode === 'atw-host' && urlGameId) {
       setGameId(urlGameId);
       setMode('atw-host');
-      // Clean URL
-      window.history.replaceState({}, '', window.location.pathname);
+    } else if (urlMode === 'host' && urlGameId) {
+      setGameId(urlGameId);
+      setMode('host');
     } else if (urlMode === 'atw-game' && urlGameId) {
       // Continue ATW game from profile
       setGameId(urlGameId);
@@ -66,8 +66,6 @@ export default function Home() {
           setMode('atw-game');
         });
       });
-      // Clean URL
-      window.history.replaceState({}, '', window.location.pathname);
     } else if (urlMode === 'player' && urlGameId) {
       // Continue regular game from profile
       setGameId(urlGameId);
@@ -76,8 +74,6 @@ export default function Home() {
         setPlayerName(playerName);
         setMode('player');
       });
-      // Clean URL
-      window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
 
@@ -115,6 +111,7 @@ export default function Home() {
 
     setGameId(game.id);
     setMode('host');
+    window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=host&gameId=${game.id}`);
   };
 
   const handleJoinGame = ({ game, playerName }) => {
@@ -125,8 +122,10 @@ export default function Home() {
     if (game.game_type === 'around_the_world') {
       setMode('atw-game');
       setIsSoloATW(game.pin === '0000');
+      window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=atw-game&gameId=${game.id}`);
     } else {
       setMode('player');
+      window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=player&gameId=${game.id}`);
     }
   };
 
@@ -364,8 +363,13 @@ export default function Home() {
                 turns_played: 0,
                 total_makes: 0,
                 total_putts: 0,
+                current_distance_points: 0,
                 current_round_draft: { attempts: [], is_finalized: false },
-                history: []
+                history: [],
+                best_score: 0,
+                best_laps: 0,
+                best_accuracy: 0,
+                attempts_count: 0
               }
             } : {}
           });
@@ -374,8 +378,10 @@ export default function Home() {
           if (isSoloATW) {
             setPlayerName(playerName);
             setMode('atw-game');
+            window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=atw-game&gameId=${game.id}`);
           } else {
             setMode('atw-host');
+            window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=atw-host&gameId=${game.id}`);
           }
         }}
       />

@@ -270,6 +270,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     const pointsAwarded = Math.max(0, distancePointsTotal - previousDistancePoints);
     const movedToNewDistance = newIndex !== currentIndex;
     const newDistancePoints = movedToNewDistance ? 0 : distancePointsTotal;
+    const isRoundComplete = lapEvent && newIndex === 0 && newDirection === 'UP';
+
     const updatedState = {
       current_distance_index: newIndex,
       direction: newDirection,
@@ -308,10 +310,14 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       }
     });
 
-    // Debounced DB sync
+    // Debounced DB sync (round completion only)
     const pending = { madePutts: actualMakes };
-    pendingUpdateRef.current = [...pendingUpdateRef.current, pending];
-    setPendingUpdates(prev => [...prev, pending]);
+    pendingUpdateRef.current = [pending];
+    setPendingUpdates([pending]);
+
+    if (!isRoundComplete) {
+      return;
+    }
     
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);

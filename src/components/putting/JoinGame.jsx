@@ -143,11 +143,13 @@ export default function JoinGame({ onJoin, onBack }) {
               turns_played: 0,
               total_makes: 0,
               total_putts: 0,
+              current_distance_points: 0,
               current_round_draft: { attempts: [], is_finalized: false },
               history: [],
               best_score: 0,
               best_laps: 0,
-              best_accuracy: 0
+              best_accuracy: 0,
+              attempts_count: 0
             }
           };
         }

@@ -142,18 +142,45 @@ export default function PuttingRecords() {
     return true;
   });
 
-  const sortedEntries = [...filteredEntries]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, displayLimit);
+  const getPlayerKey = (entry) => {
+    const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
+    const isSoloGame = game?.pin === '0000';
+    const isDiscgolfSubmission = entry?.game_id === 'discgolf-submission';
+    const emailKey = entry?.player_email && entry.player_email !== 'unknown'
+      ? `email:${entry.player_email}`
+      : null;
+    const nameKey = entry?.player_name
+      ? `name:${entry.player_name.trim().toLowerCase()}`
+      : null;
+
+    if (isDiscgolfSubmission || isSoloGame) {
+      return emailKey || nameKey || `id:${entry.id}`;
+    }
+
+    return nameKey || emailKey || `id:${entry.id}`;
+  };
+
+  // Group by player and keep only the best score for each
+  const bestScoresByPlayer = {};
+  filteredEntries.forEach(entry => {
+    const key = getPlayerKey(entry);
+    const existing = bestScoresByPlayer[key];
+    if (!existing || entry.score > existing.score || (entry.score === existing.score && entry.date > existing.date)) {
+      bestScoresByPlayer[key] = entry;
+    }
+  });
+
+  const uniqueEntries = Object.values(bestScoresByPlayer).sort((a, b) => b.score - a.score);
+  const sortedEntries = uniqueEntries.slice(0, displayLimit);
   const canFetchMore = leaderboardEntries.length >= fetchLimit && fetchLimit < MAX_FETCH;
-  const hasMoreToShow = filteredEntries.length > displayLimit;
+  const hasMoreToShow = uniqueEntries.length > displayLimit;
   const canLoadMore = hasMoreToShow || canFetchMore;
 
   useEffect(() => {
     if (!canFetchMore) return;
-    if (filteredEntries.length >= displayLimit) return;
+    if (uniqueEntries.length >= displayLimit) return;
     setFetchLimit(prev => Math.min(prev * 2, MAX_FETCH));
-  }, [canFetchMore, displayLimit, filteredEntries.length]);
+  }, [canFetchMore, displayLimit, uniqueEntries.length]);
 
   // Helper to check if a general entry has a corresponding DG.ee entry
   const hasDiscgolfEntry = (entry) => {

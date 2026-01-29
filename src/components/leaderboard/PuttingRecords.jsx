@@ -146,6 +146,7 @@ export default function PuttingRecords() {
     const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
     const isSoloGame = game?.pin === '0000';
     const isDiscgolfSubmission = entry?.game_id === 'discgolf-submission';
+    const hostEmail = game?.host_user;
     const emailKey = entry?.player_email && entry.player_email !== 'unknown'
       ? `email:${entry.player_email}`
       : null;
@@ -153,8 +154,15 @@ export default function PuttingRecords() {
       ? `name:${entry.player_name.trim().toLowerCase()}`
       : null;
 
-    if (isDiscgolfSubmission || isSoloGame) {
-      return emailKey || nameKey || `id:${entry.id}`;
+    const shouldUseEmail = !!emailKey && (
+      isDiscgolfSubmission ||
+      isSoloGame ||
+      !hostEmail ||
+      entry.player_email !== hostEmail
+    );
+
+    if (shouldUseEmail) {
+      return emailKey;
     }
 
     return nameKey || emailKey || `id:${entry.id}`;

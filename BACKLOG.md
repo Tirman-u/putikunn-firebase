@@ -5,8 +5,9 @@ Done = ✅, Osaline = ⏳, Open = ☐
 
 ## 🔴 Kriitiline
 - ⏳ ATW multi‑player race fix (server‑side merge + per‑player seq/version)
-- ✅ ATW “Made/Undo/Retry” konfliktide lukustus (200–300ms action lock)
+- ☐ ATW “Made/Undo/Retry” konfliktide lukustus (200–300ms action lock) — *rejected, tekitas LAGi*
 - ☐ ATW anomaalia: mäng jääb 5m peale (mitme mängija ajal)
+- ☐ ATW rapid UNDO: harv “stuck” (player jääb 5m peale)
 - ☐ Laps loogika: 1 ring = 5→10 + 10→5 (praegu vale)
 
 ## 🟡 Keskmine

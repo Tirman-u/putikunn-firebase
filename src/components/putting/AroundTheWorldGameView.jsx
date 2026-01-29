@@ -23,6 +23,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const updateTimeoutRef = React.useRef(null);
   const updateThrottleRef = React.useRef({ timer: null, latest: null });
   const localSeqRef = React.useRef(0);
+  const lastActionRef = React.useRef({ type: null, at: 0 });
+  const UNDO_SOFT_LOCK_MS = 200;
   const bumpLocalSeq = useCallback(() => {
     localSeqRef.current += 1;
     return localSeqRef.current;
@@ -162,6 +164,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   }, []);
 
   const handleRetry = useCallback(async () => {
+    lastActionRef.current = { type: 'retry', at: Date.now() };
     setShowConfirmDialog(false);
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
@@ -222,6 +225,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   }, [bumpLocalSeq, defaultPlayerState, getLatestGame, playerName, queryClient, updateGameWithLatest]);
 
   const handleSubmitPutts = useCallback((madePutts) => {
+    lastActionRef.current = { type: madePutts === 0 ? 'missed' : 'made', at: Date.now() };
     // Immediate local update for instant feedback
     const latestGame = getLatestGame();
     const config = latestGame.atw_config;
@@ -253,6 +257,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       }
     } else if (actualMakes === 0) {
       newIndex = 0;
+      newDirection = 'UP';
     }
 
     const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * config.discs_per_turn : 0;
@@ -378,6 +383,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   }, [completeGameMutation]);
 
   const handlePlayAgain = useCallback(async () => {
+    lastActionRef.current = { type: 'play_again', at: Date.now() };
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
@@ -525,6 +531,12 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const handleUndo = useCallback(() => {
     const latestGame = getLatestGame();
     if (!config || !latestGame) return;
+
+    const now = Date.now();
+    if (now - lastActionRef.current.at < UNDO_SOFT_LOCK_MS) {
+      return;
+    }
+    lastActionRef.current = { type: 'undo', at: now };
 
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);

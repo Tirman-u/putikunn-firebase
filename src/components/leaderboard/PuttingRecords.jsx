@@ -142,26 +142,18 @@ export default function PuttingRecords() {
     return true;
   });
 
-  // Group by player and keep only the best score for each
-  const bestScoresByPlayer = {};
-  filteredEntries.forEach(entry => {
-    const key = entry.player_name || entry.player_email || entry.id;
-    if (!bestScoresByPlayer[key] || entry.score > bestScoresByPlayer[key].score) {
-      bestScoresByPlayer[key] = entry;
-    }
-  });
-
-  const uniqueEntries = Object.values(bestScoresByPlayer).sort((a, b) => b.score - a.score);
-  const sortedEntries = uniqueEntries.slice(0, displayLimit);
+  const sortedEntries = [...filteredEntries]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, displayLimit);
   const canFetchMore = leaderboardEntries.length >= fetchLimit && fetchLimit < MAX_FETCH;
-  const hasMoreToShow = uniqueEntries.length > displayLimit;
+  const hasMoreToShow = filteredEntries.length > displayLimit;
   const canLoadMore = hasMoreToShow || canFetchMore;
 
   useEffect(() => {
     if (!canFetchMore) return;
-    if (uniqueEntries.length >= displayLimit) return;
+    if (filteredEntries.length >= displayLimit) return;
     setFetchLimit(prev => Math.min(prev * 2, MAX_FETCH));
-  }, [canFetchMore, displayLimit, uniqueEntries.length]);
+  }, [canFetchMore, displayLimit, filteredEntries.length]);
 
   // Helper to check if a general entry has a corresponding DG.ee entry
   const hasDiscgolfEntry = (entry) => {

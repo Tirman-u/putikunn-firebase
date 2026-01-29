@@ -32,7 +32,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     setShowLeaderboard(true);
   }, []);
 
-  const { currentDistance, totalScore, bestScore, makeRate, difficultyLabel } = gameStats || {};
+  const { currentDistance, totalScore, bestScore, difficultyLabel } = gameStats || {};
 
   if (isLoading || !game || !config) {
     return <LoadingState />;
@@ -68,7 +68,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       playerName={playerName}
       totalScore={totalScore}
       bestScore={bestScore}
-      makeRate={makeRate}
       difficultyLabel={difficultyLabel}
       config={config}
       isSolo={isSolo}
@@ -86,7 +85,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       currentDistance={currentDistance}
       totalScore={totalScore}
       bestScore={bestScore}
-      makeRate={makeRate}
       difficultyLabel={difficultyLabel}
       config={config}
       isSolo={isSolo}
@@ -103,12 +101,12 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
         // Memoized completed game view
         const CompletedGameView = React.memo(({ 
-        game, playerState, playerName, totalScore, bestScore, makeRate, difficultyLabel, 
+        game, playerState, playerName, totalScore, bestScore, difficultyLabel, 
         config, isSolo, handleCompleteGame,
         handlePlayAgain,
         gameId, submitToLeaderboardMutation, user 
         }) => {
-        const attemptsCount = (playerState.attempts_count || 0) + 1;
+        const attemptsCount = playerState.turns_played > 0 ? (playerState.attempts_count || 0) + 1 : 0;
         const failedTurns = useMemo(() => 
         playerState.history.filter(turn => turn.failed_to_advance || turn.missed_all),
         [playerState.history]
@@ -146,12 +144,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
               <div className="text-sm text-slate-600">Parim tulemus</div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
-              <div className="text-4xl font-bold text-blue-600 mb-2">{attemptsCount}</div>
-              <div className="text-sm text-slate-600">Mitu korda proovitud</div>
-            </div>
-            <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
-              <div className="text-4xl font-bold text-purple-600 mb-2">{makeRate}%</div>
-              <div className="text-sm text-slate-600">Täpsus</div>
+              <div className="text-4xl font-bold text-purple-600 mb-2">{attemptsCount}</div>
+              <div className="text-sm text-slate-600">Attempts</div>
             </div>
           </div>
 
@@ -246,12 +240,13 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
 // Memoized active game view
 const ActiveGameView = React.memo(({ 
-  game, playerState, playerName, currentDistance, totalScore, bestScore, makeRate, 
+  game, playerState, playerName, currentDistance, totalScore, bestScore, 
   difficultyLabel, config, isSolo, hideScore, setHideScore, handleSubmitPutts, 
   handleUndo, undoMutation,
   onViewLeaderboard, onExit 
 }) => {
   const discsPerTurn = config.discs_per_turn || 1;
+  const attemptsCount = playerState.turns_played > 0 ? (playerState.attempts_count || 0) + 1 : 0;
   const usePerDiscInput = discsPerTurn >= 3;
   const [shotResults, setShotResults] = React.useState(
     Array.from({ length: discsPerTurn }, () => null)
@@ -307,8 +302,8 @@ const ActiveGameView = React.memo(({
             <div className="text-xs text-slate-600">Ringe</div>
           </div>
           <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-            <div className="text-xl font-bold text-purple-600">{makeRate}%</div>
-            <div className="text-xs text-slate-600">Täpsus</div>
+            <div className="text-xl font-bold text-purple-600">{attemptsCount}</div>
+            <div className="text-xs text-slate-600">Attempts</div>
           </div>
         </div>
         
@@ -466,7 +461,7 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
     const bestScore = playerState.best_score || 0;
     const currentLaps = playerState.laps_completed || 0;
     const bestLaps = playerState.best_laps || 0;
-    const attemptsCount = playerState.attempts_count || 0;
+    const attemptsCount = playerState.turns_played > 0 ? (playerState.attempts_count || 0) + 1 : 0;
 
     return {
       name: playerName,

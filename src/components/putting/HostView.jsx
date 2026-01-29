@@ -164,7 +164,7 @@ export default function HostView({ gameId, onExit }) {
     const bestScore = playerState.best_score || 0;
     const currentLaps = playerState.laps_completed || 0;
     const bestLaps = playerState.best_laps || 0;
-    const attemptsCount = playerState.attempts_count || 0;
+    const attemptsCount = playerState.turns_played > 0 ? (playerState.attempts_count || 0) + 1 : 0;
 
     return {
       name: playerName,

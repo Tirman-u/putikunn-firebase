@@ -12,7 +12,6 @@ import ErrorBoundary from '@/lib/ErrorBoundary';
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
-const BUILD_MARKER = "BUILD 2026-01-28 12:55";
 
 const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
@@ -76,9 +75,6 @@ function App() {
           <ErrorBoundary>
             <AuthenticatedApp />
           </ErrorBoundary>
-          <div className="fixed bottom-2 right-2 z-50 rounded bg-black/70 px-2 py-1 text-xs text-white shadow">
-            {BUILD_MARKER}
-          </div>
         </Router>
         <Toaster />
       </QueryClientProvider>

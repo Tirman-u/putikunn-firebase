@@ -88,10 +88,14 @@ export default function ManageGames() {
   const getPlayerStats = (game, playerName) => {
     if (game.game_type === 'around_the_world') {
       const state = game.atw_state?.[playerName] || {};
-      const score = game.total_points?.[playerName] || 0;
+      const score = typeof state.best_score === 'number'
+        ? state.best_score
+        : (game.total_points?.[playerName] || 0);
       const madePutts = state.total_makes || 0;
       const totalPutts = state.total_putts || 0;
-      const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+      const accuracy = typeof state.best_accuracy === 'number'
+        ? state.best_accuracy
+        : (totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0);
       return { score, madePutts, totalPutts, accuracy };
     }
 

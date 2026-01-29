@@ -123,7 +123,13 @@ export default function PuttingRecords() {
       if (entry.game_type !== currentView.gameType) return false;
     }
     
-    if (selectedGender !== 'all' && entry.player_gender !== selectedGender) return false;
+    if (selectedGender !== 'all') {
+      if (selectedGender === 'N') {
+        if (entry.player_gender !== 'N') return false;
+      } else if (selectedGender === 'M') {
+        if (entry.player_gender === 'N') return false;
+      }
+    }
     
     if (selectedMonth !== 'all' && entry.date) {
       const entryDate = new Date(entry.date);
@@ -254,11 +260,9 @@ export default function PuttingRecords() {
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
                               <div className="flex items-center gap-2">
                                 <span>{entry.player_name}</span>
-                                {entry.player_gender && (
-                                  <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-                                    {entry.player_gender}
-                                  </span>
-                                )}
+                                <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
+                                  {entry.player_gender || 'M'}
+                                </span>
                                 {(isHostedGame(entry) || hasDiscgolfEntry(entry)) && (
                                   <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
                                     <Award className="w-3 h-3" />

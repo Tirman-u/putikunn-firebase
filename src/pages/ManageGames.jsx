@@ -14,6 +14,7 @@ export default function ManageGames() {
   const [newGroupName, setNewGroupName] = useState('');
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('all');
+  const [lastSubmitSummary, setLastSubmitSummary] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -117,92 +118,100 @@ export default function ManageGames() {
         // Check if player already has an entry
         const playerUid = game.player_uids?.[playerName];
         const playerEmail = game.player_emails?.[playerName];
+        const normalizedName = (playerName || 'guest').trim().toLowerCase();
+        const emailSlug = normalizedName.replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '') || 'guest';
+        const safeEmail = playerEmail || `guest+${emailSlug}@putikunn.local`;
         const identityFilter = playerUid
           ? { player_uid: playerUid }
           : playerEmail
           ? { player_email: playerEmail }
           : { player_name: playerName };
 
-        const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
-          ...identityFilter,
-          game_id: game.id,
-          game_type: game.game_type,
-          leaderboard_type: 'general'
-        });
-
-        if (existingGeneral) {
-          if (score > existingGeneral.score) {
-            await base44.entities.LeaderboardEntry.update(existingGeneral.id, {
-              score,
-              accuracy: Math.round(accuracy * 10) / 10,
-              made_putts: madePutts,
-              total_putts: totalPutts,
-              ...(playerUid ? { player_uid: playerUid } : {}),
-              ...(playerEmail ? { player_email: playerEmail } : {}),
-              player_name: playerName,
-              date: new Date(game.date).toISOString()
-            });
-            results.push({ player: playerName, action: 'updated' });
-          } else {
-            results.push({ player: playerName, action: 'skipped' });
-          }
-        } else {
-          await base44.entities.LeaderboardEntry.create({
-            game_id: game.id,
-            player_uid: playerUid,
-            player_email: playerEmail,
-            player_name: playerName,
-            game_type: game.game_type,
-            score,
-            accuracy: Math.round(accuracy * 10) / 10,
-            made_putts: madePutts,
-            total_putts: totalPutts,
-            leaderboard_type: 'general',
-            player_gender: 'M',
-            date: new Date(game.date).toISOString()
-          });
-          results.push({ player: playerName, action: 'created' });
-        }
-
-        if (game.game_type === 'classic') {
-          const [existingDg] = await base44.entities.LeaderboardEntry.filter({
+        try {
+          const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
             ...identityFilter,
             game_id: game.id,
             game_type: game.game_type,
-            leaderboard_type: 'discgolf_ee'
+            leaderboard_type: 'general'
           });
 
-          if (existingDg) {
-            if (score > existingDg.score) {
-              await base44.entities.LeaderboardEntry.update(existingDg.id, {
+          if (existingGeneral) {
+            if (score > existingGeneral.score) {
+              await base44.entities.LeaderboardEntry.update(existingGeneral.id, {
                 score,
                 accuracy: Math.round(accuracy * 10) / 10,
                 made_putts: madePutts,
                 total_putts: totalPutts,
                 ...(playerUid ? { player_uid: playerUid } : {}),
-                ...(playerEmail ? { player_email: playerEmail } : {}),
+                ...(safeEmail ? { player_email: safeEmail } : {}),
                 player_name: playerName,
-                submitted_by: user?.email,
                 date: new Date(game.date).toISOString()
               });
+              results.push({ player: playerName, action: 'updated' });
+            } else {
+              results.push({ player: playerName, action: 'skipped' });
             }
           } else {
             await base44.entities.LeaderboardEntry.create({
               game_id: game.id,
-              player_uid: playerUid,
-              player_email: playerEmail,
+              ...(playerUid ? { player_uid: playerUid } : {}),
+              player_email: safeEmail,
               player_name: playerName,
               game_type: game.game_type,
               score,
               accuracy: Math.round(accuracy * 10) / 10,
               made_putts: madePutts,
               total_putts: totalPutts,
-              leaderboard_type: 'discgolf_ee',
-              submitted_by: user?.email,
+              leaderboard_type: 'general',
               player_gender: 'M',
               date: new Date(game.date).toISOString()
             });
+            results.push({ player: playerName, action: 'created' });
           }
+
+          if (game.game_type === 'classic') {
+            const [existingDg] = await base44.entities.LeaderboardEntry.filter({
+              ...identityFilter,
+              game_id: game.id,
+              game_type: game.game_type,
+              leaderboard_type: 'discgolf_ee'
+            });
+
+            if (existingDg) {
+              if (score > existingDg.score) {
+                await base44.entities.LeaderboardEntry.update(existingDg.id, {
+                  score,
+                  accuracy: Math.round(accuracy * 10) / 10,
+                  made_putts: madePutts,
+                  total_putts: totalPutts,
+                  ...(playerUid ? { player_uid: playerUid } : {}),
+                  ...(safeEmail ? { player_email: safeEmail } : {}),
+                  player_name: playerName,
+                  submitted_by: user?.email,
+                  date: new Date(game.date).toISOString()
+                });
+              }
+            } else {
+              await base44.entities.LeaderboardEntry.create({
+                game_id: game.id,
+                ...(playerUid ? { player_uid: playerUid } : {}),
+                player_email: safeEmail,
+                player_name: playerName,
+                game_type: game.game_type,
+                score,
+                accuracy: Math.round(accuracy * 10) / 10,
+                made_putts: madePutts,
+                total_putts: totalPutts,
+                leaderboard_type: 'discgolf_ee',
+                submitted_by: user?.email,
+                player_gender: 'M',
+                date: new Date(game.date).toISOString()
+              });
+            }
+          }
+        } catch (error) {
+          results.push({ player: playerName, action: 'error', error });
+          continue;
         }
       }
 
@@ -212,13 +221,25 @@ export default function ManageGames() {
       const updated = results.filter(r => r.action === 'updated').length;
       const created = results.filter(r => r.action === 'created').length;
       const skipped = results.filter(r => r.action === 'skipped').length;
+      const errors = results.filter(r => r.action === 'error').length;
       
       let message = 'Submitted to dg.ee & General leaderboards';
-      if (updated > 0 || skipped > 0) {
-        message += ` (${created} new, ${updated} updated, ${skipped} skipped)`;
+      if (updated > 0 || skipped > 0 || errors > 0 || created > 0) {
+        message += ` (${created} new, ${updated} updated, ${skipped} skipped, ${errors} errors)`;
       }
-      toast.success(message);
+      if (errors > 0) {
+        toast.error(message);
+        setLastSubmitSummary({ type: 'error', text: message });
+      } else {
+        toast.success(message);
+        setLastSubmitSummary({ type: 'success', text: message });
+      }
       queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
+    },
+    onError: (error) => {
+      const message = error?.message || 'Submit failed';
+      toast.error(message);
+      setLastSubmitSummary({ type: 'error', text: message });
     }
   });
 
@@ -233,6 +254,7 @@ export default function ManageGames() {
     },
     onSuccess: () => {
       toast.success('All completed games submitted');
+      setLastSubmitSummary({ type: 'success', text: 'All completed games submitted' });
       queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
     }
   });
@@ -378,6 +400,17 @@ export default function ManageGames() {
               <Upload className="w-4 h-4 mr-2" />
               Submit Completed Games
             </Button>
+            {lastSubmitSummary && (
+              <div
+                className={`text-xs rounded-md px-3 py-2 ${
+                  lastSubmitSummary.type === 'error'
+                    ? 'bg-red-50 text-red-700 border border-red-100'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                }`}
+              >
+                {lastSubmitSummary.text}
+              </div>
+            )}
           </div>
         </div>
 

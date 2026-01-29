@@ -169,6 +169,53 @@ export default function ManageGames() {
     }
   });
 
+  const backfillLeaderboardMutation = useMutation({
+    mutationFn: async () => {
+      const gamesById = new Map((games || []).map(game => [game.id, game]));
+      const entriesToCheck = leaderboardEntries.filter(entry => gamesById.has(entry.game_id));
+
+      let updated = 0;
+      let skipped = 0;
+
+      for (const entry of entriesToCheck) {
+        const game = gamesById.get(entry.game_id);
+        const playerName = entry.player_name;
+        if (!playerName) {
+          skipped += 1;
+          continue;
+        }
+
+        const mappedUid = game?.player_uids?.[playerName];
+        const mappedEmail = game?.player_emails?.[playerName];
+        if (!mappedUid && !mappedEmail) {
+          skipped += 1;
+          continue;
+        }
+
+        const patch = {};
+        if (mappedUid && entry.player_uid !== mappedUid) patch.player_uid = mappedUid;
+        if (mappedEmail && entry.player_email !== mappedEmail) patch.player_email = mappedEmail;
+
+        if (Object.keys(patch).length === 0) {
+          skipped += 1;
+          continue;
+        }
+
+        await base44.entities.LeaderboardEntry.update(entry.id, patch);
+        updated += 1;
+      }
+
+      return { updated, skipped, total: entriesToCheck.length };
+    },
+    onSuccess: (result) => {
+      toast.success(`Backfill done: ${result.updated} updated, ${result.skipped} skipped`);
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
+    },
+    onError: () => {
+      toast.error('Backfill failed');
+    }
+  });
+
   const handleCreateGroup = () => {
     if (!newGroupName.trim() || selectedGames.length === 0) return;
     
@@ -231,14 +278,29 @@ export default function ManageGames() {
 
         {/* Actions */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-6">
-          <Button
-            onClick={() => setShowGroupDialog(true)}
-            disabled={selectedGames.length === 0}
-            className="w-full bg-emerald-600 hover:bg-emerald-700"
-          >
-            <FolderPlus className="w-4 h-4 mr-2" />
-            Create Group from Selected ({selectedGames.length})
-          </Button>
+          <div className="flex flex-col gap-3">
+            <Button
+              onClick={() => setShowGroupDialog(true)}
+              disabled={selectedGames.length === 0}
+              className="w-full bg-emerald-600 hover:bg-emerald-700"
+            >
+              <FolderPlus className="w-4 h-4 mr-2" />
+              Create Group from Selected ({selectedGames.length})
+            </Button>
+            <Button
+              onClick={() => {
+                if (confirm('Backfill leaderboard entries for your games? This updates player_uid/email mappings.')) {
+                  backfillLeaderboardMutation.mutate();
+                }
+              }}
+              disabled={backfillLeaderboardMutation.isPending || games.length === 0}
+              variant="outline"
+              className="w-full"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Backfill Leaderboard UIDs
+            </Button>
+          </div>
         </div>
 
         {/* Groups */}

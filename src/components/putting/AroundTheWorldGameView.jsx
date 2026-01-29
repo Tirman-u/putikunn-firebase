@@ -83,6 +83,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     turns_played: 0,
     total_makes: 0,
     total_putts: 0,
+    current_distance_points: 0,
     current_round_draft: { attempts: [], is_finalized: false },
     history: [],
     best_score: 0,
@@ -158,6 +159,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       turns_played: 0,
       total_makes: 0,
       total_putts: 0,
+      current_distance_points: 0,
       current_round_draft: { attempts: [], is_finalized: false },
       history: [],
       best_score: Math.max(bestScore, currentScore),
@@ -210,6 +212,12 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     const discsPerTurn = config.discs_per_turn || 1;
     const actualMakes = Math.max(0, Math.min(Number(madePutts) || 0, discsPerTurn));
     const misses = discsPerTurn - actualMakes;
+    const shouldRestart = actualMakes === 0 || (discsPerTurn >= 3 && misses >= 2);
+
+    if (shouldRestart) {
+      handleRetry({ silent: true });
+      return;
+    }
 
     let newIndex = currentIndex;
     let newDirection = direction;
@@ -255,8 +263,13 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       }
     }
 
-    const pointsAwarded = actualMakes > 0 ? distances[currentIndex] * actualMakes : 0;
-
+    const currentDistance = distances[currentIndex];
+    const previousDistancePoints = playerState.current_distance_points || 0;
+    const attemptPoints = actualMakes > 0 ? currentDistance * actualMakes : 0;
+    const distancePointsTotal = Math.max(previousDistancePoints, attemptPoints);
+    const pointsAwarded = Math.max(0, distancePointsTotal - previousDistancePoints);
+    const movedToNewDistance = newIndex !== currentIndex;
+    const newDistancePoints = movedToNewDistance ? 0 : distancePointsTotal;
     const updatedState = {
       current_distance_index: newIndex,
       direction: newDirection,
@@ -264,14 +277,16 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       turns_played: playerState.turns_played + 1,
       total_makes: playerState.total_makes + actualMakes,
       total_putts: playerState.total_putts + discsPerTurn,
+      current_distance_points: newDistancePoints,
       current_round_draft: { attempts: [], is_finalized: false },
       history: [...playerState.history, {
         turn_number: playerState.turns_played + 1,
-        distance: distances[currentIndex],
+        distance: currentDistance,
         direction: direction,
         made_putts: actualMakes,
         moved_to_distance: distances[newIndex],
         points_awarded: pointsAwarded,
+        distance_points_total: distancePointsTotal,
         lap_event: lapEvent,
         failed_to_advance: actualMakes > 0 && (discsPerTurn >= 3 ? misses >= 1 : actualMakes < threshold),
         missed_all: actualMakes === 0
@@ -293,13 +308,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       }
     });
 
-    if (actualMakes === 0) {
-      handleRetry({ silent: true });
-      return;
-    }
-
     // Debounced DB sync
-    const pending = { madePutts: actualMakes, showDialog: actualMakes === 0 };
+    const pending = { madePutts: actualMakes };
     pendingUpdateRef.current = [...pendingUpdateRef.current, pending];
     setPendingUpdates(prev => [...prev, pending]);
     
@@ -397,6 +407,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       turns_played: 0,
       total_makes: 0,
       total_putts: 0,
+      current_distance_points: 0,
       current_round_draft: { attempts: [], is_finalized: false },
       history: [],
       best_score: bestScore,
@@ -481,13 +492,20 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     let previousIndex = 0;
     let previousDirection = 'UP';
     let previousLaps = 0;
+    let previousDistancePoints = 0;
 
     if (newHistory.length > 0) {
       const prevTurn = newHistory[newHistory.length - 1];
       const distances = config.distances;
-      previousIndex = distances.indexOf(prevTurn.moved_to_distance);
-      previousDirection = prevTurn.direction;
+      const resolvedIndex = distances.indexOf(prevTurn.moved_to_distance);
+      previousIndex = resolvedIndex >= 0 ? resolvedIndex : 0;
+      previousDirection = prevTurn.lap_event
+        ? (prevTurn.direction === 'UP' ? 'DOWN' : 'UP')
+        : prevTurn.direction;
       previousLaps = playerState.laps_completed - (lastTurn.lap_event ? 1 : 0);
+      previousDistancePoints = prevTurn.moved_to_distance === prevTurn.distance
+        ? (prevTurn.distance_points_total || 0)
+        : 0;
     }
 
     const updatedState = {
@@ -499,7 +517,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       total_makes: playerState.total_makes - lastTurn.made_putts,
       total_putts: playerState.total_putts - config.discs_per_turn,
       history: newHistory,
-      current_round_draft: { attempts: [], is_finalized: false }
+      current_round_draft: { attempts: [], is_finalized: false },
+      current_distance_points: previousDistancePoints
     };
 
     updatedState.client_seq = bumpLocalSeq();
@@ -834,11 +853,28 @@ const ActiveGameView = React.memo(({
 }) => {
   const discsPerTurn = config.discs_per_turn || 1;
   const usePerDiscInput = discsPerTurn >= 3;
-  const [madeCount, setMadeCount] = React.useState(0);
+  const [shotResults, setShotResults] = React.useState(
+    Array.from({ length: discsPerTurn }, () => null)
+  );
 
   React.useEffect(() => {
-    setMadeCount(0);
+    setShotResults(Array.from({ length: discsPerTurn }, () => null));
   }, [playerState.turns_played, currentDistance, discsPerTurn]);
+
+  const handleShot = (isMake) => {
+    const nextIndex = shotResults.findIndex((result) => result === null);
+    if (nextIndex === -1) return;
+
+    const nextResults = [...shotResults];
+    nextResults[nextIndex] = isMake;
+    setShotResults(nextResults);
+
+    if (nextIndex === discsPerTurn - 1) {
+      const madeCount = nextResults.filter(Boolean).length;
+      handleSubmitPutts(madeCount);
+      setShotResults(Array.from({ length: discsPerTurn }, () => null));
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -940,43 +976,33 @@ const ActiveGameView = React.memo(({
           {/* Quick Input */}
           <div>
             {usePerDiscInput ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm text-slate-600">
-                  <span>Sisse</span>
-                  <span className="font-semibold text-slate-800">{madeCount}/{discsPerTurn}</span>
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {Array.from({ length: discsPerTurn }).map((_, idx) => {
-                    const isMade = idx < madeCount;
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setMadeCount(idx + 1)}
-                        className={`h-10 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
-                          isMade
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {idx + 1}
-                      </button>
-                    );
-                  })}
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {shotResults.map((result, idx) => (
+                    <span
+                      key={idx}
+                      className={`h-3 w-12 rounded-full transition-all ${
+                        result === true
+                          ? 'bg-emerald-500'
+                          : result === false
+                          ? 'bg-red-400'
+                          : 'bg-slate-200'
+                      }`}
+                    />
+                  ))}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <button
-                    onClick={() => handleSubmitPutts(0)}
+                    onClick={() => handleShot(false)}
                     className="h-14 rounded-xl font-bold text-base bg-red-100 text-red-700 hover:bg-red-200 active:scale-95 transition-all"
                   >
-                    Missed
+                    Miss
                   </button>
                   <button
-                    onClick={() => handleSubmitPutts(madeCount)}
-                    disabled={madeCount === 0}
-                    className="h-14 rounded-xl font-bold text-base bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 transition-all disabled:opacity-50"
+                    onClick={() => handleShot(true)}
+                    className="h-14 rounded-xl font-bold text-base bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 transition-all"
                   >
-                    Kinnita
+                    Make
                   </button>
                 </div>
               </div>

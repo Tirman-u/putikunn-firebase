@@ -14,6 +14,8 @@ export default function PuttingRecords() {
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 50;
+  const MAX_FETCH = 500;
+  const [fetchLimit, setFetchLimit] = useState(PAGE_SIZE);
 
   const viewTypes = [
     { id: 'general_classic', label: 'Classic', leaderboardType: 'general', gameType: 'classic' },
@@ -31,14 +33,15 @@ export default function PuttingRecords() {
   });
 
   const currentView = viewTypes.find(v => v.id === selectedView);
-  const limit = PAGE_SIZE * page;
+  const displayLimit = PAGE_SIZE * page;
 
   useEffect(() => {
     setPage(1);
+    setFetchLimit(PAGE_SIZE);
   }, [selectedView, selectedGender, selectedMonth]);
 
   const { data: leaderboardEntries = [] } = useQuery({
-    queryKey: ['leaderboard-entries', selectedView, limit],
+    queryKey: ['leaderboard-entries', selectedView, fetchLimit],
     queryFn: async () => {
       if (!currentView) return [];
       const filter = {
@@ -49,19 +52,19 @@ export default function PuttingRecords() {
       } else {
         filter.game_type = currentView.gameType;
       }
-      return base44.entities.LeaderboardEntry.filter(filter, '-score', limit);
+      return base44.entities.LeaderboardEntry.filter(filter, '-score', fetchLimit);
     },
     refetchInterval: 30000
   });
 
   const { data: discgolfEntries = [] } = useQuery({
-    queryKey: ['leaderboard-entries-discgolf', currentView?.leaderboardType, limit],
+    queryKey: ['leaderboard-entries-discgolf', currentView?.leaderboardType, fetchLimit],
     queryFn: async () => {
       if (!currentView || currentView.leaderboardType !== 'general') return [];
       return base44.entities.LeaderboardEntry.filter(
         { leaderboard_type: 'discgolf_ee', game_type: 'classic' },
         '-score',
-        limit
+        fetchLimit
       );
     },
     refetchInterval: 30000
@@ -142,10 +145,17 @@ export default function PuttingRecords() {
     }
   });
 
-  const sortedEntries = Object.values(bestScoresByPlayer)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, PAGE_SIZE * page);
-  const canLoadMore = leaderboardEntries.length >= limit;
+  const uniqueEntries = Object.values(bestScoresByPlayer).sort((a, b) => b.score - a.score);
+  const sortedEntries = uniqueEntries.slice(0, displayLimit);
+  const canFetchMore = leaderboardEntries.length >= fetchLimit && fetchLimit < MAX_FETCH;
+  const hasMoreToShow = uniqueEntries.length > displayLimit;
+  const canLoadMore = hasMoreToShow || canFetchMore;
+
+  useEffect(() => {
+    if (!canFetchMore) return;
+    if (uniqueEntries.length >= displayLimit) return;
+    setFetchLimit(prev => Math.min(prev * 2, MAX_FETCH));
+  }, [canFetchMore, displayLimit, uniqueEntries.length]);
 
   // Helper to check if a general entry has a corresponding DG.ee entry
   const hasDiscgolfEntry = (entry) => {

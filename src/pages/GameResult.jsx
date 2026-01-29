@@ -56,11 +56,29 @@ export default function GameResult() {
     mutationFn: async () => {
       // Find current user's name in the game
       const playerName = user?.full_name;
-      const playerPutts = game.player_putts?.[playerName] || [];
-      const madePutts = playerPutts.filter(p => p.result === 'made').length;
-      const totalPutts = playerPutts.length;
-      const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
-      const score = game.total_points[playerName] || 0;
+      let madePutts = 0;
+      let totalPutts = 0;
+      let accuracy = 0;
+      let score = 0;
+
+      if (game.game_type === 'around_the_world') {
+        const state = game.atw_state?.[playerName] || {};
+        const currentScore = game.total_points?.[playerName] || 0;
+        const bestScore = Math.max(state.best_score || 0, currentScore);
+        const currentAccuracy = state.total_putts > 0
+          ? (state.total_makes / state.total_putts) * 100
+          : 0;
+        madePutts = state.total_makes || 0;
+        totalPutts = state.total_putts || 0;
+        accuracy = Math.max(state.best_accuracy || 0, currentAccuracy);
+        score = bestScore;
+      } else {
+        const playerPutts = game.player_putts?.[playerName] || [];
+        madePutts = playerPutts.filter(p => p.result === 'made').length;
+        totalPutts = playerPutts.length;
+        accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+        score = game.total_points[playerName] || 0;
+      }
 
       // Check if player already has an entry for this game type
       const existingEntries = await base44.entities.LeaderboardEntry.filter({
@@ -120,11 +138,29 @@ export default function GameResult() {
       const results = [];
       
       for (const playerName of game.players || []) {
-        const playerPutts = game.player_putts?.[playerName] || [];
-        const madePutts = playerPutts.filter(p => p.result === 'made').length;
-        const totalPutts = playerPutts.length;
-        const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
-        const score = game.total_points?.[playerName] || 0;
+        let madePutts = 0;
+        let totalPutts = 0;
+        let accuracy = 0;
+        let score = 0;
+
+        if (game.game_type === 'around_the_world') {
+          const state = game.atw_state?.[playerName] || {};
+          const currentScore = game.total_points?.[playerName] || 0;
+          const bestScore = Math.max(state.best_score || 0, currentScore);
+          const currentAccuracy = state.total_putts > 0
+            ? (state.total_makes / state.total_putts) * 100
+            : 0;
+          madePutts = state.total_makes || 0;
+          totalPutts = state.total_putts || 0;
+          accuracy = Math.max(state.best_accuracy || 0, currentAccuracy);
+          score = bestScore;
+        } else {
+          const playerPutts = game.player_putts?.[playerName] || [];
+          madePutts = playerPutts.filter(p => p.result === 'made').length;
+          totalPutts = playerPutts.length;
+          accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+          score = game.total_points?.[playerName] || 0;
+        }
 
         // Check if player already has an entry
         const playerUid = game.player_uids?.[playerName];

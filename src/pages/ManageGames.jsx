@@ -88,14 +88,14 @@ export default function ManageGames() {
   const getPlayerStats = (game, playerName) => {
     if (game.game_type === 'around_the_world') {
       const state = game.atw_state?.[playerName] || {};
-      const score = typeof state.best_score === 'number'
-        ? state.best_score
-        : (game.total_points?.[playerName] || 0);
+      const currentScore = game.total_points?.[playerName] || 0;
+      const bestScore = typeof state.best_score === 'number' ? state.best_score : 0;
+      const score = Math.max(bestScore, currentScore);
       const madePutts = state.total_makes || 0;
       const totalPutts = state.total_putts || 0;
-      const accuracy = typeof state.best_accuracy === 'number'
-        ? state.best_accuracy
-        : (totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0);
+      const currentAccuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+      const bestAccuracy = typeof state.best_accuracy === 'number' ? state.best_accuracy : 0;
+      const accuracy = Math.max(bestAccuracy, currentAccuracy);
       return { score, madePutts, totalPutts, accuracy };
     }
 
@@ -110,11 +110,15 @@ export default function ManageGames() {
   const submitToDiscgolfMutation = useMutation({
     mutationFn: async (game) => {
       const results = [];
+      const existingEntries = await base44.entities.LeaderboardEntry.filter({ game_id: game.id });
+      for (const entry of existingEntries) {
+        await base44.entities.LeaderboardEntry.delete(entry.id);
+      }
       
       const players = resolveGamePlayers(game);
       for (const playerName of players) {
         const { score, madePutts, totalPutts, accuracy } = getPlayerStats(game, playerName);
-        if (game.game_type !== 'around_the_world' && !totalPutts && !score) {
+        if (!totalPutts && !score) {
           results.push({ player: playerName, action: 'skipped' });
           continue;
         }
@@ -168,6 +172,9 @@ export default function ManageGames() {
               total_putts: totalPutts,
               leaderboard_type: 'general',
               player_gender: 'M',
+              ...(game.game_type === 'streak_challenge'
+                ? { streak_distance: game.player_distances?.[playerName] || 0 }
+                : {}),
               date: new Date(game.date).toISOString()
             });
             results.push({ player: playerName, action: 'created' });

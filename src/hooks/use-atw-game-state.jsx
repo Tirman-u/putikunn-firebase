@@ -337,7 +337,10 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
       const madePutts = playerState.total_makes;
       const totalPutts = playerState.total_putts;
-      const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+      const currentAccuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+      const accuracy = Math.max(playerState.best_accuracy || 0, currentAccuracy);
+      const currentScore = game?.total_points?.[playerName] || 0;
+      const bestScore = Math.max(playerState.best_score || 0, currentScore);
 
       return await base44.entities.LeaderboardEntry.create({
         game_id: game.id,
@@ -345,7 +348,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
         player_email: user?.email || 'unknown',
         player_name: playerName,
         game_type: 'around_the_world',
-        score: game?.total_points?.[playerName] || 0,
+        score: bestScore,
         accuracy: Math.round(accuracy * 10) / 10,
         made_putts: madePutts,
         total_putts: totalPutts,

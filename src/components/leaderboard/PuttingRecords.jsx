@@ -147,11 +147,14 @@ export default function PuttingRecords() {
   const getPlayerKey = (entry) => {
     const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
     const mappedUid = entry?.player_name ? game?.player_uids?.[entry.player_name] : null;
+    const mappedEmail = entry?.player_name ? game?.player_emails?.[entry.player_name] : null;
     const uidKey = entry?.player_uid || mappedUid ? `uid:${entry.player_uid || mappedUid}` : null;
     if (uidKey) return uidKey;
 
     const hostEmail = game?.host_user;
-    const email = entry?.player_email && entry.player_email !== 'unknown' ? entry.player_email : null;
+    const email = entry?.player_email && entry.player_email !== 'unknown'
+      ? entry.player_email
+      : (mappedEmail || null);
     const emailKey = email && email !== hostEmail ? `email:${email}` : null;
     const nameKey = entry?.player_name
       ? `name:${entry.player_name.trim().toLowerCase()}`

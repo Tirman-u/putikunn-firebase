@@ -58,10 +58,12 @@ export default function HostView({ gameId, onExit }) {
       
       for (const playerName of game.players || []) {
         const playerState = game.atw_state?.[playerName];
-        const score = playerState?.best_score || 0;
+        const currentScore = game.total_points?.[playerName] || 0;
+        const score = Math.max(playerState?.best_score || 0, currentScore);
         const totalPutts = playerState?.total_putts || 0;
         const madePutts = playerState?.total_makes || 0;
-        const accuracy = playerState?.best_accuracy || 0;
+        const currentAccuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+        const accuracy = Math.max(playerState?.best_accuracy || 0, currentAccuracy);
 
         const playerUid = game.player_uids?.[playerName];
         const playerEmail = game.player_emails?.[playerName];

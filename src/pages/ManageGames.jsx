@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Trash2, Share2, FolderPlus, Folder, Calendar, ChevronRight, Upload, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Trash2, Share2, FolderPlus, Folder, Calendar, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
@@ -14,7 +14,6 @@ export default function ManageGames() {
   const [newGroupName, setNewGroupName] = useState('');
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('all');
-  const [lastSubmitSummary, setLastSubmitSummary] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -126,9 +125,7 @@ export default function ManageGames() {
         // Check if player already has an entry
         const playerUid = game.player_uids?.[playerName];
         const playerEmail = game.player_emails?.[playerName];
-        const normalizedName = (playerName || 'guest').trim().toLowerCase();
-        const emailSlug = normalizedName.replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '') || 'guest';
-        const safeEmail = playerEmail || `guest+${emailSlug}@putikunn.local`;
+        const safeEmail = playerEmail || game.host_user || user?.email || '';
         const identityFilter = playerUid
           ? { player_uid: playerUid }
           : playerEmail
@@ -163,7 +160,7 @@ export default function ManageGames() {
             await base44.entities.LeaderboardEntry.create({
               game_id: game.id,
               ...(playerUid ? { player_uid: playerUid } : {}),
-              player_email: safeEmail,
+              ...(safeEmail ? { player_email: safeEmail } : {}),
               player_name: playerName,
               game_type: game.game_type,
               score,
@@ -206,7 +203,7 @@ export default function ManageGames() {
               await base44.entities.LeaderboardEntry.create({
                 game_id: game.id,
                 ...(playerUid ? { player_uid: playerUid } : {}),
-                player_email: safeEmail,
+                ...(safeEmail ? { player_email: safeEmail } : {}),
                 player_name: playerName,
                 game_type: game.game_type,
                 score,
@@ -240,80 +237,14 @@ export default function ManageGames() {
       }
       if (errors > 0) {
         toast.error(message);
-        setLastSubmitSummary({ type: 'error', text: message });
       } else {
         toast.success(message);
-        setLastSubmitSummary({ type: 'success', text: message });
       }
       queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
     },
     onError: (error) => {
       const message = error?.message || 'Submit failed';
       toast.error(message);
-      setLastSubmitSummary({ type: 'error', text: message });
-    }
-  });
-
-  const submitAllCompletedMutation = useMutation({
-    mutationFn: async () => {
-      const results = [];
-      for (const game of completedGames) {
-        const res = await submitToDiscgolfMutation.mutateAsync(game);
-        results.push({ gameId: game.id, res });
-      }
-      return results;
-    },
-    onSuccess: () => {
-      toast.success('All completed games submitted');
-      setLastSubmitSummary({ type: 'success', text: 'All completed games submitted' });
-      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
-    }
-  });
-
-  const backfillLeaderboardMutation = useMutation({
-    mutationFn: async () => {
-      const gamesById = new Map((games || []).map(game => [game.id, game]));
-      const entriesToCheck = leaderboardEntries.filter(entry => gamesById.has(entry.game_id));
-
-      let updated = 0;
-      let skipped = 0;
-
-      for (const entry of entriesToCheck) {
-        const game = gamesById.get(entry.game_id);
-        const playerName = entry.player_name;
-        if (!playerName) {
-          skipped += 1;
-          continue;
-        }
-
-        const mappedUid = game?.player_uids?.[playerName];
-        const mappedEmail = game?.player_emails?.[playerName];
-        if (!mappedUid && !mappedEmail) {
-          skipped += 1;
-          continue;
-        }
-
-        const patch = {};
-        if (mappedUid && entry.player_uid !== mappedUid) patch.player_uid = mappedUid;
-        if (mappedEmail && entry.player_email !== mappedEmail) patch.player_email = mappedEmail;
-
-        if (Object.keys(patch).length === 0) {
-          skipped += 1;
-          continue;
-        }
-
-        await base44.entities.LeaderboardEntry.update(entry.id, patch);
-        updated += 1;
-      }
-
-      return { updated, skipped, total: entriesToCheck.length };
-    },
-    onSuccess: (result) => {
-      toast.success(`Backfill done: ${result.updated} updated, ${result.skipped} skipped`);
-      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
-    },
-    onError: () => {
-      toast.error('Backfill failed');
     }
   });
 
@@ -386,42 +317,7 @@ export default function ManageGames() {
               <FolderPlus className="w-4 h-4 mr-2" />
               Create Group from Selected ({selectedGames.length})
             </Button>
-            <Button
-              onClick={() => {
-                if (confirm('Backfill leaderboard entries for your games? This updates player_uid/email mappings.')) {
-                  backfillLeaderboardMutation.mutate();
-                }
-              }}
-              disabled={backfillLeaderboardMutation.isPending || games.length === 0}
-              variant="outline"
-              className="w-full"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Backfill Leaderboard UIDs
-            </Button>
-            <Button
-              onClick={() => {
-                if (confirm('Submit all completed games to leaderboards?')) {
-                  submitAllCompletedMutation.mutate();
-                }
-              }}
-              disabled={submitAllCompletedMutation.isPending || completedGames.length === 0}
-              className="w-full bg-blue-600 hover:bg-blue-700"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Submit Completed Games
-            </Button>
-            {lastSubmitSummary && (
-              <div
-                className={`text-xs rounded-md px-3 py-2 ${
-                  lastSubmitSummary.type === 'error'
-                    ? 'bg-red-50 text-red-700 border border-red-100'
-                    : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                }`}
-              >
-                {lastSubmitSummary.text}
-              </div>
-            )}
+            
           </div>
         </div>
 

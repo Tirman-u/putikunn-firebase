@@ -23,10 +23,33 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const updateTimeoutRef = React.useRef(null);
   const updateThrottleRef = React.useRef({ timer: null, latest: null });
   const localSeqRef = React.useRef(0);
+  const ACTION_LOCK_MS = 250;
+  const actionLockRef = React.useRef(0);
+  const actionUnlockRef = React.useRef(null);
+  const [isActionLocked, setIsActionLocked] = useState(false);
 
   const bumpLocalSeq = useCallback(() => {
     localSeqRef.current += 1;
     return localSeqRef.current;
+  }, []);
+
+  const tryLockAction = useCallback(() => {
+    const now = Date.now();
+    if (now - actionLockRef.current < ACTION_LOCK_MS) {
+      return false;
+    }
+
+    actionLockRef.current = now;
+    setIsActionLocked(true);
+
+    if (actionUnlockRef.current) {
+      clearTimeout(actionUnlockRef.current);
+    }
+    actionUnlockRef.current = setTimeout(() => {
+      setIsActionLocked(false);
+    }, ACTION_LOCK_MS);
+
+    return true;
   }, []);
 
   const { data: user } = useQuery({
@@ -147,6 +170,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   }, []);
 
   const handleRetry = useCallback(async () => {
+    if (!tryLockAction()) return;
+
     setShowConfirmDialog(false);
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
@@ -204,9 +229,11 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     });
     queryClient.invalidateQueries({ queryKey: ['game', gameId] });
     toast.success('Alustad uuesti 5m pealt!');
-  }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, playerName, queryClient]);
+  }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, playerName, queryClient, tryLockAction]);
 
   const handleSubmitPutts = useCallback((madePutts) => {
+    if (!tryLockAction()) return;
+
     // Immediate local update for instant feedback
     const latestGame = getLatestGame();
     const config = latestGame.atw_config;
@@ -307,7 +334,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       pendingUpdateRef.current = [];
       setPendingUpdates([]);
     }, delay);
-  }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, isSolo, playerName, queryClient, submitTurnMutation]);
+  }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, isSolo, playerName, queryClient, submitTurnMutation, tryLockAction]);
 
   const completeGameMutation = useMutation({
     mutationFn: async () => {
@@ -362,6 +389,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   }, [completeGameMutation]);
 
   const handlePlayAgain = useCallback(async () => {
+    if (!tryLockAction()) return;
+
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
@@ -414,7 +443,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     });
 
     queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-  }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, playerName, queryClient]);
+  }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, playerName, queryClient, tryLockAction]);
 
   const handleViewLeaderboard = useCallback(() => {
     setShowConfirmDialog(false);
@@ -521,6 +550,8 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     const latestGame = getLatestGame();
     if (!config || !latestGame) return;
 
+    if (!tryLockAction()) return;
+
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
@@ -545,13 +576,16 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     });
 
     undoMutation.mutate(payload);
-  }, [buildUndoPayload, config, gameId, getLatestGame, queryClient, undoMutation]);
+  }, [buildUndoPayload, config, gameId, getLatestGame, queryClient, tryLockAction, undoMutation]);
 
   // Cleanup timeout on unmount
   React.useEffect(() => {
     return () => {
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
+      }
+      if (actionUnlockRef.current) {
+        clearTimeout(actionUnlockRef.current);
       }
       if (pendingUpdateRef.current.length) {
         const latestGame = queryClient.getQueryData(['game', gameId]);
@@ -662,6 +696,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       isSolo={isSolo}
       hideScore={hideScore}
       setHideScore={setHideScore}
+      isActionLocked={isActionLocked}
       handleSubmitPutts={handleSubmitPutts}
       handleUndo={handleUndo}
       undoMutation={undoMutation}
@@ -876,6 +911,7 @@ const ActiveGameView = React.memo(({
   game, playerState, playerName, currentDistance, totalScore, bestScore, makeRate, 
   difficultyLabel, config, isSolo, hideScore, setHideScore, handleSubmitPutts, 
   handleUndo, undoMutation, showConfirmDialog, handleFinish, handleRetry,
+  isActionLocked,
   onViewLeaderboard, onExit, setShowConfirmDialog, gameId, submitTurnMutation 
 }) => {
   return (
@@ -1010,13 +1046,15 @@ const ActiveGameView = React.memo(({
             <div className="grid grid-cols-2 gap-3 mb-3">
               <button
                 onClick={() => handleSubmitPutts(0)}
-                className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 active:scale-95 transition-all"
+                disabled={isActionLocked}
+                className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Missed
               </button>
               <button
                 onClick={() => handleSubmitPutts(1)}
-                className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 transition-all"
+                disabled={isActionLocked}
+                className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Made
               </button>
@@ -1024,8 +1062,8 @@ const ActiveGameView = React.memo(({
             {playerState.history && playerState.history.length > 0 && (
               <button
                 onClick={handleUndo}
-                disabled={undoMutation.isPending}
-                className="w-full h-16 rounded-xl font-bold text-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all disabled:opacity-50"
+                disabled={undoMutation.isPending || isActionLocked}
+                className="w-full h-16 rounded-xl font-bold text-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Undo2 className="w-4 h-4 mr-2 inline" />
                 Võta tagasi

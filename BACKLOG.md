@@ -13,6 +13,7 @@ Done = ✅, Osaline = ⏳, Open = ☐
 ## 🟡 Keskmine
 - ✅ Leaderboard pagination + limit 50
 - ☐ Leaderboard server‑filter (gender + month)
+- ☐ Leaderboard: admin/super‑admin manual merge (duplicate aliases)
 - ☐ ATW/Player round‑commit batch (DB write ainult roundi lõpus)
 - ⏳ ErrorBoundary prod‑log + user‑friendly retry
 - ☐ Ühtne realtime hook (subscribe + throttle + cleanup + retry)

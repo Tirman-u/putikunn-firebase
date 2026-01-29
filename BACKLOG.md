@@ -18,7 +18,7 @@ Done = ✅, Osaline = ⏳, Open = ☐
 - ✅ ErrorBoundary prod‑log + user‑friendly retry
 - ✅ Ühtne realtime hook (subscribe + throttle + cleanup + retry)
 - ✅ Putting Records: osad tulemused ei ilmu (nt Sigmar)
-- ☐ Leaderboard ATW skoori klikk crash + peaks avama hostitud mängu
+- ✅ Leaderboard ATW skoori klikk crash + peaks avama hostitud mängu
 - ☐ My Profile: ATW mängud ei tule välja
 - ☐ Missed = auto‑restart + eraldi karika/exit nupud
 - ☐ Unikaalne mängu URL (pin vms) jagamiseks

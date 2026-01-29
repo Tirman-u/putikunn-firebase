@@ -145,7 +145,7 @@ export default function PuttingRecords() {
   // Group by player and keep only the best score for each
   const bestScoresByPlayer = {};
   filteredEntries.forEach(entry => {
-    const key = entry.player_email || entry.player_name || entry.id;
+    const key = entry.player_name || entry.player_email || entry.id;
     if (!bestScoresByPlayer[key] || entry.score > bestScoresByPlayer[key].score) {
       bestScoresByPlayer[key] = entry;
     }

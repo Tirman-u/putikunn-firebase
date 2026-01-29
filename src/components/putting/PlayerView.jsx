@@ -14,6 +14,7 @@ import JylyScoreTable from './JylyScoreTable';
 import MobileLeaderboard from './MobileLeaderboard';
 import PuttTypeSelector from './PuttTypeSelector';
 import PerformanceAnalysis from './PerformanceAnalysis';
+import useRealtimeGame from '@/hooks/use-realtime-game';
 import { 
   GAME_FORMATS, 
   getNextDistanceFromMade, 
@@ -33,7 +34,6 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const pendingUpdateRef = React.useRef(null);
   const updateTimeoutRef = React.useRef(null);
   const gameIdRef = React.useRef(gameId);
-  const updateThrottleRef = React.useRef({ timer: null, latest: null });
   const queryClient = useQueryClient();
 
   React.useEffect(() => {
@@ -54,40 +54,15 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     refetchInterval: false
   });
 
-  // Real-time subscription for multiplayer games
-  React.useEffect(() => {
-    if (!gameId || game?.pin === '0000') return;
-
-    const unsubscribe = base44.entities.Game.subscribe((event) => {
-      if (event.id === gameId && (event.type === 'update' || event.type === 'delete')) {
-        const throttle = updateThrottleRef.current;
-        const applyEvent = (evt) => {
-          queryClient.setQueryData(['game', gameId], evt.data);
-        };
-
-        if (!throttle.timer) {
-          applyEvent(event);
-          throttle.timer = setTimeout(() => {
-            if (throttle.latest) {
-              applyEvent(throttle.latest);
-              throttle.latest = null;
-            }
-            throttle.timer = null;
-          }, 1000);
-        } else {
-          throttle.latest = event;
-        }
-      }
-    });
-
-    return () => {
-      if (updateThrottleRef.current.timer) {
-        clearTimeout(updateThrottleRef.current.timer);
-      }
-      updateThrottleRef.current.latest = null;
-      unsubscribe();
-    };
-  }, [gameId, game?.pin, queryClient]);
+  useRealtimeGame({
+    gameId,
+    enabled: !!gameId && game?.pin !== '0000',
+    throttleMs: 1000,
+    eventTypes: ['update', 'delete'],
+    onEvent: (event) => {
+      queryClient.setQueryData(['game', gameId], event.data);
+    }
+  });
 
   const isSoloGame = game?.pin === '0000';
 

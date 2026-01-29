@@ -1,23 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import React, { useState } from 'react';
 import { Trophy, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import useRealtimeGame from '@/hooks/use-realtime-game';
 
 export default function MobileLeaderboard({ game, onClose }) {
   const [liveGame, setLiveGame] = useState(game);
 
-  useEffect(() => {
-    if (!game?.id) return;
-    
-    // Subscribe to real-time updates
-    const unsubscribe = base44.entities.Game.subscribe((event) => {
-      if (event.id === game.id && event.type === 'update') {
-        setLiveGame(event.data);
-      }
-    });
-
-    return unsubscribe;
-  }, [game?.id]);
+  useRealtimeGame({
+    gameId: game?.id,
+    enabled: !!game?.id,
+    throttleMs: 1000,
+    eventTypes: ['update'],
+    onEvent: (event) => {
+      setLiveGame(event.data);
+    }
+  });
 
   const currentGame = liveGame || game;
   if (!currentGame) return null;

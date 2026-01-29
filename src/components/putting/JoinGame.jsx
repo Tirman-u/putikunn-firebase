@@ -6,6 +6,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { GAME_FORMATS } from './gameRules';
+import useRealtimeGame from '@/hooks/use-realtime-game';
 
 export default function JoinGame({ onJoin, onBack }) {
   const [pin, setPin] = useState('');
@@ -32,16 +33,15 @@ export default function JoinGame({ onJoin, onBack }) {
     refetchInterval: false
   });
 
-  React.useEffect(() => {
-    if (!user) return;
-
-    const unsubscribe = base44.entities.Game.subscribe((event) => {
-      if (event.type === 'create' || event.type === 'update') {
-        queryClient.invalidateQueries({ queryKey: ['recent-games'] });
-      }
-    });
-    return unsubscribe;
-  }, [queryClient, user]);
+  useRealtimeGame({
+    enabled: !!user,
+    eventTypes: ['create', 'update'],
+    throttleMs: 1000,
+    filterEvent: (event) => event.type === 'create' || event.type === 'update',
+    onEvent: () => {
+      queryClient.invalidateQueries({ queryKey: ['recent-games'] });
+    }
+  });
 
   const getGameTypeName = (type) => {
     const names = {

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import ATWLeaderboard from './ATWLeaderboard';
+import useRealtimeGame from '@/hooks/use-realtime-game';
 
 
 
@@ -21,7 +22,6 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
   const ATW_SYNC_DELAY_MS_MULTI = 250;
   const pendingUpdateRef = React.useRef([]);
   const updateTimeoutRef = React.useRef(null);
-  const updateThrottleRef = React.useRef({ timer: null, latest: null });
   const localSeqRef = React.useRef(0);
   const lastActionRef = React.useRef({ type: null, at: 0 });
   const UNDO_SOFT_LOCK_MS = 200;
@@ -48,60 +48,37 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
     return queryClient.getQueryData(['game', gameId]) || game;
   }, [game, gameId, queryClient]);
 
-  // Real-time subscription
-  useEffect(() => {
-    if (!gameId || isSolo) return;
+  const handleRealtimeEvent = useCallback((event) => {
+    let nextData = event.data;
+    const localGame = queryClient.getQueryData(['game', gameId]);
+    const localPlayerState = localGame?.atw_state?.[playerName];
+    const localSeq = localPlayerState?.client_seq ?? localSeqRef.current ?? 0;
+    const incomingSeq = nextData?.atw_state?.[playerName]?.client_seq ?? 0;
 
-    const unsubscribe = base44.entities.Game.subscribe((event) => {
-      if (event.id === gameId && (event.type === 'update' || event.type === 'delete')) {
-        const throttle = updateThrottleRef.current;
-        const applyEvent = (evt) => {
-          let nextData = evt.data;
-          const localGame = queryClient.getQueryData(['game', gameId]);
-          const localPlayerState = localGame?.atw_state?.[playerName];
-          const localSeq = localPlayerState?.client_seq ?? localSeqRef.current ?? 0;
-          const incomingSeq = nextData?.atw_state?.[playerName]?.client_seq ?? 0;
-
-          if (localPlayerState && incomingSeq < localSeq) {
-            nextData = {
-              ...nextData,
-              atw_state: {
-                ...(nextData.atw_state || {}),
-                [playerName]: localPlayerState
-              },
-              total_points: {
-                ...(nextData.total_points || {}),
-                [playerName]: localGame?.total_points?.[playerName] ?? nextData?.total_points?.[playerName] ?? 0
-              }
-            };
-          }
-
-          queryClient.setQueryData(['game', gameId], nextData);
-        };
-
-        if (!throttle.timer) {
-          applyEvent(event);
-          throttle.timer = setTimeout(() => {
-            if (throttle.latest) {
-              applyEvent(throttle.latest);
-              throttle.latest = null;
-            }
-            throttle.timer = null;
-          }, 1000);
-        } else {
-          throttle.latest = event;
+    if (localPlayerState && incomingSeq < localSeq) {
+      nextData = {
+        ...nextData,
+        atw_state: {
+          ...(nextData.atw_state || {}),
+          [playerName]: localPlayerState
+        },
+        total_points: {
+          ...(nextData.total_points || {}),
+          [playerName]: localGame?.total_points?.[playerName] ?? nextData?.total_points?.[playerName] ?? 0
         }
-      }
-    });
+      };
+    }
 
-    return () => {
-      if (updateThrottleRef.current.timer) {
-        clearTimeout(updateThrottleRef.current.timer);
-      }
-      updateThrottleRef.current.latest = null;
-      unsubscribe();
-    };
-  }, [gameId, isSolo, playerName, queryClient]);
+    queryClient.setQueryData(['game', gameId], nextData);
+  }, [gameId, playerName, queryClient]);
+
+  useRealtimeGame({
+    gameId,
+    enabled: !!gameId && !isSolo,
+    throttleMs: 1000,
+    eventTypes: ['update', 'delete'],
+    onEvent: handleRealtimeEvent
+  });
 
   const defaultPlayerState = useMemo(() => ({
     current_distance_index: 0,

@@ -76,40 +76,70 @@ export default function ManageGames() {
     }
   });
 
+  const resolveGamePlayers = (game) => {
+    if (game.players && game.players.length) return Array.from(new Set(game.players));
+    const fromPutts = Object.keys(game.player_putts || {});
+    if (fromPutts.length) return Array.from(new Set(fromPutts));
+    const fromAtw = Object.keys(game.atw_state || {});
+    return Array.from(new Set(fromAtw));
+  };
+
+  const getPlayerStats = (game, playerName) => {
+    if (game.game_type === 'around_the_world') {
+      const state = game.atw_state?.[playerName] || {};
+      const score = game.total_points?.[playerName] || 0;
+      const madePutts = state.total_makes || 0;
+      const totalPutts = state.total_putts || 0;
+      const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+      return { score, madePutts, totalPutts, accuracy };
+    }
+
+    const playerPutts = game.player_putts?.[playerName] || [];
+    const madePutts = playerPutts.filter(p => p.result === 'made').length;
+    const totalPutts = playerPutts.length;
+    const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+    const score = game.total_points?.[playerName] || 0;
+    return { score, madePutts, totalPutts, accuracy };
+  };
+
   const submitToDiscgolfMutation = useMutation({
     mutationFn: async (game) => {
       const results = [];
       
-      for (const playerName of game.players || []) {
-        const playerPutts = game.player_putts?.[playerName] || [];
-        const madePutts = playerPutts.filter(p => p.result === 'made').length;
-        const totalPutts = playerPutts.length;
-        const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
-        const score = game.total_points?.[playerName] || 0;
+      const players = resolveGamePlayers(game);
+      for (const playerName of players) {
+        const { score, madePutts, totalPutts, accuracy } = getPlayerStats(game, playerName);
+        if (!totalPutts && !score) {
+          results.push({ player: playerName, action: 'skipped' });
+          continue;
+        }
 
         // Check if player already has an entry
         const playerUid = game.player_uids?.[playerName];
         const playerEmail = game.player_emails?.[playerName];
-        const existingEntries = await base44.entities.LeaderboardEntry.filter({
-          ...(playerUid ? { player_uid: playerUid } : { player_name: playerName }),
+        const identityFilter = playerUid
+          ? { player_uid: playerUid }
+          : playerEmail
+          ? { player_email: playerEmail }
+          : { player_name: playerName };
+
+        const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
+          ...identityFilter,
+          game_id: game.id,
           game_type: game.game_type,
-          leaderboard_type: 'discgolf_ee'
+          leaderboard_type: 'general'
         });
 
-        const existingEntry = existingEntries.length > 0 ? existingEntries[0] : null;
-
-        if (existingEntry) {
-          // Update only if new score is better
-          if (score > existingEntry.score) {
-            await base44.entities.LeaderboardEntry.update(existingEntry.id, {
-              game_id: game.id,
-              ...(playerUid ? { player_uid: playerUid } : {}),
-              ...(playerEmail ? { player_email: playerEmail } : {}),
-              score: score,
+        if (existingGeneral) {
+          if (score > existingGeneral.score) {
+            await base44.entities.LeaderboardEntry.update(existingGeneral.id, {
+              score,
               accuracy: Math.round(accuracy * 10) / 10,
               made_putts: madePutts,
               total_putts: totalPutts,
-              submitted_by: user?.email,
+              ...(playerUid ? { player_uid: playerUid } : {}),
+              ...(playerEmail ? { player_email: playerEmail } : {}),
+              player_name: playerName,
               date: new Date(game.date).toISOString()
             });
             results.push({ player: playerName, action: 'updated' });
@@ -117,40 +147,63 @@ export default function ManageGames() {
             results.push({ player: playerName, action: 'skipped' });
           }
         } else {
-          // Create new entry
           await base44.entities.LeaderboardEntry.create({
             game_id: game.id,
             player_uid: playerUid,
             player_email: playerEmail,
             player_name: playerName,
             game_type: game.game_type,
-            score: score,
+            score,
             accuracy: Math.round(accuracy * 10) / 10,
             made_putts: madePutts,
             total_putts: totalPutts,
-            leaderboard_type: 'discgolf_ee',
-            submitted_by: user?.email,
+            leaderboard_type: 'general',
             player_gender: 'M',
             date: new Date(game.date).toISOString()
           });
           results.push({ player: playerName, action: 'created' });
         }
 
-        // Also submit to general leaderboard (always create new)
-        await base44.entities.LeaderboardEntry.create({
-          game_id: game.id,
-          player_uid: playerUid,
-          player_email: playerEmail,
-          player_name: playerName,
-          game_type: game.game_type,
-          score: score,
-          accuracy: Math.round(accuracy * 10) / 10,
-          made_putts: madePutts,
-          total_putts: totalPutts,
-          leaderboard_type: 'general',
-          player_gender: 'M',
-          date: new Date(game.date).toISOString()
-        });
+        if (game.game_type === 'classic') {
+          const [existingDg] = await base44.entities.LeaderboardEntry.filter({
+            ...identityFilter,
+            game_id: game.id,
+            game_type: game.game_type,
+            leaderboard_type: 'discgolf_ee'
+          });
+
+          if (existingDg) {
+            if (score > existingDg.score) {
+              await base44.entities.LeaderboardEntry.update(existingDg.id, {
+                score,
+                accuracy: Math.round(accuracy * 10) / 10,
+                made_putts: madePutts,
+                total_putts: totalPutts,
+                ...(playerUid ? { player_uid: playerUid } : {}),
+                ...(playerEmail ? { player_email: playerEmail } : {}),
+                player_name: playerName,
+                submitted_by: user?.email,
+                date: new Date(game.date).toISOString()
+              });
+            }
+          } else {
+            await base44.entities.LeaderboardEntry.create({
+              game_id: game.id,
+              player_uid: playerUid,
+              player_email: playerEmail,
+              player_name: playerName,
+              game_type: game.game_type,
+              score,
+              accuracy: Math.round(accuracy * 10) / 10,
+              made_putts: madePutts,
+              total_putts: totalPutts,
+              leaderboard_type: 'discgolf_ee',
+              submitted_by: user?.email,
+              player_gender: 'M',
+              date: new Date(game.date).toISOString()
+            });
+          }
+        }
       }
 
       return results;
@@ -165,6 +218,21 @@ export default function ManageGames() {
         message += ` (${created} new, ${updated} updated, ${skipped} skipped)`;
       }
       toast.success(message);
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
+    }
+  });
+
+  const submitAllCompletedMutation = useMutation({
+    mutationFn: async () => {
+      const results = [];
+      for (const game of completedGames) {
+        const res = await submitToDiscgolfMutation.mutateAsync(game);
+        results.push({ gameId: game.id, res });
+      }
+      return results;
+    },
+    onSuccess: () => {
+      toast.success('All completed games submitted');
       queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
     }
   });
@@ -236,10 +304,8 @@ export default function ManageGames() {
     return names[type] || type;
   };
 
-  const isGameSubmittedToDgEe = (gameId) => {
-    return leaderboardEntries.some(entry => 
-      entry.game_id === gameId && entry.leaderboard_type === 'discgolf_ee'
-    );
+  const isGameSubmitted = (gameId) => {
+    return leaderboardEntries.some(entry => entry.game_id === gameId && entry.leaderboard_type === 'general');
   };
 
   const completedGames = games.filter(g => g.status === 'completed' && g.pin !== '0000');
@@ -299,6 +365,18 @@ export default function ManageGames() {
             >
               <Upload className="w-4 h-4 mr-2" />
               Backfill Leaderboard UIDs
+            </Button>
+            <Button
+              onClick={() => {
+                if (confirm('Submit all completed games to leaderboards?')) {
+                  submitAllCompletedMutation.mutate();
+                }
+              }}
+              disabled={submitAllCompletedMutation.isPending || completedGames.length === 0}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Submit Completed Games
             </Button>
           </div>
         </div>
@@ -476,18 +554,28 @@ export default function ManageGames() {
                         {game.players?.length || 0}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <Button
-                          onClick={() => {
-                            if (confirm('Delete this game?')) {
-                              deleteGameMutation.mutate(game.id);
-                            }
-                          }}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            onClick={() => submitToDiscgolfMutation.mutate(game)}
+                            disabled={submitToDiscgolfMutation.isPending}
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-xs"
+                          >
+                            {isGameSubmitted(game.id) ? 'Resync' : 'Submit'}
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              if (confirm('Delete this game?')) {
+                                deleteGameMutation.mutate(game.id);
+                              }
+                            }}
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

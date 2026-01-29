@@ -15,6 +15,8 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
   const updateTimeoutRef = React.useRef(null);
   const localSeqRef = React.useRef(0);
   const lastActionRef = React.useRef({ type: null, at: 0 });
+  const lastSyncRef = React.useRef(0);
+  const turnsSinceSyncRef = React.useRef(0);
   const UNDO_SOFT_LOCK_MS = 200;
 
   const bumpLocalSeq = useCallback(() => {
@@ -276,9 +278,13 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
     const pending = { madePutts: actualMakes };
     pendingUpdateRef.current = [pending];
 
-    if (!isRoundComplete) {
-      return;
-    }
+    const now = Date.now();
+    turnsSinceSyncRef.current += 1;
+    const shouldSyncNow =
+      isRoundComplete ||
+      now - lastSyncRef.current > 10000 ||
+      turnsSinceSyncRef.current >= 5;
+    if (!shouldSyncNow) return;
 
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
@@ -299,6 +305,9 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       }
       pendingUpdateRef.current = [];
     }, delay);
+
+    lastSyncRef.current = now;
+    turnsSinceSyncRef.current = 0;
   }, [bumpLocalSeq, defaultPlayerState, gameId, getLatestGame, handleRetry, isSolo, playerName, queryClient, submitTurnMutation]);
 
   const completeGameMutation = useMutation({

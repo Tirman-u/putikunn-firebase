@@ -109,7 +109,7 @@ export default function ManageGames() {
       const players = resolveGamePlayers(game);
       for (const playerName of players) {
         const { score, madePutts, totalPutts, accuracy } = getPlayerStats(game, playerName);
-        if (!totalPutts && !score) {
+        if (game.game_type !== 'around_the_world' && !totalPutts && !score) {
           results.push({ player: playerName, action: 'skipped' });
           continue;
         }

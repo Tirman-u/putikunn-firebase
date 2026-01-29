@@ -11,7 +11,7 @@ Done = ✅, Osaline = ⏳, Open = ☐
 - ✅ Laps loogika: 1 ring = 5→10 + 10→5 (praegu vale)
 
 ## 🟡 Keskmine
-- ☐ Leaderboard pagination + limit 50
+- ✅ Leaderboard pagination + limit 50
 - ☐ Leaderboard server‑filter (gender + month)
 - ☐ ATW/Player round‑commit batch (DB write ainult roundi lõpus)
 - ⏳ ErrorBoundary prod‑log + user‑friendly retry

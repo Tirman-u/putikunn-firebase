@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +12,8 @@ export default function PuttingRecords() {
   const [selectedView, setSelectedView] = useState('general_classic');
   const [selectedGender, setSelectedGender] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   const viewTypes = [
     { id: 'general_classic', label: 'Classic', leaderboardType: 'general', gameType: 'classic' },
@@ -29,9 +31,14 @@ export default function PuttingRecords() {
   });
 
   const currentView = viewTypes.find(v => v.id === selectedView);
+  const limit = PAGE_SIZE * page;
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedView, selectedGender, selectedMonth]);
 
   const { data: leaderboardEntries = [] } = useQuery({
-    queryKey: ['leaderboard-entries', selectedView],
+    queryKey: ['leaderboard-entries', selectedView, limit],
     queryFn: async () => {
       if (!currentView) return [];
       const filter = {
@@ -42,19 +49,19 @@ export default function PuttingRecords() {
       } else {
         filter.game_type = currentView.gameType;
       }
-      return base44.entities.LeaderboardEntry.filter(filter, '-score', 500);
+      return base44.entities.LeaderboardEntry.filter(filter, '-score', limit);
     },
     refetchInterval: 30000
   });
 
   const { data: discgolfEntries = [] } = useQuery({
-    queryKey: ['leaderboard-entries-discgolf', currentView?.leaderboardType],
+    queryKey: ['leaderboard-entries-discgolf', currentView?.leaderboardType, limit],
     queryFn: async () => {
       if (!currentView || currentView.leaderboardType !== 'general') return [];
       return base44.entities.LeaderboardEntry.filter(
         { leaderboard_type: 'discgolf_ee', game_type: 'classic' },
         '-score',
-        500
+        limit
       );
     },
     refetchInterval: 30000
@@ -135,7 +142,10 @@ export default function PuttingRecords() {
     }
   });
 
-  const sortedEntries = Object.values(bestScoresByPlayer).sort((a, b) => b.score - a.score).slice(0, 50);
+  const sortedEntries = Object.values(bestScoresByPlayer)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, PAGE_SIZE * page);
+  const canLoadMore = leaderboardEntries.length >= limit;
 
   // Helper to check if a general entry has a corresponding DG.ee entry
   const hasDiscgolfEntry = (entry) => {
@@ -275,6 +285,17 @@ export default function PuttingRecords() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+              {canLoadMore && (
+                <div className="flex justify-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage(prev => prev + 1)}
+                    className="px-4 py-2 rounded-full text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                  >
+                    Näita rohkem
+                  </button>
                 </div>
               )}
             </div>

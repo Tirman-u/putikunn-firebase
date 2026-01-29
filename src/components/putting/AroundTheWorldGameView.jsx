@@ -2,10 +2,9 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowUp, ArrowDown, Undo2, Trophy, Eye, EyeOff, LogOut } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, Undo2, Trophy, Eye, EyeOff, LogOut, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
-import ATWLeaderboard from './ATWLeaderboard';
 import useRealtimeGame from '@/hooks/use-realtime-game';
 
 
@@ -613,7 +612,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
             <div className="w-16" />
           </div>
           
-          <ATWLeaderboard game={game} />
+          <ATWTournamentLeaderboard game={game} />
         </div>
       </div>
     );
@@ -949,6 +948,130 @@ const ActiveGameView = React.memo(({
               </button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const ATWTournamentLeaderboard = React.memo(({ game }) => {
+  const playerNames = (game.players && game.players.length > 0)
+    ? game.players
+    : Object.keys(game.atw_state || {});
+
+  const playerStats = playerNames.map(playerName => {
+    const playerState = game.atw_state?.[playerName] || {};
+    const currentScore = game.total_points?.[playerName] || 0;
+    const bestScore = playerState.best_score || 0;
+    const currentLaps = playerState.laps_completed || 0;
+    const bestLaps = playerState.best_laps || 0;
+    const totalPutts = playerState.total_putts || 0;
+    const madePutts = playerState.total_makes || 0;
+    const currentAccuracy = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
+    const bestAccuracy = (playerState.best_accuracy || 0).toFixed(1);
+
+    return {
+      name: playerName,
+      currentScore,
+      bestScore,
+      currentLaps,
+      bestLaps,
+      currentAccuracy,
+      bestAccuracy
+    };
+  }).sort((a, b) => b.bestScore - a.bestScore);
+
+  const bestPlayer = playerStats[0];
+  const isCompleted = game.status === 'completed';
+
+  return (
+    <div className="space-y-6">
+      {game.pin && game.pin !== '0000' && (
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 shadow-lg text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold mb-1 opacity-90">Game PIN</div>
+              <div className="text-3xl font-bold tracking-widest">{game.pin}</div>
+            </div>
+            <div className="text-sm opacity-90">
+              {playerNames.length} players
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bestPlayer && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Trophy className="w-5 h-5 text-amber-500" />
+              <div className="text-sm text-slate-600">Best Score</div>
+            </div>
+            <div className="text-3xl font-bold text-emerald-600">{bestPlayer.bestScore}</div>
+            <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
+          </div>
+          <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
+            <div className="text-sm text-slate-600 mb-2">Most Laps</div>
+            <div className="text-3xl font-bold text-blue-600">{bestPlayer.bestLaps}</div>
+            <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
+          </div>
+          <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Target className="w-5 h-5 text-purple-500" />
+              <div className="text-sm text-slate-600">Best Accuracy</div>
+            </div>
+            <div className="text-3xl font-bold text-purple-600">{bestPlayer.bestAccuracy}%</div>
+            <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="text-left p-4 font-semibold text-slate-700">#</th>
+                <th className="text-left p-4 font-semibold text-slate-700">Player</th>
+                <th className="text-center p-4 font-semibold text-slate-700">Best Score</th>
+                <th className="text-center p-4 font-semibold text-slate-700">Current</th>
+                <th className="text-center p-4 font-semibold text-slate-700">Laps</th>
+                <th className="text-center p-4 font-semibold text-slate-700">Accuracy</th>
+              </tr>
+            </thead>
+            <tbody>
+              {playerStats.map((player, index) => (
+                <tr key={player.name} className={`border-b border-slate-100 ${index === 0 && isCompleted ? 'bg-amber-50' : ''}`}>
+                  <td className="p-4">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                      index === 0 ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {index + 1}
+                    </div>
+                  </td>
+                  <td className="p-4 font-medium text-slate-800">{player.name}</td>
+                  <td className="p-4 text-center">
+                    <div className="text-lg font-bold text-emerald-600">{player.bestScore}</div>
+                  </td>
+                  <td className="p-4 text-center">
+                    <div className="text-sm text-slate-500">{player.currentScore}</div>
+                  </td>
+                  <td className="p-4 text-center">
+                    <div className="flex flex-col items-center">
+                      <div className="text-sm font-bold text-blue-600">{player.bestLaps}</div>
+                      <div className="text-xs text-slate-400">{player.currentLaps}</div>
+                    </div>
+                  </td>
+                  <td className="p-4 text-center">
+                    <div className="flex flex-col items-center">
+                      <div className="text-sm font-bold text-purple-600">{player.bestAccuracy}%</div>
+                      <div className="text-xs text-slate-400">{player.currentAccuracy}%</div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

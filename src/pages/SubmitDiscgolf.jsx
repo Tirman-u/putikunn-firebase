@@ -36,6 +36,7 @@ export default function SubmitDiscgolf() {
 
       return await base44.entities.LeaderboardEntry.create({
         game_id: 'discgolf-submission',
+        player_uid: selectedUser?.id,
         player_email: playerEmail,
         player_name: selectedUser?.full_name || playerEmail,
         game_type: gameType,

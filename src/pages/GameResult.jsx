@@ -63,7 +63,7 @@ export default function GameResult() {
 
       // Check if player already has an entry for this game type
       const existingEntries = await base44.entities.LeaderboardEntry.filter({
-        player_email: user?.email,
+        ...(user?.id ? { player_uid: user.id } : { player_email: user?.email }),
         game_type: game.game_type,
         leaderboard_type: 'general'
       });
@@ -89,6 +89,7 @@ export default function GameResult() {
         // Create new entry
         await base44.entities.LeaderboardEntry.create({
           game_id: game.id,
+          player_uid: user?.id,
           player_email: user?.email || 'unknown',
           player_name: playerName,
           game_type: game.game_type,
@@ -125,8 +126,10 @@ export default function GameResult() {
         const score = game.total_points?.[playerName] || 0;
 
         // Check if player already has an entry
+        const playerUid = game.player_uids?.[playerName];
+        const playerEmail = game.player_emails?.[playerName];
         const existingEntries = await base44.entities.LeaderboardEntry.filter({
-          player_name: playerName,
+          ...(playerUid ? { player_uid: playerUid } : { player_name: playerName }),
           game_type: game.game_type,
           leaderboard_type: 'discgolf_ee'
         });
@@ -153,7 +156,8 @@ export default function GameResult() {
           // Create new entry
           await base44.entities.LeaderboardEntry.create({
             game_id: game.id,
-            player_email: user?.email,
+            player_uid: playerUid,
+            player_email: playerEmail,
             player_name: playerName,
             game_type: game.game_type,
             score: score,
@@ -171,7 +175,8 @@ export default function GameResult() {
         // Also submit to general leaderboard (always create new)
         await base44.entities.LeaderboardEntry.create({
           game_id: game.id,
-          player_email: user?.email,
+          player_uid: playerUid,
+          player_email: playerEmail,
           player_name: playerName,
           game_type: game.game_type,
           score: score,
@@ -305,9 +310,9 @@ export default function GameResult() {
   };
 
   const isSubmittedToLeaderboard = leaderboardEntries.some(entry => 
-    entry.game_id === gameId && 
-    entry.player_email === user?.email && 
-    entry.leaderboard_type === 'general'
+    entry.game_id === gameId &&
+    entry.leaderboard_type === 'general' &&
+    (user?.id ? entry.player_uid === user.id : entry.player_email === user?.email)
   );
 
   const isSubmittedToDgEe = leaderboardEntries.some(entry => 

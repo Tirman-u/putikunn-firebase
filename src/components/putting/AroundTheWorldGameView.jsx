@@ -361,6 +361,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
 
       return await base44.entities.LeaderboardEntry.create({
         game_id: game.id,
+        player_uid: user?.id,
         player_email: user?.email || 'unknown',
         player_name: playerName,
         game_type: 'around_the_world',

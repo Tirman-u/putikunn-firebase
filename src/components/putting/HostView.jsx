@@ -87,8 +87,10 @@ export default function HostView({ gameId, onExit }) {
         const madePutts = playerState?.total_makes || 0;
         const accuracy = playerState?.best_accuracy || 0;
 
+        const playerUid = game.player_uids?.[playerName];
+        const playerEmail = game.player_emails?.[playerName];
         const existingEntries = await base44.entities.LeaderboardEntry.filter({
-          player_name: playerName,
+          ...(playerUid ? { player_uid: playerUid } : { player_name: playerName }),
           game_type: game.game_type,
           leaderboard_type: 'discgolf_ee'
         });
@@ -99,6 +101,8 @@ export default function HostView({ gameId, onExit }) {
           if (score > existingEntry.score) {
             await base44.entities.LeaderboardEntry.update(existingEntry.id, {
               game_id: game.id,
+              ...(playerUid ? { player_uid: playerUid } : {}),
+              ...(playerEmail ? { player_email: playerEmail } : {}),
               score: score,
               accuracy: Math.round(accuracy * 10) / 10,
               made_putts: madePutts,
@@ -113,7 +117,8 @@ export default function HostView({ gameId, onExit }) {
         } else {
           await base44.entities.LeaderboardEntry.create({
             game_id: game.id,
-            player_email: user?.email,
+            player_uid: playerUid,
+            player_email: playerEmail,
             player_name: playerName,
             game_type: game.game_type,
             score: score,
@@ -130,7 +135,8 @@ export default function HostView({ gameId, onExit }) {
 
         await base44.entities.LeaderboardEntry.create({
           game_id: game.id,
-          player_email: user?.email,
+          player_uid: playerUid,
+          player_email: playerEmail,
           player_name: playerName,
           game_type: game.game_type,
           score: score,

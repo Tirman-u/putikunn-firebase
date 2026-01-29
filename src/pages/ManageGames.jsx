@@ -88,8 +88,10 @@ export default function ManageGames() {
         const score = game.total_points?.[playerName] || 0;
 
         // Check if player already has an entry
+        const playerUid = game.player_uids?.[playerName];
+        const playerEmail = game.player_emails?.[playerName];
         const existingEntries = await base44.entities.LeaderboardEntry.filter({
-          player_name: playerName,
+          ...(playerUid ? { player_uid: playerUid } : { player_name: playerName }),
           game_type: game.game_type,
           leaderboard_type: 'discgolf_ee'
         });
@@ -101,6 +103,8 @@ export default function ManageGames() {
           if (score > existingEntry.score) {
             await base44.entities.LeaderboardEntry.update(existingEntry.id, {
               game_id: game.id,
+              ...(playerUid ? { player_uid: playerUid } : {}),
+              ...(playerEmail ? { player_email: playerEmail } : {}),
               score: score,
               accuracy: Math.round(accuracy * 10) / 10,
               made_putts: madePutts,
@@ -116,7 +120,8 @@ export default function ManageGames() {
           // Create new entry
           await base44.entities.LeaderboardEntry.create({
             game_id: game.id,
-            player_email: user?.email,
+            player_uid: playerUid,
+            player_email: playerEmail,
             player_name: playerName,
             game_type: game.game_type,
             score: score,
@@ -134,7 +139,8 @@ export default function ManageGames() {
         // Also submit to general leaderboard (always create new)
         await base44.entities.LeaderboardEntry.create({
           game_id: game.id,
-          player_email: user?.email,
+          player_uid: playerUid,
+          player_email: playerEmail,
           player_name: playerName,
           game_type: game.game_type,
           score: score,

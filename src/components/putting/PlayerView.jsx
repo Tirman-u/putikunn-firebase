@@ -181,6 +181,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
       const leaderboardData = {
         game_id: game.id,
+        player_uid: user?.id,
         player_email: user?.email || 'unknown',
         player_name: playerName,
         game_type: game.game_type,

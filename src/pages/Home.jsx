@@ -107,6 +107,8 @@ export default function Home() {
       player_distances: {},
       player_putts: {},
       total_points: {},
+      player_uids: {},
+      player_emails: {},
       status: 'active',
       date: new Date().toISOString()
     });
@@ -295,6 +297,8 @@ export default function Home() {
         player_distances: { [user.full_name]: GAME_FORMATS[gameData.gameType || 'classic'].startDistance },
         player_putts: { [user.full_name]: [] },
         total_points: { [user.full_name]: 0 },
+        player_uids: { [user.full_name]: user.id },
+        player_emails: { [user.full_name]: user.email },
         status: 'active',
         date: new Date().toISOString()
       });
@@ -347,6 +351,8 @@ export default function Home() {
             player_distances: {},
             player_putts: {},
             total_points: {},
+            player_uids: isSoloATW ? { [playerName]: user.id } : {},
+            player_emails: isSoloATW ? { [playerName]: user.email } : {},
             status: 'active',
             date: new Date().toISOString(),
             atw_config: setupData.config,

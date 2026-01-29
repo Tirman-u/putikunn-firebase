@@ -79,8 +79,24 @@ export default function JoinGame({ onJoin, onBack }) {
 
       // Check if player already exists
       if (game.players.includes(playerName.trim())) {
-        // Player already exists, just join
-        onJoin({ game, playerName: playerName.trim() });
+        // Player already exists, ensure uid/email mapping is stored
+        if (user?.id || user?.email) {
+          const updatedPlayerUids = {
+            ...(game.player_uids || {}),
+            ...(user?.id ? { [playerName.trim()]: user.id } : {})
+          };
+          const updatedPlayerEmails = {
+            ...(game.player_emails || {}),
+            ...(user?.email ? { [playerName.trim()]: user.email } : {})
+          };
+          const updatedGame = await base44.entities.Game.update(game.id, {
+            player_uids: updatedPlayerUids,
+            player_emails: updatedPlayerEmails
+          });
+          onJoin({ game: updatedGame, playerName: playerName.trim() });
+        } else {
+          onJoin({ game, playerName: playerName.trim() });
+        }
       } else {
         // Add player to game
         const gameType = game.game_type || 'classic';
@@ -91,12 +107,22 @@ export default function JoinGame({ onJoin, onBack }) {
         const updatedDistances = { ...game.player_distances, [playerName.trim()]: startDistance };
         const updatedPutts = { ...game.player_putts, [playerName.trim()]: [] };
         const updatedPoints = { ...game.total_points, [playerName.trim()]: 0 };
+        const updatedPlayerUids = {
+          ...(game.player_uids || {}),
+          ...(user?.id ? { [playerName.trim()]: user.id } : {})
+        };
+        const updatedPlayerEmails = {
+          ...(game.player_emails || {}),
+          ...(user?.email ? { [playerName.trim()]: user.email } : {})
+        };
 
         const updateData = {
           players: updatedPlayers,
           player_distances: updatedDistances,
           player_putts: updatedPutts,
-          total_points: updatedPoints
+          total_points: updatedPoints,
+          player_uids: updatedPlayerUids,
+          player_emails: updatedPlayerEmails
         };
 
         // For ATW games, initialize player state

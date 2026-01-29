@@ -143,9 +143,14 @@ export default function PuttingRecords() {
   });
 
   const getPlayerKey = (entry) => {
-    const emailKey = entry?.player_email && entry.player_email !== 'unknown'
-      ? `email:${entry.player_email}`
-      : null;
+    const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
+    const mappedUid = entry?.player_name ? game?.player_uids?.[entry.player_name] : null;
+    const uidKey = entry?.player_uid || mappedUid ? `uid:${entry.player_uid || mappedUid}` : null;
+    if (uidKey) return uidKey;
+
+    const hostEmail = game?.host_user;
+    const email = entry?.player_email && entry.player_email !== 'unknown' ? entry.player_email : null;
+    const emailKey = email && email !== hostEmail ? `email:${email}` : null;
     const nameKey = entry?.player_name
       ? `name:${entry.player_name.trim().toLowerCase()}`
       : null;
@@ -181,7 +186,7 @@ export default function PuttingRecords() {
     return discgolfEntries.some(e => 
       e.leaderboard_type === 'discgolf_ee' && 
       e.game_id === entry.game_id &&
-      e.player_name === entry.player_name
+      (e.player_uid && entry.player_uid ? e.player_uid === entry.player_uid : e.player_name === entry.player_name)
     );
   };
 

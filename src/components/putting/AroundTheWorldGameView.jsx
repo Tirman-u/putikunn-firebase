@@ -236,6 +236,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         newIndex = Math.min(currentIndex + 1, distances.length - 1);
         if (newIndex === distances.length - 1 && currentIndex < distances.length - 1) {
           newDirection = 'DOWN';
+          lapEvent = true;
         }
       } else {
         newIndex = Math.max(currentIndex - 1, 0);

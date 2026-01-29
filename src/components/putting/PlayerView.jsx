@@ -33,8 +33,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const [streakDistanceSelected, setStreakDistanceSelected] = React.useState(false);
   const [hideScore, setHideScore] = React.useState(false);
   const [localGameState, setLocalGameState] = React.useState(null);
-  const MULTIPLAYER_SYNC_DELAY_MS = 1500;
+  const MULTIPLAYER_SYNC_DELAY_MS = 1200;
   const pendingUpdateRef = React.useRef(null);
+  const pendingCountRef = React.useRef(0);
   const updateTimeoutRef = React.useRef(null);
   const gameIdRef = React.useRef(gameId);
   const queryClient = useQueryClient();
@@ -45,19 +46,43 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
   const { user, game, isLoading, isSoloGame } = usePlayerGameState({ gameId });
 
+  const mergeIncomingGame = React.useCallback((incoming) => {
+    if (!incoming) return localGameState || incoming;
+    const localState = localGameState || {};
+    const merged = { ...incoming };
+    const mapKeys = [
+      'player_putts',
+      'total_points',
+      'player_distances',
+      'player_current_streaks',
+      'player_highest_streaks'
+    ];
+    mapKeys.forEach((key) => {
+      const incomingMap = incoming[key] || {};
+      const localMap = localState[key] || {};
+      merged[key] = {
+        ...incomingMap,
+        ...(localMap[playerName] !== undefined ? { [playerName]: localMap[playerName] } : {})
+      };
+    });
+    return merged;
+  }, [localGameState, playerName]);
+
   useRealtimeGame({
     gameId,
     enabled: !!gameId && game?.pin !== '0000',
     throttleMs: 1000,
     eventTypes: ['update', 'delete'],
     onEvent: (event) => {
-      queryClient.setQueryData(['game', gameId], event.data);
+      const merged = mergeIncomingGame(event.data);
+      setLocalGameState(merged);
+      queryClient.setQueryData(['game', gameId], merged);
     }
   });
 
-  // Initialize local state for solo games
+  // Initialize local state (solo + multiplayer)
   React.useEffect(() => {
-    if (game && isSoloGame && !localGameState) {
+    if (game && !localGameState) {
       setLocalGameState({
         player_putts: game.player_putts || {},
         total_points: game.total_points || {},
@@ -67,7 +92,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         status: game.status
       });
     }
-  }, [game, isSoloGame, localGameState]);
+  }, [game, localGameState]);
 
   const updateGameMutation = useMutation({
     mutationFn: async ({ id, data }) => {
@@ -80,13 +105,15 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       return updated;
     },
     onSuccess: (updatedGame) => {
-      // Update cache immediately with the response
-      queryClient.setQueryData(['game', gameId], updatedGame);
+      const merged = mergeIncomingGame(updatedGame);
+      setLocalGameState(merged);
+      queryClient.setQueryData(['game', gameId], merged);
     }
   });
 
   // Helper to update game state (local for solo, DB for multiplayer)
   const updateGameState = (data) => {
+    const current = localGameState || game || {};
     if (isSoloGame) {
       // For solo games, update local state only
       setLocalGameState(prev => ({
@@ -96,15 +123,15 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     } else {
       if (!game?.id) return;
       // For multiplayer games, update local cache immediately and debounce DB writes
-      queryClient.setQueryData(['game', gameId], prev => {
-        if (!prev) return prev;
-        return { ...prev, ...data };
-      });
+      const nextState = { ...current, ...data };
+      setLocalGameState(nextState);
+      queryClient.setQueryData(['game', gameId], nextState);
 
       pendingUpdateRef.current = {
         ...(pendingUpdateRef.current || {}),
         ...data
       };
+      pendingCountRef.current += 1;
 
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
@@ -117,7 +144,20 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           data: pendingUpdateRef.current
         });
         pendingUpdateRef.current = null;
+        pendingCountRef.current = 0;
       }, MULTIPLAYER_SYNC_DELAY_MS);
+
+      if (pendingCountRef.current >= 5) {
+        if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current);
+        }
+        updateGameMutation.mutate({
+          id: game.id,
+          data: pendingUpdateRef.current
+        });
+        pendingUpdateRef.current = null;
+        pendingCountRef.current = 0;
+      }
     }
   };
 
@@ -132,6 +172,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           data: pendingUpdateRef.current
         });
         pendingUpdateRef.current = null;
+        pendingCountRef.current = 0;
       }
     };
   }, [updateGameMutation]);
@@ -191,7 +232,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const handleClassicSubmit = (madeCount) => {
     const gameType = game.game_type || 'classic';
     const format = GAME_FORMATS[gameType];
-    const currentState = isSoloGame ? localGameState : game;
+    const currentState = localGameState || game;
     const playerDist = currentState.player_distances || {};
     const currentDistance = playerDist[playerName] || format.startDistance;
     
@@ -260,7 +301,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const handleBackAndForthPutt = (wasMade) => {
     const gameType = game.game_type || 'classic';
     const format = GAME_FORMATS[gameType];
-    const currentState = isSoloGame ? localGameState : game;
+    const currentState = localGameState || game;
     const playerDist = currentState.player_distances || {};
     const currentDistance = playerDist[playerName] || format.startDistance;
     const result = wasMade ? 'made' : 'missed';
@@ -339,7 +380,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
   // Handle Streak Challenge distance selection
   const handleStreakDistanceSelect = (distance) => {
-    const currentState = isSoloGame ? localGameState : game;
+    const currentState = localGameState || game;
     const newPlayerDistances = { ...currentState.player_distances };
     newPlayerDistances[playerName] = distance;
 
@@ -368,7 +409,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   };
 
   const handleUndo = () => {
-    const currentState = isSoloGame ? localGameState : game;
+    const currentState = localGameState || game;
     const playerPutts = currentState.player_putts?.[playerName];
     if (!playerPutts || playerPutts.length === 0) return;
 
@@ -443,7 +484,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   }
 
   // Use local state for solo games, otherwise use game data
-  const currentState = isSoloGame && localGameState ? localGameState : game;
+  const currentState = localGameState || game;
   
   const gameType = game.game_type || 'classic';
   const format = GAME_FORMATS[gameType];

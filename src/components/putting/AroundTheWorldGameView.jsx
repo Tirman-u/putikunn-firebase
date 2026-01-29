@@ -864,9 +864,9 @@ const ActiveGameView = React.memo(({
         {/* Current Status */}
         <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
           <div className="text-center mb-6">
-            <div className="flex items-center justify-center gap-3 mb-3">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full">
-                <span className="text-sm font-semibold text-slate-700">
+            <div className="flex flex-wrap items-center justify-center gap-3 mb-3">
+              <div className="inline-flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-full">
+                <span className="text-xs sm:text-sm font-semibold text-slate-700 whitespace-nowrap">
                   {difficultyLabel} - {config.discs_per_turn} ketas{config.discs_per_turn > 1 ? 't' : ''}
                 </span>
               </div>

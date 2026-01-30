@@ -32,6 +32,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const [hasSubmitted, setHasSubmitted] = React.useState(false);
   const [streakDistanceSelected, setStreakDistanceSelected] = React.useState(false);
   const [hideScore, setHideScore] = React.useState(false);
+  const [streakComplete, setStreakComplete] = React.useState(false);
   const [localGameState, setLocalGameState] = React.useState(null);
   const MULTIPLAYER_SYNC_DELAY_MS = 1200;
   const pendingUpdateRef = React.useRef(null);
@@ -45,6 +46,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   }, [gameId]);
 
   const { user, game, isLoading, isSoloGame } = usePlayerGameState({ gameId });
+
+  React.useEffect(() => {
+    setStreakComplete(false);
+  }, [gameId, playerName]);
 
   const mergeIncomingGame = React.useCallback((incoming) => {
     if (!incoming) return localGameState || incoming;
@@ -283,7 +288,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       player_putts: allPlayerPutts,
       total_points: newTotalPoints,
       player_distances: newPlayerDistances,
-      ...(willBeComplete ? { status: 'completed' } : {})
+      ...(willBeComplete && isSoloGame ? { status: 'completed' } : {})
     };
 
     // For solo games that are complete, save to DB
@@ -364,7 +369,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       total_points: newTotalPoints,
       player_distances: newPlayerDistances,
       ...streakUpdate,
-      ...(willBeComplete ? { status: 'completed' } : {})
+      ...(willBeComplete && isSoloGame ? { status: 'completed' } : {})
     };
 
     // For solo games that are complete, save to DB
@@ -404,7 +409,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         }
       });
     } else {
-      updateGameState(updateData);
+      setStreakComplete(true);
     }
   };
 
@@ -494,7 +499,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const canUndo = playerPutts.length > 0;
   const currentStreaks = currentState.player_current_streaks || {};
   const currentStreak = currentStreaks[playerName] || 0;
-  const isComplete = isGameComplete(gameType, playerPutts.length) || (gameType === 'streak_challenge' && currentState.status === 'completed');
+  const isComplete =
+    isGameComplete(gameType, playerPutts.length) ||
+    (gameType === 'streak_challenge' && (currentState.status === 'completed' || streakComplete));
 
   // Completed View
   if (isComplete) {

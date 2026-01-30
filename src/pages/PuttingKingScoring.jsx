@@ -2,7 +2,7 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import LoadingState from '@/components/ui/loading-state';
@@ -139,7 +139,7 @@ export default function PuttingKingScoring() {
       <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white flex items-center justify-center p-4">
         <div className="text-center">
           <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-16 h-16 text-white" />
+            <CheckCircle2 className="w-16 h-16 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-slate-800 mb-2">Match Finished!</h1>
           <p className="text-slate-600 mb-6">Winner: Team {match.winner_team}</p>

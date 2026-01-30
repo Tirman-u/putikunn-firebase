@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Trash2, Share2, FolderPlus, Folder, Calendar, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Trash2, Share2, FolderPlus, Folder, Calendar, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
@@ -420,7 +420,7 @@ export default function ManageGames() {
                         size="sm"
                         className="bg-emerald-600 hover:bg-emerald-700 whitespace-nowrap text-xs"
                       >
-                        <CheckCircle className="w-3 h-3 mr-1" />
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
                         Close Game
                       </Button>
                       <Button

@@ -4,7 +4,7 @@ import { Trophy, Target } from 'lucide-react';
 export default function ATWLeaderboard({ game }) {
   const playerStats = Object.entries(game.atw_state || {}).map(([playerName, state]) => {
     const totalScore = game.total_points?.[playerName] || 0;
-    const attemptsCount = state.turns_played > 0 ? (state.attempts_count || 0) + 1 : 0;
+    const attemptsCount = state.attempts_count || 0;
     
     return {
       name: playerName,

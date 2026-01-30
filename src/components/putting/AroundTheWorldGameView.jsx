@@ -106,7 +106,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         handlePlayAgain,
         gameId, submitToLeaderboardMutation, user 
         }) => {
-        const attemptsCount = playerState.turns_played > 0 ? (playerState.attempts_count || 0) + 1 : 0;
+        const attemptsCount = playerState.attempts_count || 0;
         const failedTurns = useMemo(() => 
         playerState.history.filter(turn => turn.failed_to_advance || turn.missed_all),
         [playerState.history]
@@ -246,7 +246,7 @@ const ActiveGameView = React.memo(({
   onViewLeaderboard, onExit 
 }) => {
   const discsPerTurn = config.discs_per_turn || 1;
-  const attemptsCount = playerState.turns_played > 0 ? (playerState.attempts_count || 0) + 1 : 0;
+  const attemptsCount = playerState.attempts_count || 0;
   const usePerDiscInput = discsPerTurn >= 3;
   const [shotResults, setShotResults] = React.useState(
     Array.from({ length: discsPerTurn }, () => null)
@@ -461,7 +461,7 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
     const bestScore = playerState.best_score || 0;
     const currentLaps = playerState.laps_completed || 0;
     const bestLaps = playerState.best_laps || 0;
-    const attemptsCount = playerState.turns_played > 0 ? (playerState.attempts_count || 0) + 1 : 0;
+    const attemptsCount = playerState.attempts_count || 0;
 
     return {
       name: playerName,

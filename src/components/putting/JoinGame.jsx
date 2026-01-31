@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowRight, LogIn, ArrowLeft, Clock } from 'lucide-react';
+import { LogIn, ArrowLeft, Clock, Users } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -61,6 +61,16 @@ export default function JoinGame({ onJoin, onBack }) {
       around_the_world: 'Around The World'
     };
     return names[type] || 'Classic';
+  };
+
+  const getPlayerCount = (game) => {
+    if (!game) return 0;
+    return (
+      game.players?.length ||
+      Object.keys(game.player_putts || {}).length ||
+      Object.keys(game.atw_state || {}).length ||
+      0
+    );
   };
 
   const handleJoin = async () => {
@@ -228,33 +238,40 @@ export default function JoinGame({ onJoin, onBack }) {
               Active Games
             </h3>
             <div className="space-y-2">
-              {recentGames.map((game) => (
-                <button
-                  key={game.id}
-                  onClick={() => {
-                    setPin(game.pin);
-                    setPlayerName(user?.full_name || '');
-                  }}
-                  className="w-full bg-white rounded-xl p-3 border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all text-left"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-slate-800 text-sm">{game.name}</div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded">
-                          {getGameTypeName(game.game_type)}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'No date'}
-                        </span>
+              {recentGames.map((game) => {
+                const playerCount = getPlayerCount(game);
+                return (
+                  <button
+                    key={game.id}
+                    onClick={() => {
+                      setPin(game.pin);
+                      setPlayerName(user?.full_name || '');
+                    }}
+                    className="w-full bg-white rounded-xl p-3 border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-slate-800 text-sm">{game.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded">
+                            {getGameTypeName(game.game_type)}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'No date'}
+                          </span>
+                          <span className="flex items-center gap-1 text-xs text-slate-500">
+                            <Users className="w-3 h-3" />
+                            {playerCount} {playerCount === 1 ? 'player' : 'players'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-xs px-2 py-1 bg-slate-100 rounded font-mono">
+                        {game.pin}
                       </div>
                     </div>
-                    <div className="text-xs px-2 py-1 bg-slate-100 rounded font-mono">
-                      {game.pin}
-                    </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

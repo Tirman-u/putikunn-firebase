@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Upload, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { createPageUrl } from '@/utils';
 import ClassicScoreInput from './ClassicScoreInput';
 import BackAndForthInput from './BackAndForthInput';
 import BackAndForthScoreInput from './BackAndForthScoreInput';
@@ -536,7 +535,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
               </Button>
             )}
             <Button
-              onClick={() => window.location.href = createPageUrl('PuttingRecordsPage')}
+              onClick={() => setShowLeaderboard(true)}
               className="w-full h-14 bg-slate-600 hover:bg-slate-700 rounded-xl"
             >
               <Trophy className="w-5 h-5 mr-2" />

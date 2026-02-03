@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -27,13 +27,48 @@ export default function HostView({ gameId, onExit }) {
     refetchInterval: false
   });
 
+  const mergeRealtimeGame = React.useCallback((previous, incoming) => {
+    if (!previous) return incoming;
+    if (!incoming) return previous;
+    const merged = { ...previous, ...incoming };
+    const mapKeys = [
+      'player_putts',
+      'total_points',
+      'player_distances',
+      'player_current_streaks',
+      'player_highest_streaks',
+      'player_uids',
+      'player_emails',
+      'atw_state'
+    ];
+    mapKeys.forEach((key) => {
+      if (previous?.[key] || incoming?.[key]) {
+        merged[key] = {
+          ...(previous?.[key] || {}),
+          ...(incoming?.[key] || {})
+        };
+      }
+    });
+    return merged;
+  }, []);
+
   useRealtimeGame({
     gameId,
     enabled: !!gameId,
     throttleMs: 1000,
     eventTypes: ['update', 'delete'],
     onEvent: (event) => {
-      queryClient.setQueryData(['game', gameId], event.data);
+      if (event.type === 'delete') {
+        queryClient.setQueryData(['game', gameId], undefined);
+        return;
+      }
+      queryClient.setQueryData(['game', gameId], (previous) => {
+        const gameType = previous?.game_type || event.data?.game_type;
+        if (gameType === 'around_the_world') {
+          return event.data;
+        }
+        return mergeRealtimeGame(previous, event.data);
+      });
     }
   });
 
@@ -150,12 +185,22 @@ export default function HostView({ gameId, onExit }) {
     }
   };
 
+  const gameType = game?.game_type;
+  const isATWGame = gameType === 'around_the_world';
+  const isCompleted = game?.status === 'completed';
+  const scoreLabel = gameType === 'streak_challenge' ? 'Best Streak' : 'Score';
+
+  useEffect(() => {
+    if (!gameId || !gameType || isATWGame) return undefined;
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [gameId, gameType, isATWGame, queryClient]);
+
   if (isLoading || !game) {
     return <LoadingState />;
   }
-
-  const isATWGame = game.game_type === 'around_the_world';
-  const isCompleted = game.status === 'completed';
 
   // Calculate player stats for ATW
   const playerStats = (game.players || []).map(playerName => {
@@ -175,6 +220,24 @@ export default function HostView({ gameId, onExit }) {
       attemptsCount
     };
   }).sort((a, b) => b.bestScore - a.bestScore);
+
+  const nonAtwPlayerStats = !isATWGame
+    ? (game.players || []).map((playerName) => {
+        const putts = game.player_putts?.[playerName] || [];
+        const totalPutts = putts.length;
+        const madePutts = putts.filter(p => p.result === 'made').length;
+        const puttingPercentage = totalPutts > 0 ? Math.round((madePutts / totalPutts) * 10) / 10 : 0;
+        const totalPoints = game.total_points?.[playerName] || 0;
+
+        return {
+          name: playerName,
+          totalPoints,
+          totalPutts,
+          madePutts,
+          puttingPercentage
+        };
+      }).sort((a, b) => b.totalPoints - a.totalPoints)
+    : [];
 
   const bestPlayer = playerStats[0];
   const mostAttempts = Math.max(...playerStats.map(p => p.attemptsCount || 0), 0);
@@ -287,6 +350,54 @@ export default function HostView({ gameId, onExit }) {
                       </td>
                       <td className="p-4 text-center">
                         <div className="text-sm font-bold text-purple-600">{player.attemptsCount}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {!isATWGame && game.players.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-slate-800 font-semibold">
+                <Trophy className="w-4 h-4 text-amber-500" />
+                Live Results
+              </div>
+              <div className="text-xs text-slate-500">Auto-updating</div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50">
+                    <th className="text-left p-4 font-semibold text-slate-700">#</th>
+                    <th className="text-left p-4 font-semibold text-slate-700">Player</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">{scoreLabel}</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Putts</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Accuracy</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {nonAtwPlayerStats.map((player, index) => (
+                    <tr key={player.name} className={`border-b border-slate-100 ${index === 0 ? 'bg-amber-50' : ''}`}>
+                      <td className="p-4">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                          index === 0 ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {index + 1}
+                        </div>
+                      </td>
+                      <td className="p-4 font-medium text-slate-800">{player.name}</td>
+                      <td className="p-4 text-center">
+                        <div className="text-lg font-bold text-emerald-600">{player.totalPoints}</div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="text-sm text-slate-500">{player.madePutts}/{player.totalPutts}</div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="text-sm text-slate-500">{player.puttingPercentage}%</div>
                       </td>
                     </tr>
                   ))}

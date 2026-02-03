@@ -26,6 +26,14 @@ import {
   isGameComplete 
 } from './gameRules';
 
+const PLAYER_STATE_KEYS = [
+  'player_putts',
+  'total_points',
+  'player_distances',
+  'player_current_streaks',
+  'player_highest_streaks'
+];
+
 export default function PlayerView({ gameId, playerName, onExit }) {
   const [showLeaderboard, setShowLeaderboard] = React.useState(false);
   const [hasSubmitted, setHasSubmitted] = React.useState(false);
@@ -33,7 +41,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const [hideScore, setHideScore] = React.useState(false);
   const [streakComplete, setStreakComplete] = React.useState(false);
   const [localGameState, setLocalGameState] = React.useState(null);
-  const MULTIPLAYER_SYNC_DELAY_MS = 1200;
+  const MULTIPLAYER_SYNC_DELAY_MS = 350;
   const pendingUpdateRef = React.useRef(null);
   const pendingCountRef = React.useRef(0);
   const updateTimeoutRef = React.useRef(null);
@@ -45,6 +53,37 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   }, [gameId]);
 
   const { user, game, isLoading, isSoloGame } = usePlayerGameState({ gameId });
+
+  const buildRemotePatch = React.useCallback((data) => {
+    const patch = { ...data };
+    PLAYER_STATE_KEYS.forEach((key) => {
+      if (!data?.[key]) {
+        delete patch[key];
+        return;
+      }
+      const playerEntry = data[key]?.[playerName];
+      if (playerEntry === undefined) {
+        delete patch[key];
+        return;
+      }
+      patch[key] = { [playerName]: playerEntry };
+    });
+    return patch;
+  }, [playerName]);
+
+  const mergeWithLatest = React.useCallback((latestGame, patch) => {
+    if (!latestGame) return patch;
+    const merged = { ...patch };
+    PLAYER_STATE_KEYS.forEach((key) => {
+      if (patch?.[key]) {
+        merged[key] = {
+          ...(latestGame[key] || {}),
+          ...(patch[key] || {})
+        };
+      }
+    });
+    return merged;
+  }, []);
 
   React.useEffect(() => {
     setStreakComplete(false);
@@ -101,7 +140,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const updateGameMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       const startedAt = performance.now();
-      const updated = await base44.entities.Game.update(id, data);
+      const latestGames = await base44.entities.Game.filter({ id });
+      const latestGame = latestGames?.[0];
+      const payload = mergeWithLatest(latestGame, data);
+      const updated = await base44.entities.Game.update(id, payload);
       logSyncMetric('player_sync', performance.now() - startedAt, {
         game_id: id,
         game_type: game?.game_type || 'unknown'
@@ -131,9 +173,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       setLocalGameState(nextState);
       queryClient.setQueryData(['game', gameId], nextState);
 
+      const remotePatch = buildRemotePatch(data);
       pendingUpdateRef.current = {
         ...(pendingUpdateRef.current || {}),
-        ...data
+        ...remotePatch
       };
       pendingCountRef.current += 1;
 

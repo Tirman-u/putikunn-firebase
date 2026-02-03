@@ -226,7 +226,9 @@ export default function HostView({ gameId, onExit }) {
         const putts = game.player_putts?.[playerName] || [];
         const totalPutts = putts.length;
         const madePutts = putts.filter(p => p.result === 'made').length;
-        const puttingPercentage = totalPutts > 0 ? Math.round((madePutts / totalPutts) * 10) / 10 : 0;
+        const puttingPercentage = totalPutts > 0
+          ? Math.round((madePutts / totalPutts) * 1000) / 10
+          : 0;
         const totalPoints = game.total_points?.[playerName] || 0;
 
         return {

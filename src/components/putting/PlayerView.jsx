@@ -41,6 +41,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const [hideScore, setHideScore] = React.useState(false);
   const [streakComplete, setStreakComplete] = React.useState(false);
   const [localGameState, setLocalGameState] = React.useState(null);
+  const localGameStateRef = React.useRef(null);
   const MULTIPLAYER_SYNC_DELAY_MS = 350;
   const pendingUpdateRef = React.useRef(null);
   const pendingCountRef = React.useRef(0);
@@ -53,6 +54,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   }, [gameId]);
 
   const { user, game, isLoading, isSoloGame } = usePlayerGameState({ gameId });
+
+  const getLatestState = React.useCallback(() => {
+    return localGameStateRef.current || game || {};
+  }, [game]);
 
   const buildRemotePatch = React.useCallback((data) => {
     const patch = { ...data };
@@ -89,6 +94,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     setStreakComplete(false);
   }, [gameId, playerName]);
 
+  React.useEffect(() => {
+    localGameStateRef.current = localGameState;
+  }, [localGameState]);
+
   const mergeIncomingGame = React.useCallback((incoming) => {
     if (!incoming) return localGameState || incoming;
     const localState = localGameState || {};
@@ -117,8 +126,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     throttleMs: 1000,
     eventTypes: ['update', 'delete'],
     onEvent: (event) => {
+      if (!event?.data) return;
       const merged = mergeIncomingGame(event.data);
       setLocalGameState(merged);
+      localGameStateRef.current = merged;
       queryClient.setQueryData(['game', gameId], merged);
     }
   });
@@ -126,14 +137,16 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   // Initialize local state (solo + multiplayer)
   React.useEffect(() => {
     if (game && !localGameState) {
-      setLocalGameState({
+      const initialState = {
         player_putts: game.player_putts || {},
         total_points: game.total_points || {},
         player_distances: game.player_distances || {},
         player_current_streaks: game.player_current_streaks || {},
         player_highest_streaks: game.player_highest_streaks || {},
         status: game.status
-      });
+      };
+      setLocalGameState(initialState);
+      localGameStateRef.current = initialState;
     }
   }, [game, localGameState]);
 
@@ -153,24 +166,25 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     onSuccess: (updatedGame) => {
       const merged = mergeIncomingGame(updatedGame);
       setLocalGameState(merged);
+      localGameStateRef.current = merged;
       queryClient.setQueryData(['game', gameId], merged);
     }
   });
 
   // Helper to update game state (local for solo, DB for multiplayer)
   const updateGameState = (data) => {
-    const current = localGameState || game || {};
+    const current = getLatestState();
     if (isSoloGame) {
       // For solo games, update local state only
-      setLocalGameState(prev => ({
-        ...prev,
-        ...data
-      }));
+      const nextState = { ...current, ...data };
+      setLocalGameState(nextState);
+      localGameStateRef.current = nextState;
     } else {
       if (!game?.id) return;
       // For multiplayer games, update local cache immediately and debounce DB writes
       const nextState = { ...current, ...data };
       setLocalGameState(nextState);
+      localGameStateRef.current = nextState;
       queryClient.setQueryData(['game', gameId], nextState);
 
       const remotePatch = buildRemotePatch(data);
@@ -279,7 +293,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const handleClassicSubmit = (madeCount) => {
     const gameType = game.game_type || 'classic';
     const format = GAME_FORMATS[gameType];
-    const currentState = localGameState || game;
+    const currentState = getLatestState();
     const playerDist = currentState.player_distances || {};
     const currentDistance = playerDist[playerName] || format.startDistance;
     
@@ -348,7 +362,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const handleBackAndForthPutt = (wasMade) => {
     const gameType = game.game_type || 'classic';
     const format = GAME_FORMATS[gameType];
-    const currentState = localGameState || game;
+    const currentState = getLatestState();
     const playerDist = currentState.player_distances || {};
     const currentDistance = playerDist[playerName] || format.startDistance;
     const result = wasMade ? 'made' : 'missed';
@@ -427,7 +441,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
   // Handle Streak Challenge distance selection
   const handleStreakDistanceSelect = (distance) => {
-    const currentState = localGameState || game;
+    const currentState = getLatestState();
     const newPlayerDistances = { ...currentState.player_distances };
     newPlayerDistances[playerName] = distance;
 
@@ -456,7 +470,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   };
 
   const handleUndo = () => {
-    const currentState = localGameState || game;
+    const currentState = getLatestState();
     const playerPutts = currentState.player_putts?.[playerName];
     if (!playerPutts || playerPutts.length === 0) return;
 

@@ -39,7 +39,8 @@ export default function HostView({ gameId, onExit }) {
       'player_highest_streaks',
       'player_uids',
       'player_emails',
-      'atw_state'
+      'atw_state',
+      'live_stats'
     ];
     mapKeys.forEach((key) => {
       if (previous?.[key] || incoming?.[key]) {
@@ -224,12 +225,13 @@ export default function HostView({ gameId, onExit }) {
   const nonAtwPlayerStats = !isATWGame
     ? (game.players || []).map((playerName) => {
         const putts = game.player_putts?.[playerName] || [];
-        const totalPutts = putts.length;
-        const madePutts = putts.filter(p => p.result === 'made').length;
+        const liveStats = game.live_stats?.[playerName];
+        const totalPutts = liveStats?.total_putts ?? putts.length;
+        const madePutts = liveStats?.made_putts ?? putts.filter(p => p.result === 'made').length;
+        const totalPoints = liveStats?.total_points ?? game.total_points?.[playerName] || 0;
         const puttingPercentage = totalPutts > 0
           ? Math.round((madePutts / totalPutts) * 1000) / 10
           : 0;
-        const totalPoints = game.total_points?.[playerName] || 0;
 
         return {
           name: playerName,

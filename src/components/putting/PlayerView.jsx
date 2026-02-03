@@ -44,10 +44,16 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const localGameStateRef = React.useRef(null);
   const MULTIPLAYER_SYNC_INTERVAL_MS = 30000;
   const MULTIPLAYER_SYNC_DEBOUNCE_MS = 300;
+  const LIVE_SYNC_DEBOUNCE_MS = 200;
   const pendingUpdateRef = React.useRef(null);
+  const pendingLiveRef = React.useRef(null);
   const syncTimeoutRef = React.useRef(null);
+  const liveTimeoutRef = React.useRef(null);
   const syncInFlightRef = React.useRef(false);
+  const flushPendingRef = React.useRef(null);
+  const flushLivePendingRef = React.useRef(null);
   const queuedSyncRef = React.useRef(null);
+  const queuedLiveRef = React.useRef(null);
   const lastSyncAtRef = React.useRef(0);
   const turnsSinceSyncRef = React.useRef(0);
   const gameIdRef = React.useRef(gameId);
@@ -124,6 +130,34 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     return merged;
   }, [playerName]);
 
+  const buildLiveStats = React.useCallback((state) => {
+    const putts = state.player_putts?.[playerName] || [];
+    const totalPutts = putts.length;
+    const madePutts = putts.filter(p => p.result === 'made').length;
+    const totalPoints = state.total_points?.[playerName] || 0;
+
+    return {
+      total_putts: totalPutts,
+      made_putts: madePutts,
+      total_points: totalPoints,
+      updated_at: new Date().toISOString()
+    };
+  }, [playerName]);
+
+  const buildLivePayload = React.useCallback((payload, id) => {
+    const latest = queryClient.getQueryData(['game', id]) || game || {};
+    return {
+      live_stats: {
+        ...(latest.live_stats || {}),
+        ...(payload.live_stats || {})
+      },
+      total_points: {
+        ...(latest.total_points || {}),
+        ...(payload.total_points || {})
+      }
+    };
+  }, [game, queryClient]);
+
   useRealtimeGame({
     gameId,
     enabled: !!gameId && game?.pin !== '0000',
@@ -175,12 +209,11 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     }
   });
 
-  const flushPending = React.useCallback(async (idOverride) => {
+  const flushPending = React.useCallback(async (idOverride, payloadOverride) => {
     if (isSoloGame) return;
     const id = idOverride || game?.id;
-    if (!id) return;
-    const payload = pendingUpdateRef.current;
-    if (!payload) return;
+    const payload = payloadOverride || pendingUpdateRef.current;
+    if (!id || !payload) return;
 
     if (syncInFlightRef.current) {
       queuedSyncRef.current = payload;
@@ -198,12 +231,56 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     } finally {
       syncInFlightRef.current = false;
       if (queuedSyncRef.current) {
-        pendingUpdateRef.current = queuedSyncRef.current;
+        const queued = queuedSyncRef.current;
         queuedSyncRef.current = null;
-        flushPending(id);
+        flushPendingRef.current?.(id, queued);
+      } else if (queuedLiveRef.current) {
+        const queued = queuedLiveRef.current;
+        queuedLiveRef.current = null;
+        flushLivePendingRef.current?.(id, queued);
       }
     }
   }, [game?.id, isSoloGame, updateGameMutation]);
+
+  const flushLivePending = React.useCallback(async (idOverride, payloadOverride) => {
+    if (isSoloGame) return;
+    const id = idOverride || game?.id;
+    const payload = payloadOverride || pendingLiveRef.current;
+    if (!id || !payload) return;
+
+    if (syncInFlightRef.current) {
+      queuedLiveRef.current = payload;
+      return;
+    }
+
+    syncInFlightRef.current = true;
+    pendingLiveRef.current = null;
+    try {
+      const mergedPayload = buildLivePayload(payload, id);
+      await base44.entities.Game.update(id, mergedPayload);
+    } catch (error) {
+      pendingLiveRef.current = payload;
+    } finally {
+      syncInFlightRef.current = false;
+      if (queuedSyncRef.current) {
+        const queued = queuedSyncRef.current;
+        queuedSyncRef.current = null;
+        flushPendingRef.current?.(id, queued);
+      } else if (queuedLiveRef.current) {
+        const queued = queuedLiveRef.current;
+        queuedLiveRef.current = null;
+        flushLivePendingRef.current?.(id, queued);
+      }
+    }
+  }, [buildLivePayload, game?.id, isSoloGame]);
+
+  React.useEffect(() => {
+    flushPendingRef.current = flushPending;
+  }, [flushPending]);
+
+  React.useEffect(() => {
+    flushLivePendingRef.current = flushLivePending;
+  }, [flushLivePending]);
 
   const scheduleFlush = React.useCallback((force = false) => {
     if (syncTimeoutRef.current) {
@@ -223,6 +300,16 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     }, MULTIPLAYER_SYNC_DEBOUNCE_MS);
   }, [flushPending, MULTIPLAYER_SYNC_DEBOUNCE_MS, MULTIPLAYER_SYNC_INTERVAL_MS]);
 
+  const scheduleLiveFlush = React.useCallback(() => {
+    if (liveTimeoutRef.current) {
+      clearTimeout(liveTimeoutRef.current);
+    }
+    liveTimeoutRef.current = setTimeout(() => {
+      liveTimeoutRef.current = null;
+      flushLivePending();
+    }, LIVE_SYNC_DEBOUNCE_MS);
+  }, [flushLivePending, LIVE_SYNC_DEBOUNCE_MS]);
+
   // Helper to update game state (local for solo, DB for multiplayer)
   const updateGameState = (data, options = {}) => {
     const { forceSync = false } = options;
@@ -230,12 +317,22 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     if (isSoloGame) {
       // For solo games, update local state only
       const nextState = { ...current, ...data };
+      const liveStats = buildLiveStats(nextState);
+      nextState.live_stats = {
+        ...(nextState.live_stats || {}),
+        [playerName]: liveStats
+      };
       setLocalGameState(nextState);
       localGameStateRef.current = nextState;
     } else {
       if (!game?.id) return;
       // For multiplayer games, update local cache immediately and debounce DB writes
       const nextState = { ...current, ...data };
+      const liveStats = buildLiveStats(nextState);
+      nextState.live_stats = {
+        ...(nextState.live_stats || {}),
+        [playerName]: liveStats
+      };
       setLocalGameState(nextState);
       localGameStateRef.current = nextState;
       queryClient.setQueryData(['game', gameId], nextState);
@@ -247,6 +344,13 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       };
       turnsSinceSyncRef.current += 1;
       scheduleFlush(forceSync);
+
+      pendingLiveRef.current = {
+        ...(pendingLiveRef.current || {}),
+        live_stats: { [playerName]: liveStats },
+        total_points: { [playerName]: liveStats.total_points }
+      };
+      scheduleLiveFlush();
     }
   };
 
@@ -255,11 +359,17 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current);
       }
+      if (liveTimeoutRef.current) {
+        clearTimeout(liveTimeoutRef.current);
+      }
       if (pendingUpdateRef.current && gameIdRef.current) {
         flushPending(gameIdRef.current);
       }
+      if (pendingLiveRef.current && gameIdRef.current) {
+        flushLivePending(gameIdRef.current);
+      }
     };
-  }, [flushPending]);
+  }, [flushLivePending, flushPending]);
 
   React.useEffect(() => {
     if (isSoloGame || !game?.id) return undefined;

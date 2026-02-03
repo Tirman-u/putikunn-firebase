@@ -42,10 +42,14 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const [streakComplete, setStreakComplete] = React.useState(false);
   const [localGameState, setLocalGameState] = React.useState(null);
   const localGameStateRef = React.useRef(null);
-  const MULTIPLAYER_SYNC_DELAY_MS = 350;
+  const MULTIPLAYER_SYNC_INTERVAL_MS = 30000;
+  const MULTIPLAYER_SYNC_DEBOUNCE_MS = 300;
   const pendingUpdateRef = React.useRef(null);
-  const pendingCountRef = React.useRef(0);
-  const updateTimeoutRef = React.useRef(null);
+  const syncTimeoutRef = React.useRef(null);
+  const syncInFlightRef = React.useRef(false);
+  const queuedSyncRef = React.useRef(null);
+  const lastSyncAtRef = React.useRef(0);
+  const turnsSinceSyncRef = React.useRef(0);
   const gameIdRef = React.useRef(gameId);
   const queryClient = useQueryClient();
 
@@ -99,8 +103,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   }, [localGameState]);
 
   const mergeIncomingGame = React.useCallback((incoming) => {
-    if (!incoming) return localGameState || incoming;
-    const localState = localGameState || {};
+    if (!incoming) return localGameStateRef.current || incoming;
+    const localState = localGameStateRef.current || {};
     const merged = { ...incoming };
     const mapKeys = [
       'player_putts',
@@ -118,7 +122,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       };
     });
     return merged;
-  }, [localGameState, playerName]);
+  }, [playerName]);
 
   useRealtimeGame({
     gameId,
@@ -171,8 +175,57 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     }
   });
 
+  const flushPending = React.useCallback(async (idOverride) => {
+    if (isSoloGame) return;
+    const id = idOverride || game?.id;
+    if (!id) return;
+    const payload = pendingUpdateRef.current;
+    if (!payload) return;
+
+    if (syncInFlightRef.current) {
+      queuedSyncRef.current = payload;
+      return;
+    }
+
+    syncInFlightRef.current = true;
+    pendingUpdateRef.current = null;
+    try {
+      await updateGameMutation.mutateAsync({ id, data: payload });
+      lastSyncAtRef.current = Date.now();
+      turnsSinceSyncRef.current = 0;
+    } catch (error) {
+      pendingUpdateRef.current = payload;
+    } finally {
+      syncInFlightRef.current = false;
+      if (queuedSyncRef.current) {
+        pendingUpdateRef.current = queuedSyncRef.current;
+        queuedSyncRef.current = null;
+        flushPending(id);
+      }
+    }
+  }, [game?.id, isSoloGame, updateGameMutation]);
+
+  const scheduleFlush = React.useCallback((force = false) => {
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    const now = Date.now();
+    const shouldSyncNow =
+      force ||
+      now - lastSyncAtRef.current > MULTIPLAYER_SYNC_INTERVAL_MS ||
+      turnsSinceSyncRef.current >= 5;
+
+    if (!shouldSyncNow) return;
+
+    syncTimeoutRef.current = setTimeout(() => {
+      syncTimeoutRef.current = null;
+      flushPending();
+    }, MULTIPLAYER_SYNC_DEBOUNCE_MS);
+  }, [flushPending, MULTIPLAYER_SYNC_DEBOUNCE_MS, MULTIPLAYER_SYNC_INTERVAL_MS]);
+
   // Helper to update game state (local for solo, DB for multiplayer)
-  const updateGameState = (data) => {
+  const updateGameState = (data, options = {}) => {
+    const { forceSync = false } = options;
     const current = getLatestState();
     if (isSoloGame) {
       // For solo games, update local state only
@@ -192,51 +245,31 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         ...(pendingUpdateRef.current || {}),
         ...remotePatch
       };
-      pendingCountRef.current += 1;
-
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
-
-      updateTimeoutRef.current = setTimeout(() => {
-        if (!pendingUpdateRef.current) return;
-        updateGameMutation.mutate({
-          id: game.id,
-          data: pendingUpdateRef.current
-        });
-        pendingUpdateRef.current = null;
-        pendingCountRef.current = 0;
-      }, MULTIPLAYER_SYNC_DELAY_MS);
-
-      if (pendingCountRef.current >= 5) {
-        if (updateTimeoutRef.current) {
-          clearTimeout(updateTimeoutRef.current);
-        }
-        updateGameMutation.mutate({
-          id: game.id,
-          data: pendingUpdateRef.current
-        });
-        pendingUpdateRef.current = null;
-        pendingCountRef.current = 0;
-      }
+      turnsSinceSyncRef.current += 1;
+      scheduleFlush(forceSync);
     }
   };
 
   React.useEffect(() => {
     return () => {
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
       }
       if (pendingUpdateRef.current && gameIdRef.current) {
-        updateGameMutation.mutate({
-          id: gameIdRef.current,
-          data: pendingUpdateRef.current
-        });
-        pendingUpdateRef.current = null;
-        pendingCountRef.current = 0;
+        flushPending(gameIdRef.current);
       }
     };
-  }, [updateGameMutation]);
+  }, [flushPending]);
+
+  React.useEffect(() => {
+    if (isSoloGame || !game?.id) return undefined;
+    const interval = setInterval(() => {
+      if (pendingUpdateRef.current) {
+        flushPending();
+      }
+    }, MULTIPLAYER_SYNC_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [flushPending, game?.id, isSoloGame, MULTIPLAYER_SYNC_INTERVAL_MS]);
 
   // Save solo game to DB when completed
   const saveSoloGameMutation = useMutation({
@@ -354,7 +387,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         data: updateData
       });
     } else {
-      updateGameState(updateData);
+      updateGameState(updateData, { forceSync: willBeComplete });
     }
   };
 
@@ -435,7 +468,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         data: updateData
       });
     } else {
-      updateGameState(updateData);
+      updateGameState(updateData, { forceSync: willBeComplete });
     }
   };
 

@@ -11,6 +11,7 @@ import PerformanceAnalysis from '@/components/putting/PerformanceAnalysis';
 import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView';
 import { createPageUrl } from '@/utils';
 import LoadingState from '@/components/ui/loading-state';
+import useRealtimeGame from '@/hooks/use-realtime-game';
 
 
 export default function GameResult() {
@@ -31,13 +32,53 @@ export default function GameResult() {
   const { data: game, isLoading, error } = useQuery({
     queryKey: ['game', gameId],
     queryFn: async () => {
-      const games = await base44.entities.Game.list();
-      const found = games.find(g => g.id === gameId);
+      const games = await base44.entities.Game.filter({ id: gameId });
+      const found = games?.[0];
       if (!found) throw new Error('Game not found');
       return found;
     },
     enabled: !!gameId,
     retry: false
+  });
+
+  const mergeRealtimeGame = React.useCallback((previous, incoming) => {
+    if (!previous) return incoming;
+    if (!incoming) return previous;
+    const merged = { ...previous, ...incoming };
+    const mapKeys = [
+      'player_putts',
+      'total_points',
+      'player_distances',
+      'player_current_streaks',
+      'player_highest_streaks',
+      'player_uids',
+      'player_emails',
+      'atw_state',
+      'live_stats'
+    ];
+    mapKeys.forEach((key) => {
+      if (previous?.[key] || incoming?.[key]) {
+        merged[key] = {
+          ...(previous?.[key] || {}),
+          ...(incoming?.[key] || {})
+        };
+      }
+    });
+    return merged;
+  }, []);
+
+  useRealtimeGame({
+    gameId,
+    enabled: !!gameId,
+    throttleMs: 1000,
+    eventTypes: ['update', 'delete'],
+    onEvent: (event) => {
+      if (event.type === 'delete') {
+        queryClient.setQueryData(['game', gameId], undefined);
+        return;
+      }
+      queryClient.setQueryData(['game', gameId], (previous) => mergeRealtimeGame(previous, event.data));
+    }
   });
 
   const { data: leaderboardEntries = [] } = useQuery({

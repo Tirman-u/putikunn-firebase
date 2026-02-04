@@ -15,6 +15,7 @@ export default function PuttingRecords() {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 50;
   const MAX_FETCH = 500;
+  const FETCH_BATCH_SIZE = 50;
   const [fetchLimit, setFetchLimit] = useState(PAGE_SIZE);
 
   const viewTypes = [
@@ -24,7 +25,7 @@ export default function PuttingRecords() {
     { id: 'general_streak_challenge', label: 'Streak', leaderboardType: 'general', gameType: 'streak_challenge' },
     { id: 'general_random_distance', label: 'Random', leaderboardType: 'general', gameType: 'random_distance' },
     { id: 'general_around_the_world', label: 'Around World', leaderboardType: 'general', gameType: 'around_the_world' },
-    { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'discgolf_ee', gameType: 'classic' }
+    { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'discgolf_ee', gameType: 'all' }
   ];
 
   const { data: user } = useQuery({
@@ -46,6 +47,24 @@ export default function PuttingRecords() {
     setFetchLimit(PAGE_SIZE);
   }, [selectedView, selectedGender, selectedMonth]);
 
+  const fetchLeaderboardRows = async (filter) => {
+    const rows = [];
+    let skip = 0;
+
+    while (rows.length < fetchLimit) {
+      const limit = Math.min(FETCH_BATCH_SIZE, fetchLimit - rows.length);
+      const chunk = await base44.entities.LeaderboardEntry.filter(filter, '-score', limit, skip);
+      if (!chunk?.length) break;
+
+      rows.push(...chunk);
+      skip += chunk.length;
+
+      if (chunk.length < limit) break;
+    }
+
+    return rows;
+  };
+
   const { data: leaderboardEntries = [] } = useQuery({
     queryKey: ['leaderboard-entries', selectedView, fetchLimit],
     queryFn: async () => {
@@ -53,12 +72,10 @@ export default function PuttingRecords() {
       const filter = {
         leaderboard_type: currentView.leaderboardType,
       };
-      if (currentView.leaderboardType === 'discgolf_ee') {
-        filter.game_type = 'classic';
-      } else {
+      if (currentView.leaderboardType !== 'discgolf_ee') {
         filter.game_type = currentView.gameType;
       }
-      return base44.entities.LeaderboardEntry.filter(filter, '-score', fetchLimit);
+      return fetchLeaderboardRows(filter);
     },
     refetchInterval: 30000
   });
@@ -67,11 +84,7 @@ export default function PuttingRecords() {
     queryKey: ['leaderboard-entries-discgolf', currentView?.leaderboardType, currentView?.gameType, fetchLimit],
     queryFn: async () => {
       if (!currentView || currentView.leaderboardType !== 'general') return [];
-      return base44.entities.LeaderboardEntry.filter(
-        { leaderboard_type: 'discgolf_ee', game_type: currentView.gameType },
-        '-score',
-        fetchLimit
-      );
+      return fetchLeaderboardRows({ leaderboard_type: 'discgolf_ee', game_type: currentView.gameType });
     },
     refetchInterval: 30000
   });
@@ -169,8 +182,7 @@ export default function PuttingRecords() {
     if (entry.leaderboard_type !== currentView.leaderboardType) return false;
     
     if (currentView.leaderboardType === 'discgolf_ee') {
-      // DG.ee view: only classic records
-      if (entry.game_type !== 'classic') return false;
+      // DG.ee view: include every format that has DG.ee entry
     } else {
       if (entry.game_type !== currentView.gameType) return false;
     }

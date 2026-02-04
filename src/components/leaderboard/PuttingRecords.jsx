@@ -1,18 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trophy, Target, Award } from 'lucide-react';
+import { Trophy, Target, Award, Trash2 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { toast } from 'sonner';
 
 export default function PuttingRecords() {
   const [selectedView, setSelectedView] = useState('general_classic');
   const [selectedGender, setSelectedGender] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [page, setPage] = useState(1);
+  const queryClient = useQueryClient();
   const PAGE_SIZE = 50;
   const MAX_FETCH = 500;
   const FETCH_BATCH_SIZE = 50;
@@ -119,6 +121,61 @@ export default function PuttingRecords() {
 
   const userRole = user?.app_role || 'user';
   const canDelete = ['admin', 'super_admin'].includes(userRole);
+
+  const getEntryIdentityFilter = (entry) => {
+    const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
+    const mappedUid = entry?.player_name ? game?.player_uids?.[entry.player_name] : null;
+    const mappedEmail = entry?.player_name ? game?.player_emails?.[entry.player_name] : null;
+    const playerUid = entry?.player_uid || mappedUid;
+    if (playerUid) {
+      return { player_uid: playerUid };
+    }
+
+    const entryEmail = entry?.player_email && entry.player_email !== 'unknown'
+      ? entry.player_email
+      : mappedEmail;
+    if (entryEmail) {
+      return { player_email: entryEmail.trim().toLowerCase() };
+    }
+
+    return { player_name: entry?.player_name };
+  };
+
+  const deleteRecordMutation = useMutation({
+    mutationFn: async (entry) => {
+      const identityFilter = getEntryIdentityFilter(entry);
+      const leaderboardType = currentView?.leaderboardType || entry?.leaderboard_type;
+      const deleteFilter = {
+        ...identityFilter,
+        leaderboard_type: leaderboardType
+      };
+
+      if (leaderboardType !== 'discgolf_ee') {
+        deleteFilter.game_type = currentView?.gameType || entry?.game_type;
+      }
+
+      const rows = await base44.entities.LeaderboardEntry.filter(deleteFilter, '-score', MAX_FETCH);
+      const ids = rows.map((row) => row.id);
+
+      if (ids.length === 0 && entry?.id) {
+        ids.push(entry.id);
+      }
+
+      for (const id of ids) {
+        await base44.entities.LeaderboardEntry.delete(id);
+      }
+
+      return ids.length;
+    },
+    onSuccess: (deletedCount) => {
+      toast.success(`Kustutatud (${deletedCount})`);
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries-discgolf'] });
+    },
+    onError: (error) => {
+      toast.error(error?.message || 'Kustutamine ebaonnestus');
+    }
+  });
 
   const usersByUid = useMemo(() => {
     const map = {};
@@ -326,6 +383,9 @@ export default function PuttingRecords() {
                           <th className="text-center py-3 px-2 text-slate-600 font-semibold">Putts</th>
                         )}
                         <th className="text-right py-3 px-2 text-slate-600 font-semibold">Date</th>
+                        {canDelete && (
+                          <th className="text-right py-3 px-2 text-slate-600 font-semibold">Kustuta</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -388,6 +448,25 @@ export default function PuttingRecords() {
                               {entry.date ? format(new Date(entry.date), 'MMM d, yyyy') : '-'}
                             </Link>
                           </td>
+                          {canDelete && (
+                            <td className="py-3 px-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const player = getResolvedPlayerName(entry) || 'unknown';
+                                  if (!confirm(`Kustuta "${player}" sellest tabelist?`)) {
+                                    return;
+                                  }
+                                  deleteRecordMutation.mutate(entry);
+                                }}
+                                disabled={deleteRecordMutation.isPending}
+                                className="inline-flex items-center justify-center w-8 h-8 rounded-md text-red-500 hover:text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                title="Kustuta kirje"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Trash2, FolderPlus, Folder, Calendar, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Trash2, FolderPlus, Folder, Calendar, ChevronRight, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
@@ -89,99 +89,99 @@ export default function ManageGames() {
     return Array.from(new Set(fromAtw));
   };
 
-  const submitToDiscgolfMutation = useMutation({
-    mutationFn: async (game) => {
-      const results = [];
-      const profileCache = {};
-      
-      const players = resolveGamePlayers(game);
-      for (const rawPlayerName of players) {
-        if (!rawPlayerName) continue;
+  const syncGameToLeaderboards = async (game, profileCache = {}) => {
+    const results = [];
+    const players = resolveGamePlayers(game);
 
-        const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, rawPlayerName);
-        const resolvedPlayer = await resolveLeaderboardPlayer({
-          game,
-          playerName: rawPlayerName,
-          cache: profileCache
-        });
-        const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
-        const normalizedDate = new Date(game.date || new Date().toISOString()).toISOString();
-        const basePayload = {
-          game_id: game.id,
+    for (const rawPlayerName of players) {
+      if (!rawPlayerName) continue;
+
+      const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, rawPlayerName);
+      const resolvedPlayer = await resolveLeaderboardPlayer({
+        game,
+        playerName: rawPlayerName,
+        cache: profileCache
+      });
+      const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
+      const normalizedDate = new Date(game.date || new Date().toISOString()).toISOString();
+      const basePayload = {
+        game_id: game.id,
+        game_type: game.game_type,
+        player_name: resolvedPlayer.playerName,
+        score,
+        accuracy: Math.round(accuracy * 10) / 10,
+        made_putts: madePutts,
+        total_putts: totalPutts,
+        ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
+        ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
+        ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
+        ...(game.game_type === 'streak_challenge'
+          ? { streak_distance: game.player_distances?.[rawPlayerName] || 0 }
+          : {}),
+        date: normalizedDate
+      };
+
+      if (!totalPutts && !score) {
+        results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
+        continue;
+      }
+
+      try {
+        const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
+          ...identityFilter,
           game_type: game.game_type,
-          player_name: resolvedPlayer.playerName,
-          score,
-          accuracy: Math.round(accuracy * 10) / 10,
-          made_putts: madePutts,
-          total_putts: totalPutts,
-          ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
-          ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
-          ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
-          ...(game.game_type === 'streak_challenge'
-            ? { streak_distance: game.player_distances?.[rawPlayerName] || 0 }
-            : {}),
-          date: normalizedDate
-        };
+          leaderboard_type: 'general'
+        });
 
-        if (!totalPutts && !score) {
-          results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
-          continue;
+        if (existingGeneral) {
+          if (score > existingGeneral.score) {
+            await base44.entities.LeaderboardEntry.update(existingGeneral.id, {
+              ...basePayload,
+              leaderboard_type: 'general'
+            });
+            results.push({ player: resolvedPlayer.playerName, action: 'updated' });
+          } else {
+            results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
+          }
+        } else {
+          await base44.entities.LeaderboardEntry.create({
+            ...basePayload,
+            leaderboard_type: 'general',
+          });
+          results.push({ player: resolvedPlayer.playerName, action: 'created' });
         }
 
-        try {
-          const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
-            ...identityFilter,
-            game_type: game.game_type,
-            leaderboard_type: 'general'
-          });
+        const [existingDg] = await base44.entities.LeaderboardEntry.filter({
+          ...identityFilter,
+          game_type: game.game_type,
+          leaderboard_type: 'discgolf_ee'
+        });
 
-          if (existingGeneral) {
-            if (score > existingGeneral.score) {
-              await base44.entities.LeaderboardEntry.update(existingGeneral.id, {
-                ...basePayload,
-                leaderboard_type: 'general'
-              });
-              results.push({ player: resolvedPlayer.playerName, action: 'updated' });
-            } else {
-              results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
-            }
-          } else {
-            await base44.entities.LeaderboardEntry.create({
-              ...basePayload,
-              leaderboard_type: 'general',
-            });
-            results.push({ player: resolvedPlayer.playerName, action: 'created' });
-          }
-
-          const [existingDg] = await base44.entities.LeaderboardEntry.filter({
-            ...identityFilter,
-            game_type: game.game_type,
-            leaderboard_type: 'discgolf_ee'
-          });
-
-          if (existingDg) {
-            if (score > existingDg.score) {
-              await base44.entities.LeaderboardEntry.update(existingDg.id, {
-                ...basePayload,
-                leaderboard_type: 'discgolf_ee',
-                submitted_by: user?.email
-              });
-            }
-          } else {
-            await base44.entities.LeaderboardEntry.create({
+        if (existingDg) {
+          if (score > existingDg.score) {
+            await base44.entities.LeaderboardEntry.update(existingDg.id, {
               ...basePayload,
               leaderboard_type: 'discgolf_ee',
               submitted_by: user?.email
             });
           }
-        } catch (error) {
-          results.push({ player: resolvedPlayer.playerName, action: 'error', error });
-          continue;
+        } else {
+          await base44.entities.LeaderboardEntry.create({
+            ...basePayload,
+            leaderboard_type: 'discgolf_ee',
+            submitted_by: user?.email
+          });
         }
+      } catch (error) {
+        results.push({ player: resolvedPlayer.playerName, action: 'error', error });
       }
+    }
 
-      return results;
-    },
+    return results;
+  };
+
+  const submitToDiscgolfMutation = useMutation({
+    mutationFn: async (game) => syncGameToLeaderboards(game, {}),
     onSuccess: (results) => {
       const updated = results.filter(r => r.action === 'updated').length;
       const created = results.filter(r => r.action === 'created').length;
@@ -202,6 +202,41 @@ export default function ManageGames() {
     onError: (error) => {
       const message = error?.message || 'Submit failed';
       toast.error(message);
+    }
+  });
+
+  const bulkSyncMutation = useMutation({
+    mutationFn: async (gamesToSync) => {
+      const profileCache = {};
+      const summary = {
+        games: gamesToSync.length,
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        errors: 0
+      };
+
+      for (const game of gamesToSync) {
+        const results = await syncGameToLeaderboards(game, profileCache);
+        summary.created += results.filter(r => r.action === 'created').length;
+        summary.updated += results.filter(r => r.action === 'updated').length;
+        summary.skipped += results.filter(r => r.action === 'skipped').length;
+        summary.errors += results.filter(r => r.action === 'error').length;
+      }
+
+      return summary;
+    },
+    onSuccess: (summary) => {
+      const message = `Bulk sync valmis (${summary.games} mängu, ${summary.created} new, ${summary.updated} updated, ${summary.skipped} skipped, ${summary.errors} errors)`;
+      if (summary.errors > 0) {
+        toast.error(message);
+      } else {
+        toast.success(message);
+      }
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
+    },
+    onError: (error) => {
+      toast.error(error?.message || 'Bulk sync failed');
     }
   });
 
@@ -406,18 +441,29 @@ export default function ManageGames() {
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-800">Completed Games</h2>
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium bg-white hover:border-emerald-300"
-              >
-                <option value="all">All Months</option>
-                {sortedMonths.map((month) => {
-                  const [year, monthNum] = month.split('-');
-                  const monthName = new Date(year, parseInt(monthNum) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                  return <option key={month} value={month}>{monthName}</option>;
-                })}
-              </select>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => bulkSyncMutation.mutate(filteredCompletedGames)}
+                  disabled={bulkSyncMutation.isPending || filteredCompletedGames.length === 0}
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-xs"
+                >
+                  <RefreshCw className={`w-3 h-3 mr-1 ${bulkSyncMutation.isPending ? 'animate-spin' : ''}`} />
+                  {bulkSyncMutation.isPending ? 'Syncing...' : `Bulk Resync (${filteredCompletedGames.length})`}
+                </Button>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium bg-white hover:border-emerald-300"
+                >
+                  <option value="all">All Months</option>
+                  {sortedMonths.map((month) => {
+                    const [year, monthNum] = month.split('-');
+                    const monthName = new Date(year, parseInt(monthNum) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    return <option key={month} value={month}>{monthName}</option>;
+                  })}
+                </select>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -454,7 +500,7 @@ export default function ManageGames() {
                         <div className="flex items-center justify-end gap-2">
                           <Button
                             onClick={() => submitToDiscgolfMutation.mutate(game)}
-                            disabled={submitToDiscgolfMutation.isPending}
+                            disabled={submitToDiscgolfMutation.isPending || bulkSyncMutation.isPending}
                             size="sm"
                             className="bg-blue-600 hover:bg-blue-700 text-xs"
                           >

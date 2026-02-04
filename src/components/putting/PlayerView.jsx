@@ -9,19 +9,20 @@ import ClassicScoreInput from './ClassicScoreInput';
 import BackAndForthInput from './BackAndForthInput';
 import BackAndForthScoreInput from './BackAndForthScoreInput';
 import StreakChallengeInput from './StreakChallengeInput';
-import JylyScoreTable from './JylyScoreTable';
 import MobileLeaderboard from './MobileLeaderboard';
-import PuttTypeSelector from './PuttTypeSelector';
 import PerformanceAnalysis from './PerformanceAnalysis';
 import useRealtimeGame from '@/hooks/use-realtime-game';
 import LoadingState from '@/components/ui/loading-state';
 import { logSyncMetric } from '@/lib/metrics';
 import usePlayerGameState from '@/hooks/use-player-game-state';
+import {
+  buildLeaderboardIdentityFilter,
+  resolveLeaderboardPlayer
+} from '@/lib/leaderboard-utils';
 import { 
   GAME_FORMATS, 
   getNextDistanceFromMade, 
   getNextDistanceBackAndForth,
-  getNextDistanceStreak,
   calculateRoundScore,
   isGameComplete 
 } from './gameRules';
@@ -63,7 +64,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     gameIdRef.current = gameId;
   }, [gameId]);
 
-  const { user, game, isLoading, isSoloGame } = usePlayerGameState({ gameId });
+  const { game, isLoading, isSoloGame } = usePlayerGameState({ gameId });
 
   const getLatestState = React.useCallback(() => {
     return localGameStateRef.current || game || {};
@@ -403,25 +404,44 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       const madePutts = playerPutts.filter(p => p.result === 'made').length;
       const totalPutts = playerPutts.length;
       const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+      const resolvedPlayer = await resolveLeaderboardPlayer({
+        game,
+        playerName,
+        cache: {}
+      });
+      const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
 
       const leaderboardData = {
         game_id: game.id,
-        player_uid: user?.id,
-        player_email: user?.email || 'unknown',
-        player_name: playerName,
+        ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
+        ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
+        player_name: resolvedPlayer.playerName,
         game_type: game.game_type,
         score: game.total_points[playerName] || 0,
         accuracy: Math.round(accuracy * 10) / 10,
         made_putts: madePutts,
         total_putts: totalPutts,
         leaderboard_type: 'general',
-        player_gender: user?.gender || 'M',
+        ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
         date: new Date().toISOString()
       };
 
       // Add distance for streak challenge
       if (game.game_type === 'streak_challenge') {
         leaderboardData.streak_distance = game.player_distances?.[playerName] || 0;
+      }
+
+      const [existingEntry] = await base44.entities.LeaderboardEntry.filter({
+        ...identityFilter,
+        game_type: game.game_type,
+        leaderboard_type: 'general'
+      });
+
+      if (existingEntry) {
+        if (leaderboardData.score > existingEntry.score) {
+          await base44.entities.LeaderboardEntry.update(existingEntry.id, leaderboardData);
+        }
+        return existingEntry;
       }
 
       return await base44.entities.LeaderboardEntry.create(leaderboardData);

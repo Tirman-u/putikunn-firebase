@@ -32,6 +32,12 @@ export default function PuttingRecords() {
     queryFn: () => base44.auth.me()
   });
 
+  const { data: users = [] } = useQuery({
+    queryKey: ['leaderboard-users'],
+    queryFn: () => base44.entities.User.list(),
+    staleTime: 120000
+  });
+
   const currentView = viewTypes.find(v => v.id === selectedView);
   const displayLimit = PAGE_SIZE * page;
 
@@ -58,11 +64,11 @@ export default function PuttingRecords() {
   });
 
   const { data: discgolfEntries = [] } = useQuery({
-    queryKey: ['leaderboard-entries-discgolf', currentView?.leaderboardType, fetchLimit],
+    queryKey: ['leaderboard-entries-discgolf', currentView?.leaderboardType, currentView?.gameType, fetchLimit],
     queryFn: async () => {
       if (!currentView || currentView.leaderboardType !== 'general') return [];
       return base44.entities.LeaderboardEntry.filter(
-        { leaderboard_type: 'discgolf_ee', game_type: 'classic' },
+        { leaderboard_type: 'discgolf_ee', game_type: currentView.gameType },
         '-score',
         fetchLimit
       );
@@ -101,6 +107,26 @@ export default function PuttingRecords() {
   const userRole = user?.app_role || 'user';
   const canDelete = ['admin', 'super_admin'].includes(userRole);
 
+  const usersByUid = useMemo(() => {
+    const map = {};
+    users.forEach((u) => {
+      if (u?.id) {
+        map[u.id] = u;
+      }
+    });
+    return map;
+  }, [users]);
+
+  const usersByEmail = useMemo(() => {
+    const map = {};
+    users.forEach((u) => {
+      if (u?.email) {
+        map[u.email.trim().toLowerCase()] = u;
+      }
+    });
+    return map;
+  }, [users]);
+
   // Generate last 6 months for filter
   const monthOptions = [];
   for (let i = 0; i < 6; i++) {
@@ -111,6 +137,32 @@ export default function PuttingRecords() {
       label: format(date, 'MMMM yyyy')
     });
   }
+
+  const resolveEntryUser = (entry) => {
+    const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
+    const mappedUid = entry?.player_uid || (entry?.player_name ? game?.player_uids?.[entry.player_name] : null);
+    if (mappedUid && usersByUid[mappedUid]) {
+      return usersByUid[mappedUid];
+    }
+    const mappedEmail = (entry?.player_email && entry.player_email !== 'unknown')
+      ? entry.player_email
+      : (entry?.player_name ? game?.player_emails?.[entry.player_name] : null);
+    const normalizedEmail = mappedEmail?.trim().toLowerCase();
+    if (normalizedEmail && usersByEmail[normalizedEmail]) {
+      return usersByEmail[normalizedEmail];
+    }
+    return null;
+  };
+
+  const getResolvedGender = (entry) => {
+    const profile = resolveEntryUser(entry);
+    return profile?.gender || entry?.player_gender || null;
+  };
+
+  const getResolvedPlayerName = (entry) => {
+    const profile = resolveEntryUser(entry);
+    return profile?.full_name || entry?.player_name;
+  };
 
   const filteredEntries = leaderboardEntries.filter(entry => {
     if (!currentView) return false;
@@ -123,11 +175,12 @@ export default function PuttingRecords() {
       if (entry.game_type !== currentView.gameType) return false;
     }
     
+    const resolvedGender = getResolvedGender(entry);
     if (selectedGender !== 'all') {
       if (selectedGender === 'N') {
-        if (entry.player_gender !== 'N') return false;
+        if (resolvedGender !== 'N') return false;
       } else if (selectedGender === 'M') {
-        if (entry.player_gender === 'N') return false;
+        if (resolvedGender === 'N') return false;
       }
     }
     
@@ -191,14 +244,8 @@ export default function PuttingRecords() {
     return discgolfEntries.some(e => 
       e.leaderboard_type === 'discgolf_ee' && 
       e.game_id === entry.game_id &&
-      (e.player_uid && entry.player_uid ? e.player_uid === entry.player_uid : e.player_name === entry.player_name)
+      getPlayerKey(e) === getPlayerKey(entry)
     );
-  };
-
-  const isHostedGame = (entry) => {
-    if (!entry?.game_id) return false;
-    const game = gamesById[entry.game_id];
-    return !!(game?.pin && game.pin !== '0000');
   };
 
   return (
@@ -287,11 +334,13 @@ export default function PuttingRecords() {
                           <td className="py-3 px-2 font-medium text-slate-700">
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
                               <div className="flex items-center gap-2">
-                                <span>{entry.player_name}</span>
-                                <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-                                  {entry.player_gender || 'M'}
-                                </span>
-                                {(isHostedGame(entry) || hasDiscgolfEntry(entry)) && (
+                                <span>{getResolvedPlayerName(entry)}</span>
+                                {getResolvedGender(entry) && (
+                                  <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
+                                    {getResolvedGender(entry)}
+                                  </span>
+                                )}
+                                {hasDiscgolfEntry(entry) && (
                                   <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
                                     <Award className="w-3 h-3" />
                                     DG.ee

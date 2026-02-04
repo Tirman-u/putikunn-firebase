@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trash2, Share2, Calendar, Users, Target, Upload } from 'lucide-react';
+import { ArrowLeft, Trash2, Share2, Calendar, Upload } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format as formatDate } from 'date-fns';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
@@ -12,6 +12,11 @@ import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView'
 import { createPageUrl } from '@/utils';
 import LoadingState from '@/components/ui/loading-state';
 import useRealtimeGame from '@/hooks/use-realtime-game';
+import {
+  buildLeaderboardIdentityFilter,
+  getLeaderboardStats,
+  resolveLeaderboardPlayer
+} from '@/lib/leaderboard-utils';
 
 
 export default function GameResult() {
@@ -95,74 +100,52 @@ export default function GameResult() {
 
   const submitToLeaderboardMutation = useMutation({
     mutationFn: async () => {
-      // Find current user's name in the game
-      const playerName = user?.full_name;
-      let madePutts = 0;
-      let totalPutts = 0;
-      let accuracy = 0;
-      let score = 0;
+      const playerEntries = game.players || [];
+      const matchedName =
+        playerEntries.find((name) => game.player_uids?.[name] && game.player_uids?.[name] === user?.id) ||
+        playerEntries.find((name) => game.player_emails?.[name] && game.player_emails?.[name] === user?.email) ||
+        playerEntries.find((name) => name === user?.full_name) ||
+        playerEntries.find((name) => name === user?.display_name) ||
+        user?.full_name;
 
-      if (game.game_type === 'around_the_world') {
-        const state = game.atw_state?.[playerName] || {};
-        const currentScore = game.total_points?.[playerName] || 0;
-        const bestScore = Math.max(state.best_score || 0, currentScore);
-        const currentAccuracy = state.total_putts > 0
-          ? (state.total_makes / state.total_putts) * 100
-          : 0;
-        madePutts = state.total_makes || 0;
-        totalPutts = state.total_putts || 0;
-        accuracy = Math.max(state.best_accuracy || 0, currentAccuracy);
-        score = bestScore;
-      } else {
-        const playerPutts = game.player_putts?.[playerName] || [];
-        madePutts = playerPutts.filter(p => p.result === 'made').length;
-        totalPutts = playerPutts.length;
-        accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
-        score = game.total_points[playerName] || 0;
+      if (!matchedName) {
+        return { updated: false, existing: 0 };
       }
 
-      // Check if player already has an entry for this game type
-      const existingEntries = await base44.entities.LeaderboardEntry.filter({
-        ...(user?.id ? { player_uid: user.id } : { player_email: user?.email }),
+      const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, matchedName);
+      const resolvedPlayer = await resolveLeaderboardPlayer({ game, playerName: matchedName, cache: {} });
+      const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
+      const [existingEntry] = await base44.entities.LeaderboardEntry.filter({
+        ...identityFilter,
         game_type: game.game_type,
         leaderboard_type: 'general'
       });
 
-      const existingEntry = existingEntries.length > 0 ? existingEntries[0] : null;
+      const payload = {
+        game_id: game.id,
+        player_name: resolvedPlayer.playerName,
+        ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
+        ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
+        ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
+        game_type: game.game_type,
+        score,
+        accuracy: Math.round(accuracy * 10) / 10,
+        made_putts: madePutts,
+        total_putts: totalPutts,
+        leaderboard_type: 'general',
+        date: new Date(game.date || new Date().toISOString()).toISOString()
+      };
 
       if (existingEntry) {
-        // Only update if new score is better
         if (score > existingEntry.score) {
-          await base44.entities.LeaderboardEntry.update(existingEntry.id, {
-            game_id: game.id,
-            score: score,
-            accuracy: Math.round(accuracy * 10) / 10,
-            made_putts: madePutts,
-            total_putts: totalPutts,
-            date: new Date(game.date).toISOString()
-          });
+          await base44.entities.LeaderboardEntry.update(existingEntry.id, payload);
           return { updated: true };
-        } else {
-          return { updated: false, existing: existingEntry.score };
         }
-      } else {
-        // Create new entry
-        await base44.entities.LeaderboardEntry.create({
-          game_id: game.id,
-          player_uid: user?.id,
-          player_email: user?.email || 'unknown',
-          player_name: playerName,
-          game_type: game.game_type,
-          score: score,
-          accuracy: Math.round(accuracy * 10) / 10,
-          made_putts: madePutts,
-          total_putts: totalPutts,
-          leaderboard_type: 'general',
-          player_gender: user?.gender || 'M',
-          date: new Date(game.date).toISOString()
-        });
-        return { updated: true };
+        return { updated: false, existing: existingEntry.score };
       }
+
+      await base44.entities.LeaderboardEntry.create(payload);
+      return { updated: true };
     },
     onSuccess: (result) => {
       if (result.updated) {
@@ -177,94 +160,79 @@ export default function GameResult() {
   const submitToDiscgolfMutation = useMutation({
     mutationFn: async () => {
       const results = [];
+      const profileCache = {};
       
-      for (const playerName of game.players || []) {
-        let madePutts = 0;
-        let totalPutts = 0;
-        let accuracy = 0;
-        let score = 0;
+      for (const rawPlayerName of game.players || []) {
+        const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, rawPlayerName);
+        const resolvedPlayer = await resolveLeaderboardPlayer({
+          game,
+          playerName: rawPlayerName,
+          cache: profileCache
+        });
+        const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
+        const normalizedDate = new Date(game.date || new Date().toISOString()).toISOString();
+        const basePayload = {
+          game_id: game.id,
+          player_name: resolvedPlayer.playerName,
+          ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
+          ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
+          ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
+          game_type: game.game_type,
+          score,
+          accuracy: Math.round(accuracy * 10) / 10,
+          made_putts: madePutts,
+          total_putts: totalPutts,
+          ...(game.game_type === 'streak_challenge'
+            ? { streak_distance: game.player_distances?.[rawPlayerName] || 0 }
+            : {}),
+          date: normalizedDate
+        };
 
-        if (game.game_type === 'around_the_world') {
-          const state = game.atw_state?.[playerName] || {};
-          const currentScore = game.total_points?.[playerName] || 0;
-          const bestScore = Math.max(state.best_score || 0, currentScore);
-          const currentAccuracy = state.total_putts > 0
-            ? (state.total_makes / state.total_putts) * 100
-            : 0;
-          madePutts = state.total_makes || 0;
-          totalPutts = state.total_putts || 0;
-          accuracy = Math.max(state.best_accuracy || 0, currentAccuracy);
-          score = bestScore;
-        } else {
-          const playerPutts = game.player_putts?.[playerName] || [];
-          madePutts = playerPutts.filter(p => p.result === 'made').length;
-          totalPutts = playerPutts.length;
-          accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
-          score = game.total_points?.[playerName] || 0;
-        }
-
-        // Check if player already has an entry
-        const playerUid = game.player_uids?.[playerName];
-        const playerEmail = game.player_emails?.[playerName];
-        const existingEntries = await base44.entities.LeaderboardEntry.filter({
-          ...(playerUid ? { player_uid: playerUid } : { player_name: playerName }),
+        const [existingDiscgolf] = await base44.entities.LeaderboardEntry.filter({
+          ...identityFilter,
           game_type: game.game_type,
           leaderboard_type: 'discgolf_ee'
         });
 
-        const existingEntry = existingEntries.length > 0 ? existingEntries[0] : null;
-
-        if (existingEntry) {
-          // Update only if new score is better
-          if (score > existingEntry.score) {
-            await base44.entities.LeaderboardEntry.update(existingEntry.id, {
-              game_id: game.id,
-              score: score,
-              accuracy: Math.round(accuracy * 10) / 10,
-              made_putts: madePutts,
-              total_putts: totalPutts,
-              submitted_by: user?.email,
-              date: new Date(game.date).toISOString()
+        if (existingDiscgolf) {
+          if (score > existingDiscgolf.score) {
+            await base44.entities.LeaderboardEntry.update(existingDiscgolf.id, {
+              ...basePayload,
+              leaderboard_type: 'discgolf_ee',
+              submitted_by: user?.email
             });
-            results.push({ player: playerName, action: 'updated' });
+            results.push({ player: resolvedPlayer.playerName, action: 'updated' });
           } else {
-            results.push({ player: playerName, action: 'skipped' });
+            results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
           }
         } else {
-          // Create new entry
           await base44.entities.LeaderboardEntry.create({
-            game_id: game.id,
-            player_uid: playerUid,
-            player_email: playerEmail,
-            player_name: playerName,
-            game_type: game.game_type,
-            score: score,
-            accuracy: Math.round(accuracy * 10) / 10,
-            made_putts: madePutts,
-            total_putts: totalPutts,
+            ...basePayload,
             leaderboard_type: 'discgolf_ee',
-            submitted_by: user?.email,
-            player_gender: 'M',
-            date: new Date(game.date).toISOString()
+            submitted_by: user?.email
           });
-          results.push({ player: playerName, action: 'created' });
+          results.push({ player: resolvedPlayer.playerName, action: 'created' });
         }
 
-        // Also submit to general leaderboard (always create new)
-        await base44.entities.LeaderboardEntry.create({
-          game_id: game.id,
-          player_uid: playerUid,
-          player_email: playerEmail,
-          player_name: playerName,
+        const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
+          ...identityFilter,
           game_type: game.game_type,
-          score: score,
-          accuracy: Math.round(accuracy * 10) / 10,
-          made_putts: madePutts,
-          total_putts: totalPutts,
-          leaderboard_type: 'general',
-          player_gender: 'M',
-          date: new Date(game.date).toISOString()
+          leaderboard_type: 'general'
         });
+
+        if (existingGeneral) {
+          if (score > existingGeneral.score) {
+            await base44.entities.LeaderboardEntry.update(existingGeneral.id, {
+              ...basePayload,
+              leaderboard_type: 'general'
+            });
+          }
+        } else {
+          await base44.entities.LeaderboardEntry.create({
+            ...basePayload,
+            leaderboard_type: 'general'
+          });
+        }
       }
 
       return results;

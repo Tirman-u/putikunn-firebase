@@ -6,6 +6,10 @@ import { createPageUrl } from '@/utils';
 import useRealtimeGame from '@/hooks/use-realtime-game';
 import { getATWMovement, isATWRoundComplete, shouldATWRestart } from '@/components/putting/gameRules';
 import { logSyncMetric } from '@/lib/metrics';
+import {
+  buildLeaderboardIdentityFilter,
+  resolveLeaderboardPlayer
+} from '@/lib/leaderboard-utils';
 
 export default function useATWGameState({ gameId, playerName, isSolo }) {
   const queryClient = useQueryClient();
@@ -342,20 +346,41 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       const currentScore = game?.total_points?.[playerName] || 0;
       const bestScore = Math.max(playerState.best_score || 0, currentScore);
 
-      return await base44.entities.LeaderboardEntry.create({
+      const resolvedPlayer = await resolveLeaderboardPlayer({
+        game,
+        playerName,
+        cache: {}
+      });
+      const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
+      const payload = {
         game_id: game.id,
-        player_uid: user?.id,
-        player_email: user?.email || 'unknown',
-        player_name: playerName,
+        ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
+        ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
+        player_name: resolvedPlayer.playerName,
         game_type: 'around_the_world',
         score: bestScore,
         accuracy: Math.round(accuracy * 10) / 10,
         made_putts: madePutts,
         total_putts: totalPutts,
         leaderboard_type: 'general',
-        player_gender: user?.gender || 'M',
+        ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
         date: new Date().toISOString()
+      };
+
+      const [existingEntry] = await base44.entities.LeaderboardEntry.filter({
+        ...identityFilter,
+        game_type: 'around_the_world',
+        leaderboard_type: 'general'
       });
+
+      if (existingEntry) {
+        if (payload.score > existingEntry.score) {
+          return await base44.entities.LeaderboardEntry.update(existingEntry.id, payload);
+        }
+        return existingEntry;
+      }
+
+      return await base44.entities.LeaderboardEntry.create(payload);
     },
     onSuccess: () => {
       toast.success('Result submitted to leaderboard!');

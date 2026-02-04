@@ -8,6 +8,11 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import useRealtimeGame from '@/hooks/use-realtime-game';
 import LoadingState from '@/components/ui/loading-state';
+import {
+  buildLeaderboardIdentityFilter,
+  getLeaderboardStats,
+  resolveLeaderboardPlayer
+} from '@/lib/leaderboard-utils';
 
 export default function HostView({ gameId, onExit }) {
   const [copied, setCopied] = useState(false);
@@ -104,76 +109,79 @@ export default function HostView({ gameId, onExit }) {
   const submitToDiscgolfMutation = useMutation({
     mutationFn: async () => {
       const results = [];
+      const profileCache = {};
       
-      for (const playerName of game.players || []) {
-        const playerState = game.atw_state?.[playerName];
-        const currentScore = game.total_points?.[playerName] || 0;
-        const score = Math.max(playerState?.best_score || 0, currentScore);
-        const totalPutts = playerState?.total_putts || 0;
-        const madePutts = playerState?.total_makes || 0;
-        const currentAccuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
-        const accuracy = Math.max(playerState?.best_accuracy || 0, currentAccuracy);
+      for (const rawPlayerName of game.players || []) {
+        const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, rawPlayerName);
+        const resolvedPlayer = await resolveLeaderboardPlayer({
+          game,
+          playerName: rawPlayerName,
+          cache: profileCache
+        });
+        const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
+        const normalizedDate = new Date(game.date || new Date().toISOString()).toISOString();
+        const basePayload = {
+          game_id: game.id,
+          player_name: resolvedPlayer.playerName,
+          ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
+          ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
+          ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
+          game_type: game.game_type,
+          score,
+          accuracy: Math.round(accuracy * 10) / 10,
+          made_putts: madePutts,
+          total_putts: totalPutts,
+          ...(game.game_type === 'streak_challenge'
+            ? { streak_distance: game.player_distances?.[rawPlayerName] || 0 }
+            : {}),
+          date: normalizedDate
+        };
 
-        const playerUid = game.player_uids?.[playerName];
-        const playerEmail = game.player_emails?.[playerName];
-        const existingEntries = await base44.entities.LeaderboardEntry.filter({
-          ...(playerUid ? { player_uid: playerUid } : { player_name: playerName }),
+        const [existingDiscgolf] = await base44.entities.LeaderboardEntry.filter({
+          ...identityFilter,
           game_type: game.game_type,
           leaderboard_type: 'discgolf_ee'
         });
 
-        const existingEntry = existingEntries.length > 0 ? existingEntries[0] : null;
-
-        if (existingEntry) {
-          if (score > existingEntry.score) {
-            await base44.entities.LeaderboardEntry.update(existingEntry.id, {
-              game_id: game.id,
-              ...(playerUid ? { player_uid: playerUid } : {}),
-              ...(playerEmail ? { player_email: playerEmail } : {}),
-              score: score,
-              accuracy: Math.round(accuracy * 10) / 10,
-              made_putts: madePutts,
-              total_putts: totalPutts,
-              submitted_by: user?.email,
-              date: new Date(game.date).toISOString()
+        if (existingDiscgolf) {
+          if (score > existingDiscgolf.score) {
+            await base44.entities.LeaderboardEntry.update(existingDiscgolf.id, {
+              ...basePayload,
+              leaderboard_type: 'discgolf_ee',
+              submitted_by: user?.email
             });
-            results.push({ player: playerName, action: 'updated' });
+            results.push({ player: resolvedPlayer.playerName, action: 'updated' });
           } else {
-            results.push({ player: playerName, action: 'skipped' });
+            results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
           }
         } else {
           await base44.entities.LeaderboardEntry.create({
-            game_id: game.id,
-            player_uid: playerUid,
-            player_email: playerEmail,
-            player_name: playerName,
-            game_type: game.game_type,
-            score: score,
-            accuracy: Math.round(accuracy * 10) / 10,
-            made_putts: madePutts,
-            total_putts: totalPutts,
+            ...basePayload,
             leaderboard_type: 'discgolf_ee',
-            submitted_by: user?.email,
-            player_gender: 'M',
-            date: new Date(game.date).toISOString()
+            submitted_by: user?.email
           });
-          results.push({ player: playerName, action: 'created' });
+          results.push({ player: resolvedPlayer.playerName, action: 'created' });
         }
 
-        await base44.entities.LeaderboardEntry.create({
-          game_id: game.id,
-          player_uid: playerUid,
-          player_email: playerEmail,
-          player_name: playerName,
+        const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
+          ...identityFilter,
           game_type: game.game_type,
-          score: score,
-          accuracy: Math.round(accuracy * 10) / 10,
-          made_putts: madePutts,
-          total_putts: totalPutts,
-          leaderboard_type: 'general',
-          player_gender: 'M',
-          date: new Date(game.date).toISOString()
+          leaderboard_type: 'general'
         });
+
+        if (existingGeneral) {
+          if (score > existingGeneral.score) {
+            await base44.entities.LeaderboardEntry.update(existingGeneral.id, {
+              ...basePayload,
+              leaderboard_type: 'general'
+            });
+          }
+        } else {
+          await base44.entities.LeaderboardEntry.create({
+            ...basePayload,
+            leaderboard_type: 'general'
+          });
+        }
       }
 
       return results;

@@ -105,6 +105,7 @@ export default function Home() {
       total_points: {},
       player_uids: {},
       player_emails: {},
+      join_closed: false,
       status: 'active',
       date: new Date().toISOString()
     });
@@ -298,6 +299,7 @@ export default function Home() {
         total_points: { [user.full_name]: 0 },
         player_uids: { [user.full_name]: user.id },
         player_emails: { [user.full_name]: user.email },
+        join_closed: false,
         status: 'active',
         date: new Date().toISOString()
       });
@@ -352,6 +354,7 @@ export default function Home() {
             total_points: {},
             player_uids: isSoloATW ? { [playerName]: user.id } : {},
             player_emails: isSoloATW ? { [playerName]: user.email } : {},
+            join_closed: false,
             status: 'active',
             date: new Date().toISOString(),
             atw_config: setupData.config,

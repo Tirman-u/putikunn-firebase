@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Copy, Check, Users, Upload, Trophy, Target } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Users, Upload, Trophy, Target, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -85,6 +85,19 @@ export default function HostView({ gameId, onExit }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
       toast.success('Mäng lõpetatud!');
+    }
+  });
+
+  const closeGameMutation = useMutation({
+    mutationFn: async () => {
+      await base44.entities.Game.update(gameId, {
+        join_closed: true,
+        status: 'closed'
+      });
+    },
+    onSuccess: () => {
+      toast.success('Mäng suletud');
+      onExit?.();
     }
   });
 
@@ -414,6 +427,18 @@ export default function HostView({ gameId, onExit }) {
         {/* Actions */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <div className="flex flex-col gap-3">
+            {!isATWGame && (
+              <Button
+                onClick={() => closeGameMutation.mutate()}
+                disabled={closeGameMutation.isPending || game.join_closed === true}
+                variant="outline"
+                className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              >
+                <XCircle className="w-4 h-4 mr-2" />
+                {game.join_closed === true ? 'Game Closed' : 'Close Game'}
+              </Button>
+            )}
+
             {!isCompleted && isATWGame && (
               <Button 
                 onClick={() => completeGameMutation.mutate()}

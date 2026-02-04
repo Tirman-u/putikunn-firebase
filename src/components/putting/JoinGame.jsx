@@ -25,9 +25,14 @@ export default function JoinGame({ onJoin, onBack }) {
     queryKey: ['recent-games'],
     queryFn: async () => {
       const activeGames = await base44.entities.Game.filter({
-        status: { $in: ['setup', 'active'] }
+        status: { $in: ['setup', 'active', 'completed'] }
       }, '-date', 10);
-      return activeGames.filter(g => g.pin !== null && g.pin !== '0000');
+      return activeGames.filter(g =>
+        g.pin !== null &&
+        g.pin !== '0000' &&
+        g.join_closed !== true &&
+        g.status !== 'closed'
+      );
     },
     enabled: !!user,
     refetchInterval: false
@@ -93,6 +98,12 @@ export default function JoinGame({ onJoin, onBack }) {
       }
 
       const game = games[0];
+
+      if (game.join_closed === true || game.status === 'closed') {
+        setError('Game is closed by host.');
+        setLoading(false);
+        return;
+      }
 
       // Check if player already exists
       if (game.players.includes(playerName.trim())) {

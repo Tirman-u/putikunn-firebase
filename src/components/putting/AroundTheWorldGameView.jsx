@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowUp, ArrowDown, Undo2, Trophy, Eye, EyeOff, LogOut, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
 import LoadingState from '@/components/ui/loading-state';
 import useATWGameState from '@/hooks/use-atw-game-state';
+import { deleteGameAndLeaderboardEntries } from '@/lib/leaderboard-utils';
 
 
 
@@ -107,10 +107,20 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         gameId, submitToLeaderboardMutation, user 
         }) => {
         const attemptsCount = playerState.attempts_count || 0;
+        const [hasAskedSubmit, setHasAskedSubmit] = useState(false);
         const failedTurns = useMemo(() => 
         playerState.history.filter(turn => turn.failed_to_advance || turn.missed_all),
         [playerState.history]
         );
+
+    React.useEffect(() => {
+      if (!isSolo || hasAskedSubmit || submitToLeaderboardMutation.isSuccess) return;
+      setHasAskedSubmit(true);
+      const shouldSubmit = window.confirm('Kas soovid tulemuse rekorditabelisse lisada?');
+      if (shouldSubmit) {
+        submitToLeaderboardMutation.mutate();
+      }
+    }, [hasAskedSubmit, isSolo, submitToLeaderboardMutation]);
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -222,7 +232,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
             <Button
               onClick={async () => {
                 if (confirm('Kas oled kindel, et soovid mängu kustutada?')) {
-                  await base44.entities.Game.delete(gameId);
+                  await deleteGameAndLeaderboardEntries(gameId);
                   toast.success('Mäng kustutatud');
                   window.location.href = createPageUrl('Home');
                 }

@@ -15,10 +15,9 @@ export default function PuttingRecords() {
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
-  const PAGE_SIZE = 50;
-  const MAX_FETCH = 500;
-  const FETCH_BATCH_SIZE = 50;
-  const [fetchLimit, setFetchLimit] = useState(PAGE_SIZE);
+  const PAGE_SIZE = 20;
+  const MAX_FETCH = 2000;
+  const FETCH_BATCH_SIZE = 200;
 
   const viewTypes = [
     { id: 'general_classic', label: 'Classic', leaderboardType: 'general', gameType: 'classic' },
@@ -26,7 +25,7 @@ export default function PuttingRecords() {
     { id: 'general_short', label: 'Short', leaderboardType: 'general', gameType: 'short' },
     { id: 'general_streak_challenge', label: 'Streak', leaderboardType: 'general', gameType: 'streak_challenge' },
     { id: 'general_random_distance', label: 'Random', leaderboardType: 'general', gameType: 'random_distance' },
-    { id: 'general_around_the_world', label: 'Around World', leaderboardType: 'general', gameType: 'around_the_world' },
+    { id: 'general_around_the_world', label: 'Around the World', leaderboardType: 'general', gameType: 'around_the_world' },
     { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'discgolf_ee', gameType: 'all' }
   ];
 
@@ -42,19 +41,17 @@ export default function PuttingRecords() {
   });
 
   const currentView = viewTypes.find(v => v.id === selectedView);
-  const displayLimit = PAGE_SIZE * page;
 
   useEffect(() => {
     setPage(1);
-    setFetchLimit(PAGE_SIZE);
   }, [selectedView, selectedGender, selectedMonth]);
 
   const fetchLeaderboardRows = async (filter) => {
     const rows = [];
     let skip = 0;
 
-    while (rows.length < fetchLimit) {
-      const limit = Math.min(FETCH_BATCH_SIZE, fetchLimit - rows.length);
+    while (rows.length < MAX_FETCH) {
+      const limit = Math.min(FETCH_BATCH_SIZE, MAX_FETCH - rows.length);
       const chunk = await base44.entities.LeaderboardEntry.filter(filter, '-score', limit, skip);
       if (!chunk?.length) break;
 
@@ -68,25 +65,18 @@ export default function PuttingRecords() {
   };
 
   const { data: leaderboardEntries = [] } = useQuery({
-    queryKey: ['leaderboard-entries', selectedView, fetchLimit],
+    queryKey: ['leaderboard-entries', selectedView],
     queryFn: async () => {
       if (!currentView) return [];
       const filter = {
         leaderboard_type: currentView.leaderboardType,
       };
-      if (currentView.leaderboardType !== 'discgolf_ee') {
+      if (currentView.leaderboardType === 'discgolf_ee') {
+        filter.game_type = 'classic';
+      } else {
         filter.game_type = currentView.gameType;
       }
       return fetchLeaderboardRows(filter);
-    },
-    refetchInterval: 30000
-  });
-
-  const { data: discgolfEntries = [] } = useQuery({
-    queryKey: ['leaderboard-entries-discgolf', currentView?.leaderboardType, currentView?.gameType, fetchLimit],
-    queryFn: async () => {
-      if (!currentView || currentView.leaderboardType !== 'general') return [];
-      return fetchLeaderboardRows({ leaderboard_type: 'discgolf_ee', game_type: currentView.gameType });
     },
     refetchInterval: 30000
   });
@@ -95,7 +85,7 @@ export default function PuttingRecords() {
     return Array.from(new Set(leaderboardEntries.map(entry => entry.game_id).filter(Boolean)));
   }, [leaderboardEntries]);
 
-  const { data: gamesById = {} } = useQuery({
+  const { data: gamesById = {}, isLoading: isGamesLoading } = useQuery({
     queryKey: ['leaderboard-games', leaderboardGameIds.join('|')],
     queryFn: async () => {
       if (leaderboardGameIds.length === 0) return {};
@@ -122,55 +112,16 @@ export default function PuttingRecords() {
   const userRole = user?.app_role || 'user';
   const canDelete = ['admin', 'super_admin'].includes(userRole);
 
-  const getEntryIdentityFilter = (entry) => {
-    const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
-    const mappedUid = entry?.player_name ? game?.player_uids?.[entry.player_name] : null;
-    const mappedEmail = entry?.player_name ? game?.player_emails?.[entry.player_name] : null;
-    const playerUid = entry?.player_uid || mappedUid;
-    if (playerUid) {
-      return { player_uid: playerUid };
-    }
-
-    const entryEmail = entry?.player_email && entry.player_email !== 'unknown'
-      ? entry.player_email
-      : mappedEmail;
-    if (entryEmail) {
-      return { player_email: entryEmail.trim().toLowerCase() };
-    }
-
-    return { player_name: entry?.player_name };
-  };
-
   const deleteRecordMutation = useMutation({
     mutationFn: async (entry) => {
-      const identityFilter = getEntryIdentityFilter(entry);
-      const leaderboardType = currentView?.leaderboardType || entry?.leaderboard_type;
-      const deleteFilter = {
-        ...identityFilter,
-        leaderboard_type: leaderboardType
-      };
-
-      if (leaderboardType !== 'discgolf_ee') {
-        deleteFilter.game_type = currentView?.gameType || entry?.game_type;
-      }
-
-      const rows = await base44.entities.LeaderboardEntry.filter(deleteFilter, '-score', MAX_FETCH);
-      const ids = rows.map((row) => row.id);
-
-      if (ids.length === 0 && entry?.id) {
-        ids.push(entry.id);
-      }
-
-      for (const id of ids) {
-        await base44.entities.LeaderboardEntry.delete(id);
-      }
-
-      return ids.length;
+      if (!entry?.id) return 0;
+      await base44.entities.LeaderboardEntry.delete(entry.id);
+      return 1;
     },
     onSuccess: (deletedCount) => {
       toast.success(`Kustutatud (${deletedCount})`);
       queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
-      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries-discgolf'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-games'] });
     },
     onError: (error) => {
       toast.error(error?.message || 'Kustutamine ebaonnestus');
@@ -197,16 +148,23 @@ export default function PuttingRecords() {
     return map;
   }, [users]);
 
-  // Generate last 6 months for filter
-  const monthOptions = [];
-  for (let i = 0; i < 6; i++) {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    monthOptions.push({
-      value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
-      label: format(date, 'MMMM yyyy')
+  const monthOptions = useMemo(() => {
+    const monthSet = new Set();
+    leaderboardEntries.forEach((entry) => {
+      if (!entry?.date) return;
+      monthSet.add(format(new Date(entry.date), 'yyyy-MM'));
     });
-  }
+
+    return Array.from(monthSet)
+      .sort((a, b) => b.localeCompare(a))
+      .map((value) => {
+        const [year, month] = value.split('-');
+        return {
+          value,
+          label: format(new Date(Number(year), Number(month) - 1, 1), 'MMMM yyyy')
+        };
+      });
+  }, [leaderboardEntries]);
 
   const resolveEntryUser = (entry) => {
     const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
@@ -234,23 +192,27 @@ export default function PuttingRecords() {
     return profile?.full_name || entry?.player_name;
   };
 
+  const isHostedEntry = (entry) => {
+    const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
+    return Boolean(game?.pin && game.pin !== '0000');
+  };
+
   const filteredEntries = leaderboardEntries.filter(entry => {
     if (!currentView) return false;
     if (entry.leaderboard_type !== currentView.leaderboardType) return false;
+    if (!entry?.game_id || !gamesById?.[entry.game_id]) return false;
     
     if (currentView.leaderboardType === 'discgolf_ee') {
-      // DG.ee view: include every format that has DG.ee entry
+      if (entry.game_type !== 'classic') return false;
+      if (!isHostedEntry(entry)) return false;
     } else {
       if (entry.game_type !== currentView.gameType) return false;
     }
     
     const resolvedGender = getResolvedGender(entry);
     if (selectedGender !== 'all') {
-      if (selectedGender === 'N') {
-        if (resolvedGender !== 'N') return false;
-      } else if (selectedGender === 'M') {
-        if (resolvedGender === 'N') return false;
-      }
+      if (selectedGender === 'N' && resolvedGender !== 'N') return false;
+      if (selectedGender === 'M' && resolvedGender !== 'M') return false;
     }
     
     if (selectedMonth !== 'all' && entry.date) {
@@ -296,26 +258,16 @@ export default function PuttingRecords() {
   });
 
   const uniqueEntries = Object.values(bestScoresByPlayer).sort((a, b) => b.score - a.score);
-  const sortedEntries = uniqueEntries.slice(0, displayLimit);
-  const canFetchMore = leaderboardEntries.length >= fetchLimit && fetchLimit < MAX_FETCH;
-  const hasMoreToShow = uniqueEntries.length > displayLimit;
-  const canLoadMore = hasMoreToShow || canFetchMore;
+  const totalPages = Math.max(1, Math.ceil(uniqueEntries.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const sortedEntries = uniqueEntries.slice(pageStart, pageStart + PAGE_SIZE);
 
   useEffect(() => {
-    if (!canFetchMore) return;
-    if (uniqueEntries.length >= displayLimit) return;
-    setFetchLimit(prev => Math.min(prev * 2, MAX_FETCH));
-  }, [canFetchMore, displayLimit, uniqueEntries.length]);
-
-  // Helper to check if a general entry has a corresponding DG.ee entry
-  const hasDiscgolfEntry = (entry) => {
-    if (entry.leaderboard_type !== 'general') return false;
-    return discgolfEntries.some(e => 
-      e.leaderboard_type === 'discgolf_ee' && 
-      e.game_id === entry.game_id &&
-      getPlayerKey(e) === getPlayerKey(entry)
-    );
-  };
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
@@ -362,10 +314,17 @@ export default function PuttingRecords() {
               </div>
 
               {sortedEntries.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                  <Target className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No records yet. Be the first!</p>
-                </div>
+                isGamesLoading && leaderboardEntries.length > 0 ? (
+                  <div className="text-center py-12 text-slate-400">
+                    <Target className="w-12 h-12 mx-auto mb-3 opacity-50 animate-pulse" />
+                    <p>Laen mänge...</p>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-slate-400">
+                    <Target className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No records yet. Be the first!</p>
+                  </div>
+                )
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -389,17 +348,19 @@ export default function PuttingRecords() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedEntries.map((entry, idx) => (
-                        <tr key={entry.id} className={`border-b border-slate-100 ${idx < 3 ? 'bg-amber-50' : 'hover:bg-slate-50'} cursor-pointer transition-colors`}>
+                      {sortedEntries.map((entry, idx) => {
+                        const absoluteRank = pageStart + idx + 1;
+                        return (
+                        <tr key={entry.id} className={`border-b border-slate-100 ${absoluteRank <= 3 ? 'bg-amber-50' : 'hover:bg-slate-50'} cursor-pointer transition-colors`}>
                           <td className="py-3 px-2">
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                                idx === 0 ? 'bg-yellow-400 text-yellow-900' :
-                                idx === 1 ? 'bg-slate-300 text-slate-700' :
-                                idx === 2 ? 'bg-orange-300 text-orange-800' :
+                                absoluteRank === 1 ? 'bg-yellow-400 text-yellow-900' :
+                                absoluteRank === 2 ? 'bg-slate-300 text-slate-700' :
+                                absoluteRank === 3 ? 'bg-orange-300 text-orange-800' :
                                 'bg-slate-100 text-slate-600'
                               }`}>
-                                {idx + 1}
+                                {absoluteRank}
                               </div>
                             </Link>
                           </td>
@@ -407,12 +368,7 @@ export default function PuttingRecords() {
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
                               <div className="flex items-center gap-2">
                                 <span>{getResolvedPlayerName(entry)}</span>
-                                {getResolvedGender(entry) && (
-                                  <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-                                    {getResolvedGender(entry)}
-                                  </span>
-                                )}
-                                {hasDiscgolfEntry(entry) && (
+                                {isHostedEntry(entry) && (
                                   <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
                                     <Award className="w-3 h-3" />
                                     DG.ee
@@ -468,19 +424,32 @@ export default function PuttingRecords() {
                             </td>
                           )}
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
-              {canLoadMore && (
-                <div className="flex justify-center pt-2">
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setPage(prev => prev + 1)}
-                    className="px-4 py-2 rounded-full text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                    onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={safePage === 1}
+                    className="px-3 py-2 rounded-md text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50"
                   >
-                    Näita rohkem
+                    Eelmine
+                  </button>
+                  <span className="text-sm text-slate-600 min-w-[90px] text-center">
+                    Leht {safePage}/{totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={safePage === totalPages}
+                    className="px-3 py-2 rounded-md text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                  >
+                    Järgmine
                   </button>
                 </div>
               )}

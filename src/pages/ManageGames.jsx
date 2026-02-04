@@ -10,7 +10,9 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import {
   buildLeaderboardIdentityFilter,
+  deleteGameAndLeaderboardEntries,
   getLeaderboardStats,
+  isHostedClassicGame,
   resolveLeaderboardPlayer
 } from '@/lib/leaderboard-utils';
 
@@ -58,9 +60,10 @@ export default function ManageGames() {
   });
 
   const deleteGameMutation = useMutation({
-    mutationFn: (gameId) => base44.entities.Game.delete(gameId),
+    mutationFn: (gameId) => deleteGameAndLeaderboardEntries(gameId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-games'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
     }
   });
 
@@ -151,26 +154,28 @@ export default function ManageGames() {
           results.push({ player: resolvedPlayer.playerName, action: 'created' });
         }
 
-        const [existingDg] = await base44.entities.LeaderboardEntry.filter({
-          ...identityFilter,
-          game_type: game.game_type,
-          leaderboard_type: 'discgolf_ee'
-        });
+        if (isHostedClassicGame(game)) {
+          const [existingDg] = await base44.entities.LeaderboardEntry.filter({
+            ...identityFilter,
+            game_type: game.game_type,
+            leaderboard_type: 'discgolf_ee'
+          });
 
-        if (existingDg) {
-          if (score > existingDg.score) {
-            await base44.entities.LeaderboardEntry.update(existingDg.id, {
+          if (existingDg) {
+            if (score > existingDg.score) {
+              await base44.entities.LeaderboardEntry.update(existingDg.id, {
+                ...basePayload,
+                leaderboard_type: 'discgolf_ee',
+                submitted_by: user?.email
+              });
+            }
+          } else {
+            await base44.entities.LeaderboardEntry.create({
               ...basePayload,
               leaderboard_type: 'discgolf_ee',
               submitted_by: user?.email
             });
           }
-        } else {
-          await base44.entities.LeaderboardEntry.create({
-            ...basePayload,
-            leaderboard_type: 'discgolf_ee',
-            submitted_by: user?.email
-          });
         }
       } catch (error) {
         results.push({ player: resolvedPlayer.playerName, action: 'error', error });
@@ -188,7 +193,7 @@ export default function ManageGames() {
       const skipped = results.filter(r => r.action === 'skipped').length;
       const errors = results.filter(r => r.action === 'error').length;
       
-      let message = 'Submitted to dg.ee & General leaderboards';
+      let message = 'Submitted to leaderboards';
       if (updated > 0 || skipped > 0 || errors > 0 || created > 0) {
         message += ` (${created} new, ${updated} updated, ${skipped} skipped, ${errors} errors)`;
       }

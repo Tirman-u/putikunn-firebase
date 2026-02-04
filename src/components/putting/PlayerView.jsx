@@ -38,6 +38,7 @@ const PLAYER_STATE_KEYS = [
 export default function PlayerView({ gameId, playerName, onExit }) {
   const [showLeaderboard, setShowLeaderboard] = React.useState(false);
   const [hasSubmitted, setHasSubmitted] = React.useState(false);
+  const [hasAskedSoloSubmit, setHasAskedSoloSubmit] = React.useState(false);
   const [streakDistanceSelected, setStreakDistanceSelected] = React.useState(false);
   const [hideScore, setHideScore] = React.useState(false);
   const [streakComplete, setStreakComplete] = React.useState(false);
@@ -65,6 +66,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   }, [gameId]);
 
   const { game, isLoading, isSoloGame } = usePlayerGameState({ gameId });
+
+  React.useEffect(() => {
+    setHasAskedSoloSubmit(false);
+  }, [gameId]);
 
   const getLatestState = React.useCallback(() => {
     return localGameStateRef.current || game || {};
@@ -703,24 +708,33 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     }
   };
 
-  if (isLoading || !game) {
-    return <LoadingState />;
-  }
-
   // Use local state for solo games, otherwise use game data
   const currentState = localGameState || game;
-  
-  const gameType = game.game_type || 'classic';
-  const format = GAME_FORMATS[gameType];
-  const playerPutts = currentState.player_putts?.[playerName] || [];
-  const playerDistances = currentState.player_distances || {};
+  const gameType = currentState?.game_type || 'classic';
+  const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
+  const playerPutts = currentState?.player_putts?.[playerName] || [];
+  const playerDistances = currentState?.player_distances || {};
   const currentDistance = playerDistances[playerName] || format.startDistance;
   const canUndo = playerPutts.length > 0;
-  const currentStreaks = currentState.player_current_streaks || {};
+  const currentStreaks = currentState?.player_current_streaks || {};
   const currentStreak = currentStreaks[playerName] || 0;
-  const isComplete =
+  const isComplete = Boolean(currentState) && (
     isGameComplete(gameType, playerPutts.length) ||
-    (gameType === 'streak_challenge' && (currentState.status === 'completed' || streakComplete));
+    (gameType === 'streak_challenge' && (currentState.status === 'completed' || streakComplete))
+  );
+
+  React.useEffect(() => {
+    if (!currentState || !isComplete || !isSoloGame || hasSubmitted || hasAskedSoloSubmit) return;
+    setHasAskedSoloSubmit(true);
+    const shouldSubmit = window.confirm('Kas soovid tulemuse rekorditabelisse lisada?');
+    if (shouldSubmit) {
+      submitToLeaderboardMutation.mutate();
+    }
+  }, [currentState, hasAskedSoloSubmit, hasSubmitted, isComplete, isSoloGame, submitToLeaderboardMutation]);
+
+  if (isLoading || !game || !currentState) {
+    return <LoadingState />;
+  }
 
   // Completed View
   if (isComplete) {

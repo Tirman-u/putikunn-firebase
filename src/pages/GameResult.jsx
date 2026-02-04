@@ -9,12 +9,15 @@ import { GAME_FORMATS } from '@/components/putting/gameRules';
 import { toast } from 'sonner';
 import PerformanceAnalysis from '@/components/putting/PerformanceAnalysis';
 import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView';
+import HostView from '@/components/putting/HostView';
 import { createPageUrl } from '@/utils';
 import LoadingState from '@/components/ui/loading-state';
 import useRealtimeGame from '@/hooks/use-realtime-game';
 import {
   buildLeaderboardIdentityFilter,
+  deleteGameAndLeaderboardEntries,
   getLeaderboardStats,
+  isHostedClassicGame,
   resolveLeaderboardPlayer
 } from '@/lib/leaderboard-utils';
 
@@ -92,8 +95,9 @@ export default function GameResult() {
   });
 
   const deleteGameMutation = useMutation({
-    mutationFn: (id) => base44.entities.Game.delete(id),
+    mutationFn: (id) => deleteGameAndLeaderboardEntries(id),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
       navigate(-1);
     }
   });
@@ -188,30 +192,32 @@ export default function GameResult() {
           date: normalizedDate
         };
 
-        const [existingDiscgolf] = await base44.entities.LeaderboardEntry.filter({
-          ...identityFilter,
-          game_type: game.game_type,
-          leaderboard_type: 'discgolf_ee'
-        });
+        if (isHostedClassicGame(game)) {
+          const [existingDiscgolf] = await base44.entities.LeaderboardEntry.filter({
+            ...identityFilter,
+            game_type: game.game_type,
+            leaderboard_type: 'discgolf_ee'
+          });
 
-        if (existingDiscgolf) {
-          if (score > existingDiscgolf.score) {
-            await base44.entities.LeaderboardEntry.update(existingDiscgolf.id, {
+          if (existingDiscgolf) {
+            if (score > existingDiscgolf.score) {
+              await base44.entities.LeaderboardEntry.update(existingDiscgolf.id, {
+                ...basePayload,
+                leaderboard_type: 'discgolf_ee',
+                submitted_by: user?.email
+              });
+              results.push({ player: resolvedPlayer.playerName, action: 'updated' });
+            } else {
+              results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
+            }
+          } else {
+            await base44.entities.LeaderboardEntry.create({
               ...basePayload,
               leaderboard_type: 'discgolf_ee',
               submitted_by: user?.email
             });
-            results.push({ player: resolvedPlayer.playerName, action: 'updated' });
-          } else {
-            results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
+            results.push({ player: resolvedPlayer.playerName, action: 'created' });
           }
-        } else {
-          await base44.entities.LeaderboardEntry.create({
-            ...basePayload,
-            leaderboard_type: 'discgolf_ee',
-            submitted_by: user?.email
-          });
-          results.push({ player: resolvedPlayer.playerName, action: 'created' });
         }
 
         const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
@@ -271,6 +277,10 @@ export default function GameResult() {
   // Show ATW views for Around The World games
   if (game.game_type === 'around_the_world') {
     const isSolo = game.players.length === 1 && game.pin === '0000';
+
+    if (!isSolo && game.status === 'completed') {
+      return <HostView gameId={game.id} onExit={() => navigate(-1)} />;
+    }
     
     // If user is the host, redirect to HostView
     if (user?.email === game.host_user && !isSolo) {
@@ -290,6 +300,7 @@ export default function GameResult() {
 
   const gameType = game.game_type || 'classic';
   const gameFormat = GAME_FORMATS[gameType];
+  const canSubmitDgForGame = canSubmitDiscgolf && isHostedClassicGame(game);
   const canDelete = ['admin', 'super_admin'].includes(userRole) || user?.email === game?.host_user;
 
   // Calculate statistics for each player
@@ -423,7 +434,7 @@ export default function GameResult() {
                   {isSubmittedToLeaderboard ? 'Submitted' : 'Submit to Leaderboard'}
                 </Button>
               )}
-              {canSubmitDiscgolf && !(game.pin === '0000') && (
+              {canSubmitDgForGame && (
                 <Button 
                   onClick={() => submitToDiscgolfMutation.mutate()}
                   disabled={submitToDiscgolfMutation.isPending || isSubmittedToDgEe}

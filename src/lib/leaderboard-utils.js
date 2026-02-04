@@ -55,6 +55,14 @@ export function normalizeLeaderboardGender(gender) {
   return gender === 'N' ? 'N' : undefined;
 }
 
+export function isHostedGame(game) {
+  return Boolean(game?.pin && game.pin !== '0000');
+}
+
+export function isHostedClassicGame(game) {
+  return isHostedGame(game) && game?.game_type === 'classic';
+}
+
 export function buildLeaderboardIdentityFilter({ playerUid, playerEmail, playerName }) {
   if (playerUid) return { player_uid: playerUid };
   if (playerEmail) return { player_email: normalizeEmail(playerEmail) };
@@ -100,4 +108,26 @@ export function getLeaderboardStats(game, playerName) {
   const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
   const score = game?.total_points?.[playerName] || 0;
   return { score, madePutts, totalPutts, accuracy };
+}
+
+export async function deleteGameAndLeaderboardEntries(gameId) {
+  if (!gameId) return;
+
+  const pageSize = 100;
+  let skip = 0;
+  const entryIds = [];
+
+  while (true) {
+    const chunk = await base44.entities.LeaderboardEntry.filter({ game_id: gameId }, '-created_date', pageSize, skip);
+    if (!chunk?.length) break;
+    entryIds.push(...chunk.map((entry) => entry.id).filter(Boolean));
+    if (chunk.length < pageSize) break;
+    skip += chunk.length;
+  }
+
+  for (const id of entryIds) {
+    await base44.entities.LeaderboardEntry.delete(id);
+  }
+
+  await base44.entities.Game.delete(gameId);
 }

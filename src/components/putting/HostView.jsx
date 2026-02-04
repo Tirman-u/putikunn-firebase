@@ -11,6 +11,7 @@ import LoadingState from '@/components/ui/loading-state';
 import {
   buildLeaderboardIdentityFilter,
   getLeaderboardStats,
+  isHostedClassicGame,
   resolveLeaderboardPlayer
 } from '@/lib/leaderboard-utils';
 
@@ -106,8 +107,7 @@ export default function HostView({ gameId, onExit }) {
     }
   });
 
-  const submitToDiscgolfMutation = useMutation({
-    mutationFn: async () => {
+  const syncLeaderboardEntries = async ({ includeDiscgolf }) => {
       const results = [];
       const profileCache = {};
       
@@ -137,30 +137,32 @@ export default function HostView({ gameId, onExit }) {
           date: normalizedDate
         };
 
-        const [existingDiscgolf] = await base44.entities.LeaderboardEntry.filter({
-          ...identityFilter,
-          game_type: game.game_type,
-          leaderboard_type: 'discgolf_ee'
-        });
+        if (includeDiscgolf && isHostedClassicGame(game)) {
+          const [existingDiscgolf] = await base44.entities.LeaderboardEntry.filter({
+            ...identityFilter,
+            game_type: game.game_type,
+            leaderboard_type: 'discgolf_ee'
+          });
 
-        if (existingDiscgolf) {
-          if (score > existingDiscgolf.score) {
-            await base44.entities.LeaderboardEntry.update(existingDiscgolf.id, {
+          if (existingDiscgolf) {
+            if (score > existingDiscgolf.score) {
+              await base44.entities.LeaderboardEntry.update(existingDiscgolf.id, {
+                ...basePayload,
+                leaderboard_type: 'discgolf_ee',
+                submitted_by: user?.email
+              });
+              results.push({ player: resolvedPlayer.playerName, action: 'updated' });
+            } else {
+              results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
+            }
+          } else {
+            await base44.entities.LeaderboardEntry.create({
               ...basePayload,
               leaderboard_type: 'discgolf_ee',
               submitted_by: user?.email
             });
-            results.push({ player: resolvedPlayer.playerName, action: 'updated' });
-          } else {
-            results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
+            results.push({ player: resolvedPlayer.playerName, action: 'created' });
           }
-        } else {
-          await base44.entities.LeaderboardEntry.create({
-            ...basePayload,
-            leaderboard_type: 'discgolf_ee',
-            submitted_by: user?.email
-          });
-          results.push({ player: resolvedPlayer.playerName, action: 'created' });
         }
 
         const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
@@ -175,23 +177,49 @@ export default function HostView({ gameId, onExit }) {
               ...basePayload,
               leaderboard_type: 'general'
             });
+            if (!includeDiscgolf) {
+              results.push({ player: resolvedPlayer.playerName, action: 'updated' });
+            }
+          } else if (!includeDiscgolf) {
+            results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
           }
         } else {
           await base44.entities.LeaderboardEntry.create({
             ...basePayload,
             leaderboard_type: 'general'
           });
+          if (!includeDiscgolf) {
+            results.push({ player: resolvedPlayer.playerName, action: 'created' });
+          }
         }
       }
 
       return results;
-    },
+  };
+
+  const submitToLeaderboardMutation = useMutation({
+    mutationFn: async () => syncLeaderboardEntries({ includeDiscgolf: false }),
     onSuccess: (results) => {
       const updated = results.filter(r => r.action === 'updated').length;
       const created = results.filter(r => r.action === 'created').length;
       const skipped = results.filter(r => r.action === 'skipped').length;
       
-      let message = 'Submitted to Discgolf.ee & General leaderboards';
+      let message = 'Submitted to Leaderboard';
+      if (updated > 0 || skipped > 0) {
+        message += ` (${created} new, ${updated} updated, ${skipped} skipped)`;
+      }
+      toast.success(message);
+    }
+  });
+
+  const submitToDiscgolfMutation = useMutation({
+    mutationFn: async () => syncLeaderboardEntries({ includeDiscgolf: true }),
+    onSuccess: (results) => {
+      const updated = results.filter(r => r.action === 'updated').length;
+      const created = results.filter(r => r.action === 'created').length;
+      const skipped = results.filter(r => r.action === 'skipped').length;
+      
+      let message = 'Submitted to Discgolf.ee';
       if (updated > 0 || skipped > 0) {
         message += ` (${created} new, ${updated} updated, ${skipped} skipped)`;
       }
@@ -210,6 +238,7 @@ export default function HostView({ gameId, onExit }) {
   const gameType = game?.game_type;
   const isATWGame = gameType === 'around_the_world';
   const isCompleted = game?.status === 'completed';
+  const canSubmitDiscgolfForGame = canSubmitDiscgolf && isHostedClassicGame(game);
   const scoreLabel = gameType === 'streak_challenge' ? 'Best Streak' : 'Score';
 
   useEffect(() => {
@@ -458,24 +487,26 @@ export default function HostView({ gameId, onExit }) {
               </Button>
             )}
             
-            {isCompleted && canSubmitDiscgolf && (
+            {isCompleted && (
               <>
                 <Button 
-                  onClick={() => submitToDiscgolfMutation.mutate()}
-                  disabled={submitToDiscgolfMutation.isPending}
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Submit to Discgolf.ee
-                </Button>
-                <Button 
-                  onClick={() => submitToDiscgolfMutation.mutate()}
-                  disabled={submitToDiscgolfMutation.isPending}
+                  onClick={() => submitToLeaderboardMutation.mutate()}
+                  disabled={submitToLeaderboardMutation.isPending}
                   className="w-full bg-emerald-600 hover:bg-emerald-700"
                 >
                   <Upload className="w-4 h-4 mr-2" />
                   Submit to Leaderboard
                 </Button>
+                {canSubmitDiscgolfForGame && (
+                  <Button 
+                    onClick={() => submitToDiscgolfMutation.mutate()}
+                    disabled={submitToDiscgolfMutation.isPending}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Submit to Discgolf.ee
+                  </Button>
+                )}
               </>
             )}
             

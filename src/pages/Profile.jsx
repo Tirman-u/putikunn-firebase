@@ -152,6 +152,27 @@ export default function Profile() {
   });
   const avgScore = myGames.length > 0 ? Math.round(totalPoints / myGames.length) : 0;
 
+  const trendGames = myGames
+    .map((game) => {
+      const putts = game.player_putts?.[myDisplayName] || game.player_putts?.[user?.full_name] || game.player_putts?.[user?.email] || [];
+      const total = putts.length;
+      if (total === 0) return null;
+      const made = putts.filter(p => p.result === 'made').length;
+      const accuracy = Math.round((made / total) * 1000) / 10;
+      return {
+        id: game.id,
+        date: game.date || game.created_date || null,
+        accuracy
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+
+  const trendData = trendGames.slice(-10);
+  const trendDelta = trendData.length > 1
+    ? Math.round((trendData[trendData.length - 1].accuracy - trendData[0].accuracy) * 10) / 10
+    : 0;
+
   // Distance analysis
   const distanceStats = allPutts.reduce((acc, putt) => {
     const dist = putt.distance;
@@ -161,23 +182,57 @@ export default function Profile() {
     return acc;
   }, {});
 
-  const distancePercentages = Object.entries(distanceStats).map(([dist, stats]) => ({
-    distance: parseInt(dist),
-    percentage: (stats.made / stats.attempts * 100).toFixed(1),
-    attempts: stats.attempts
-  })).sort((a, b) => a.distance - b.distance);
+  const distanceBuckets = Object.entries(distanceStats).map(([dist, stats]) => {
+    const attempts = stats.attempts || 0;
+    const made = stats.made || 0;
+    const misses = Math.max(0, attempts - made);
+    const accuracy = attempts > 0 ? Math.round((made / attempts) * 1000) / 10 : 0;
+    return {
+      distance: parseInt(dist, 10),
+      attempts,
+      made,
+      misses,
+      accuracy
+    };
+  }).sort((a, b) => a.distance - b.distance);
 
-  const sweetSpot = distancePercentages.length > 0
-    ? distancePercentages.reduce((best, curr) => 
-        parseFloat(curr.percentage) > parseFloat(best.percentage) ? curr : best
-      )
+  const totalDistanceAttempts = distanceBuckets.reduce((sum, item) => sum + item.attempts, 0);
+
+  const comfortZone = distanceBuckets.length > 0
+    ? distanceBuckets.reduce((best, curr) => {
+        if (curr.attempts > best.attempts) return curr;
+        if (curr.attempts === best.attempts && curr.accuracy > best.accuracy) return curr;
+        if (curr.attempts === best.attempts && curr.accuracy === best.accuracy && curr.distance > best.distance) return curr;
+        return best;
+      })
     : null;
 
-  const challengeArea = distancePercentages.length > 0
-    ? distancePercentages.reduce((worst, curr) => 
-        parseFloat(curr.percentage) < parseFloat(worst.percentage) ? curr : worst
-      )
-    : null;
+  const comfortShare = comfortZone && totalDistanceAttempts > 0
+    ? Math.round((comfortZone.attempts / totalDistanceAttempts) * 1000) / 10
+    : 0;
+
+  const dropCandidates = comfortZone
+    ? distanceBuckets.filter((entry) => entry.distance > comfortZone.distance && entry.attempts > 0)
+    : [];
+
+  const dropCause = dropCandidates.length > 0
+    ? dropCandidates.reduce((worst, curr) => {
+        if (curr.misses > worst.misses) return curr;
+        if (curr.misses === worst.misses && curr.accuracy < worst.accuracy) return curr;
+        if (curr.misses === worst.misses && curr.accuracy === worst.accuracy && curr.distance > worst.distance) return curr;
+        return worst;
+      })
+    : (distanceBuckets.length > 0
+        ? distanceBuckets.reduce((worst, curr) =>
+            curr.accuracy < worst.accuracy ? curr : worst
+          )
+        : null);
+
+  const distancePercentages = distanceBuckets.map((stat) => ({
+    distance: stat.distance,
+    percentage: stat.accuracy,
+    attempts: stat.attempts
+  }));
 
   // Group game stats
   const groupGames = games.filter(g => g.group_id);
@@ -427,6 +482,36 @@ export default function Profile() {
            </div>
          </div>
 
+         {/* Putt % Trend */}
+         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+           <div className="flex items-center justify-between mb-4">
+             <div className="flex items-center gap-2 text-slate-800 font-semibold">
+               <TrendingUp className="w-5 h-5 text-emerald-600" />
+               Puti % trend (viimased 10 mängu)
+             </div>
+             {trendData.length > 1 && (
+               <div className={`text-sm font-semibold ${trendDelta >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                 {trendDelta >= 0 ? '+' : ''}{trendDelta}%
+               </div>
+             )}
+           </div>
+           {trendData.length === 0 ? (
+             <div className="text-sm text-slate-400">Pole piisavalt andmeid trendi jaoks.</div>
+           ) : (
+             <div className="flex items-end gap-2 h-28">
+               {trendData.map((item, idx) => (
+                 <div key={`${item.id}-${idx}`} className="flex-1 flex flex-col items-center gap-1">
+                   <div className="w-full max-w-[18px] bg-emerald-500 rounded-t-md transition-all"
+                        style={{ height: `${Math.max(8, Math.round(item.accuracy))}%` }} />
+                   <div className="text-[10px] text-slate-400">
+                     {item.date ? format(new Date(item.date), 'd.M') : '-'}
+                   </div>
+                 </div>
+               ))}
+             </div>
+           )}
+         </div>
+
          {/* Game Format Best Scores */}
          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
             <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -521,23 +606,27 @@ export default function Profile() {
             Soorituse analüüs
           </h2>
           
-          {sweetSpot && (
+          {comfortZone && (
             <div className="mb-4 p-4 bg-emerald-50 rounded-xl">
-              <div className="text-sm text-emerald-700 font-semibold mb-1">Parim tsoon</div>
+              <div className="text-sm text-emerald-700 font-semibold mb-1">Mugavus tsoon</div>
               <div className="text-2xl font-bold text-emerald-600">
-                {sweetSpot.distance}m • {sweetSpot.percentage}%
+                {comfortZone.distance}m • {comfortZone.accuracy}%
               </div>
-              <div className="text-xs text-emerald-600">{sweetSpot.attempts} katset</div>
+              <div className="text-xs text-emerald-600">
+                {comfortZone.attempts} katset • {comfortShare}% sinu katsetest
+              </div>
             </div>
           )}
 
-          {challengeArea && (
+          {dropCause && (
             <div className="mb-4 p-4 bg-amber-50 rounded-xl">
-              <div className="text-sm text-amber-700 font-semibold mb-1">Väljakutse tsoon</div>
+              <div className="text-sm text-amber-700 font-semibold mb-1">Languse põhjus</div>
               <div className="text-2xl font-bold text-amber-600">
-                {challengeArea.distance}m • {challengeArea.percentage}%
+                {dropCause.distance}m • {dropCause.accuracy}%
               </div>
-              <div className="text-xs text-amber-600">{challengeArea.attempts} katset</div>
+              <div className="text-xs text-amber-600">
+                Mööda {dropCause.misses}/{dropCause.attempts}
+              </div>
             </div>
           )}
 
@@ -549,10 +638,10 @@ export default function Profile() {
                 <div key={stat.distance} className="flex items-center gap-3">
                   <div className="w-12 text-sm font-medium text-slate-600">{stat.distance}m</div>
                   <div className="flex-1 h-6 bg-slate-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-emerald-500"
-                      style={{ width: `${stat.percentage}%` }}
-                    />
+                  <div
+                    className="h-full bg-emerald-500"
+                    style={{ width: `${stat.percentage}%` }}
+                  />
                   </div>
                   <div className="w-16 text-sm font-medium text-slate-700 text-right">
                     {stat.percentage}%

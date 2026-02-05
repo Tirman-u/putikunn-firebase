@@ -28,8 +28,8 @@ Staatus: ☐ Open, ⏳ In Progress, ✅ Done
 - ✅ ATW reset: Attempts loendur resetib igal restartil (peab näitama kogukatsete arvu)
 - ✅ Uus mäng: "Mini Liiga" (Classic 50% mahust)
 - ✅ Mängu ajal näita skoori kõrval "potentsiaalne max skoor" (dünaamiline, muutub vastavalt tabamustele)
-- ☐ My Profile: putt % trendigraafik (nt viimased 10 mängu, näita tõusu/langust)
-- ☐ Distance Performance analüüs: defineeri "mugavus tsoon" kõige sagedamini esinevate distantside põhjal, ja "languse põhjus" (millisel distantsil tabamused kukuvad nii, et viib madalamale; nt 10m/9m mis tõmbab alla 8m/7m tsooni)
+- ✅ My Profile: putt % trendigraafik (nt viimased 10 mängu, näita tõusu/langust)
+- ✅ Distance Performance analüüs: defineeri "mugavus tsoon" kõige sagedamini esinevate distantside põhjal, ja "languse põhjus" (millisel distantsil tabamused kukuvad nii, et viib madalamale; nt 10m/9m mis tõmbab alla 8m/7m tsooni)
 - ☐ Puti stiilid: lisa juurde "Põlvelt putt" ja "Marksman"
 - ☐ Uus beta mäng: "Võitlus sõbraga" (2 mängijat, PIN/Join, ilma host-õigusteta)
   - Variant A: kordamööda 1 ketas. Kui üks tabab ja teine mööda, tabaja liigub +1m. Kui mõlemad tabavad/mööda, keegi ei liigu. Võit 10m.

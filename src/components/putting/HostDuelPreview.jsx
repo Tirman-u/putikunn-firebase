@@ -99,7 +99,12 @@ export default function HostDuelPreview() {
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-slate-800">{player}</span>
                       <span className="text-[11px] text-slate-400">
-                        V {playerStats[player]?.wins ?? 0} • K {playerStats[player]?.losses ?? 0} • P {playerStats[player]?.points ?? 0}
+                        <span>
+                          V {playerStats[player]?.wins ?? 0} • K {playerStats[player]?.losses ?? 0}
+                        </span>
+                        <span className="ml-3 text-slate-600 font-semibold">
+                          P {playerStats[player]?.points ?? 0}
+                        </span>
                       </span>
                     </div>
                     <div className="grid grid-cols-6 gap-1.5 text-[9px] text-slate-400">

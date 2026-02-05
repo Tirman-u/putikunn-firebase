@@ -85,7 +85,7 @@ export default function ManageGames() {
     }
   });
 
-  const WRITE_THROTTLE_MS = 75;
+  const REQUEST_INTERVAL_MS = 150;
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const normalizeEmail = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
   const normalizeIdentityEmail = (value) => {
@@ -114,6 +114,28 @@ export default function ManageGames() {
       }
     }
   };
+  const requestQueueRef = React.useRef(Promise.resolve());
+  const lastRequestAtRef = React.useRef(0);
+  const enqueueRequest = React.useCallback(async (fn) => {
+    const run = async () => {
+      const elapsed = Date.now() - lastRequestAtRef.current;
+      const waitMs = Math.max(0, REQUEST_INTERVAL_MS - elapsed);
+      if (waitMs > 0) {
+        await sleep(waitMs);
+      }
+      const result = await fn();
+      lastRequestAtRef.current = Date.now();
+      return result;
+    };
+
+    const chained = requestQueueRef.current.then(run, run);
+    requestQueueRef.current = chained.catch(() => {});
+    return chained;
+  }, []);
+  const queuedRequest = React.useCallback(
+    (fn, options) => withRateLimitRetry(() => enqueueRequest(fn), options),
+    [enqueueRequest]
+  );
 
   const resolveGamePlayers = (game) => {
     const fromPlayers = Array.isArray(game.players) ? game.players : [];
@@ -143,7 +165,7 @@ export default function ManageGames() {
     let skip = 0;
     const limit = 200;
     while (entries.length < 2000) {
-      const chunk = await withRateLimitRetry(
+      const chunk = await queuedRequest(
         () => base44.entities.LeaderboardEntry.filter(filter, '-score', limit, skip),
         { retries: 4, delayMs: 350 }
       );
@@ -237,7 +259,7 @@ export default function ManageGames() {
 
         if (existingGeneral) {
           if (score > existingGeneral.score) {
-            await withRateLimitRetry(
+            await queuedRequest(
               () => base44.entities.LeaderboardEntry.update(existingGeneral.id, {
                 ...basePayload,
                 leaderboard_type: 'general'
@@ -253,7 +275,7 @@ export default function ManageGames() {
             results.push({ player: resolvedPlayer.playerName, action: 'skipped', reason: 'lower_score' });
           }
         } else {
-          const created = await withRateLimitRetry(
+          const created = await queuedRequest(
             () => base44.entities.LeaderboardEntry.create({
               ...basePayload,
               leaderboard_type: 'general',
@@ -272,7 +294,7 @@ export default function ManageGames() {
 
           if (existingDg) {
             if (score > existingDg.score) {
-              await withRateLimitRetry(
+              await queuedRequest(
                 () => base44.entities.LeaderboardEntry.update(existingDg.id, {
                   ...basePayload,
                   leaderboard_type: 'discgolf_ee',
@@ -286,7 +308,7 @@ export default function ManageGames() {
               }
             }
           } else {
-            const createdDg = await withRateLimitRetry(
+            const createdDg = await queuedRequest(
               () => base44.entities.LeaderboardEntry.create({
                 ...basePayload,
                 leaderboard_type: 'discgolf_ee',
@@ -302,7 +324,7 @@ export default function ManageGames() {
         }
 
         if (didWrite) {
-          await sleep(WRITE_THROTTLE_MS);
+          await sleep(REQUEST_INTERVAL_MS);
         }
       } catch (error) {
         results.push({ player: resolvedPlayer.playerName, action: 'error', error });

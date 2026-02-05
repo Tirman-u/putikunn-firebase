@@ -72,14 +72,35 @@ export default function HostDuelPreview() {
                   {station.status}
                 </span>
               </div>
-              <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                <span>Distants</span>
-                <span className="font-semibold text-slate-700">{station.distance}m</span>
-              </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-700">
-                {station.players.map((player) => (
-                  <div key={player} className="rounded-lg bg-white px-3 py-2 border border-slate-200">
-                    {player}
+                {station.players.map((player, index) => (
+                  <div key={player} className="rounded-xl bg-white px-3 py-3 border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">{player}</span>
+                      <span className="text-[11px] font-semibold text-slate-500">{station.distance}m</span>
+                    </div>
+                    <div className="grid grid-cols-6 gap-1.5 text-[9px] text-slate-400">
+                      {[5, 6, 7, 8, 9, 10].map((step) => (
+                        <span key={`${player}-${step}`} className="text-center">
+                          {step}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-6 gap-1.5">
+                      {[5, 6, 7, 8, 9, 10].map((step) => (
+                        <div
+                          key={`${player}-bar-${step}`}
+                          className={cn(
+                            'h-1.5 rounded-full border',
+                            step <= station.distance
+                              ? index === 0
+                                ? 'bg-emerald-400 border-emerald-400'
+                                : 'bg-sky-400 border-sky-400'
+                              : 'bg-slate-100 border-slate-200'
+                          )}
+                        />
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>

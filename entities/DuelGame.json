@@ -1,0 +1,73 @@
+{
+  "name": "DuelGame",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Duel name or session identifier"
+    },
+    "pin": {
+      "type": "string",
+      "description": "4-digit PIN for duel join",
+      "index": true
+    },
+    "disc_count": {
+      "type": "number",
+      "description": "Number of discs per round",
+      "default": 3
+    },
+    "station_count": {
+      "type": "number",
+      "description": "Number of stations",
+      "default": 6
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "solo",
+        "host"
+      ],
+      "default": "solo",
+      "description": "Duel mode"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "lobby",
+        "active",
+        "finished"
+      ],
+      "default": "lobby",
+      "description": "Duel status"
+    },
+    "host_user": {
+      "type": "string",
+      "description": "Email of the host",
+      "index": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Created timestamp"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Started timestamp"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Ended timestamp"
+    },
+    "winner_id": {
+      "type": "string",
+      "description": "Winner player id"
+    },
+    "state": {
+      "type": "object",
+      "description": "Duel state data",
+      "additionalProperties": true
+    }
+  }
+}

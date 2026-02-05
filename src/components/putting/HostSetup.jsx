@@ -90,6 +90,36 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
           <PuttTypeSelector selectedType={puttType} onSelect={setPuttType} />
         </div>
 
+        {isSolo && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-700">Beta mängud</div>
+                <div className="text-xs text-slate-500">Katsetused ja uued formaadid</div>
+              </div>
+              <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                BETA
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                window.location.href = createPageUrl('SoloDuelPreview');
+              }}
+              className="w-full rounded-2xl border-2 border-amber-200 bg-amber-50 px-4 py-4 text-left hover:border-amber-300 hover:bg-amber-100 transition-all"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-slate-800">Sõbraduell (SOLO)</div>
+                  <div className="text-xs text-slate-500">Kahe mängija duell PIN‑iga</div>
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-200 text-amber-800">
+                  BETA
+                </span>
+              </div>
+            </button>
+          </div>
+        )}
+
         {!isSolo && (
           <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg mb-6 text-white">
             <div className="text-center mb-4">

@@ -107,11 +107,19 @@ export default function HostView({ gameId, onExit }) {
     }
   });
 
+  const resolveGamePlayers = (gameData) => {
+    const fromPlayers = Array.isArray(gameData?.players) ? gameData.players : [];
+    const fromPutts = Object.keys(gameData?.player_putts || {});
+    const fromAtw = Object.keys(gameData?.atw_state || {});
+    return Array.from(new Set([...fromPlayers, ...fromPutts, ...fromAtw].filter(Boolean)));
+  };
+
   const syncLeaderboardEntries = async ({ includeDiscgolf }) => {
       const results = [];
       const profileCache = {};
-      
-      for (const rawPlayerName of game.players || []) {
+
+      const playersToSync = resolveGamePlayers(game);
+      for (const rawPlayerName of playersToSync) {
         const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, rawPlayerName);
         const resolvedPlayer = await resolveLeaderboardPlayer({
           game,

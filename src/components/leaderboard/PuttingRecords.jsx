@@ -89,20 +89,19 @@ export default function PuttingRecords() {
     queryKey: ['leaderboard-games', leaderboardGameIds.join('|')],
     queryFn: async () => {
       if (leaderboardGameIds.length === 0) return {};
-      const results = await Promise.all(
-        leaderboardGameIds.map(async (id) => {
-          try {
-            const games = await base44.entities.Game.filter({ id });
-            return games?.[0] || null;
-          } catch {
-            return null;
-          }
-        })
-      );
       const map = {};
-      results.forEach(game => {
-        if (game?.id) map[game.id] = game;
-      });
+      const chunkSize = 50;
+      for (let i = 0; i < leaderboardGameIds.length; i += chunkSize) {
+        const chunk = leaderboardGameIds.slice(i, i + chunkSize);
+        try {
+          const games = await base44.entities.Game.filter({ id: { $in: chunk } });
+          (games || []).forEach((game) => {
+            if (game?.id) map[game.id] = game;
+          });
+        } catch {
+          // ignore chunk failures; missing games will be filtered out
+        }
+      }
       return map;
     },
     enabled: leaderboardGameIds.length > 0,

@@ -86,11 +86,10 @@ export default function ManageGames() {
   });
 
   const resolveGamePlayers = (game) => {
-    if (game.players && game.players.length) return Array.from(new Set(game.players));
+    const fromPlayers = Array.isArray(game.players) ? game.players : [];
     const fromPutts = Object.keys(game.player_putts || {});
-    if (fromPutts.length) return Array.from(new Set(fromPutts));
     const fromAtw = Object.keys(game.atw_state || {});
-    return Array.from(new Set(fromAtw));
+    return Array.from(new Set([...fromPlayers, ...fromPutts, ...fromAtw].filter(Boolean)));
   };
 
   const syncGameToLeaderboards = async (game, profileCache = {}) => {

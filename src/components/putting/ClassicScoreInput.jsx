@@ -26,14 +26,14 @@ export default function ClassicScoreInput({
   onUndo,
   distanceMap,
   currentRoundPutts = [],
-  puttType = 'regular'
+  puttType = 'regular',
+  totalFrames = 20
 }) {
   const handleScoreClick = (made) => {
     onSubmit(made);
   };
 
-  // Visual frames - 20 frames representing 20 rounds
-  const totalFrames = 20;
+  // Visual frames represent total rounds
   const currentFrameIndex = Math.floor(currentRoundPutts.length / 5);
 
   return (

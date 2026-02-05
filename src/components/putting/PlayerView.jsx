@@ -956,16 +956,17 @@ export default function PlayerView({ gameId, playerName, onExit }) {
              />
            )
          ) : (
-           <ClassicScoreInput
-             player={playerName}
-             currentDistance={currentDistance}
-             onSubmit={handleClassicSubmit}
-             canUndo={canUndo}
-             onUndo={handleUndo}
-             distanceMap={format.distanceMap || {}}
-             currentRoundPutts={playerPutts}
-             puttType={game.putt_type || 'regular'}
-           />
+          <ClassicScoreInput
+            player={playerName}
+            currentDistance={currentDistance}
+            onSubmit={handleClassicSubmit}
+            canUndo={canUndo}
+            onUndo={handleUndo}
+            distanceMap={format.distanceMap || {}}
+            currentRoundPutts={playerPutts}
+            puttType={game.putt_type || 'regular'}
+            totalFrames={getTotalRounds(gameType)}
+          />
          )}
       </div>
 

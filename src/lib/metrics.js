@@ -17,10 +17,8 @@ export async function logSyncMetric(name, durationMs, context = {}) {
       return;
     }
 
-    const metricEntity = base44?.entities?.SyncMetric || base44?.entities?.Metric;
-    if (metricEntity?.create) {
-      await metricEntity.create(payload);
-    }
+    // Avoid noisy console errors when metrics schema is not available in the app
+    return;
   } catch (error) {
     // Silent fail - observability should not break UX
   }

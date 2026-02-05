@@ -63,6 +63,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const lastSyncAtRef = React.useRef(0);
   const turnsSinceSyncRef = React.useRef(0);
   const gameIdRef = React.useRef(gameId);
+  const baseGameRef = React.useRef(null);
   const queryClient = useQueryClient();
 
   React.useEffect(() => {
@@ -122,6 +123,13 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     if (!incoming) return localGameStateRef.current || incoming;
     const localState = localGameStateRef.current || {};
     const merged = { ...localState, ...incoming };
+    const fallback = baseGameRef.current || localState;
+    const staticKeys = ['name', 'pin', 'host_user', 'game_type', 'putt_type', 'status', 'date'];
+    staticKeys.forEach((key) => {
+      if (merged?.[key] === undefined || merged?.[key] === null) {
+        merged[key] = fallback?.[key];
+      }
+    });
     if (!merged.game_type && localState.game_type) {
       merged.game_type = localState.game_type;
     }
@@ -194,7 +202,12 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   // Initialize local state (solo + multiplayer)
   React.useEffect(() => {
     if (!game) return;
+    baseGameRef.current = { ...baseGameRef.current, ...game };
     const nextState = {
+      name: game.name,
+      pin: game.pin,
+      host_user: game.host_user,
+      date: game.date,
       game_type: game.game_type,
       putt_type: game.putt_type,
       player_putts: game.player_putts || {},
@@ -864,7 +877,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="text-center">
-            <h2 className="text-lg font-bold text-slate-800">{game.name}</h2>
+            <h2 className="text-lg font-bold text-slate-800">{currentState.name || game.name}</h2>
             <p className="text-sm text-slate-500">
               {format.name} • Ring {currentRound}/{totalRounds}
             </p>

@@ -19,6 +19,14 @@ const GAME_FORMATS = [
     badge: 'BETA'
   },
   {
+    id: 'duel',
+    name: 'Sõbraduell',
+    distance: '5-10m',
+    description: 'Duell PIN-iga',
+    color: 'emerald',
+    badge: 'BETA'
+  },
+  {
     id: 'back_and_forth',
     name: 'Back & Forth',
     distance: '5-10m',

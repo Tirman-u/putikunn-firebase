@@ -73,6 +73,19 @@ const FORMAT_RULES = {
       'Näide: 7m pealt sees = 7 punkti',
       'Mängi 20 ringi (kokku 100 putti)'
     ]
+  },
+  duel: {
+    title: 'Sõbraduell reeglid',
+    range: '5m - 10m',
+    start: '5m',
+    rules: [
+      'Duell 1 vs 1, liitutakse PIN-iga',
+      'Host valib ketaste arvu (1/3/5)',
+      'Mõlemad sisestavad tulemuse paralleelselt',
+      'Võitja liigub distantsil +1m, kaotaja jääb',
+      'Viigi korral mängitakse sama distants uuesti',
+      '10m võit lõpetab duelli antud jaamas'
+    ]
   }
 };
 

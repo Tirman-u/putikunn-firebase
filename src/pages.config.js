@@ -4,6 +4,9 @@ import GroupResult from './pages/GroupResult';
 import Home from './pages/Home';
 import ManageGames from './pages/ManageGames';
 import Profile from './pages/Profile';
+import DuelHost from './pages/DuelHost';
+import DuelJoin from './pages/DuelJoin';
+import DuelSolo from './pages/DuelSolo';
 import PuttingKing from './pages/PuttingKing';
 import PuttingKingOverview from './pages/PuttingKingOverview';
 import PuttingKingScoring from './pages/PuttingKingScoring';
@@ -22,6 +25,9 @@ export const PAGES = {
     "Home": Home,
     "ManageGames": ManageGames,
     "Profile": Profile,
+    "DuelHost": DuelHost,
+    "DuelJoin": DuelJoin,
+    "DuelSolo": DuelSolo,
     "PuttingKing": PuttingKing,
     "PuttingKingOverview": PuttingKingOverview,
     "PuttingKingScoring": PuttingKingScoring,

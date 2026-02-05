@@ -103,7 +103,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
             </div>
             <button
               onClick={() => {
-                window.location.href = createPageUrl('SoloDuelPreview');
+                window.location.href = createPageUrl('DuelSolo');
               }}
               className="w-full rounded-2xl border-2 border-amber-200 bg-amber-50 px-4 py-4 text-left hover:border-amber-300 hover:bg-amber-100 transition-all"
             >
@@ -134,7 +134,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
             <div className="grid gap-3">
               <button
                 onClick={() => {
-                  window.location.href = createPageUrl('HostDuelPreview');
+                  window.location.href = createPageUrl('DuelHost');
                 }}
                 className="w-full rounded-2xl border-2 border-amber-200 bg-amber-50 px-4 py-4 text-left hover:border-amber-300 hover:bg-amber-100 transition-all"
               >
@@ -150,7 +150,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
               </button>
               <button
                 onClick={() => {
-                  window.location.href = createPageUrl('PlayerDuelPreview');
+                  window.location.href = createPageUrl('DuelJoin');
                 }}
                 className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-4 py-4 text-left hover:border-slate-300 hover:bg-slate-100 transition-all"
               >

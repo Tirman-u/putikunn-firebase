@@ -147,6 +147,11 @@ export default function PuttingRecords() {
     return map;
   }, [users]);
 
+  const normalizeText = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+  const currentUserEmail = normalizeText(user?.email);
+  const currentUserName = normalizeText(user?.full_name || user?.display_name);
+  const currentUserId = user?.id;
+
   const monthOptions = useMemo(() => {
     const monthSet = new Set();
     leaderboardEntries.forEach((entry) => {
@@ -189,6 +194,17 @@ export default function PuttingRecords() {
   const getResolvedPlayerName = (entry) => {
     const profile = resolveEntryUser(entry);
     return profile?.full_name || entry?.player_name;
+  };
+
+  const isCurrentUserEntry = (entry) => {
+    if (!user) return false;
+    const profile = resolveEntryUser(entry);
+    if (currentUserId && profile?.id && profile.id === currentUserId) return true;
+    const entryEmail = normalizeText(profile?.email || entry?.player_email);
+    if (currentUserEmail && entryEmail && currentUserEmail === entryEmail) return true;
+    const entryName = normalizeText(profile?.full_name || entry?.player_name);
+    if (currentUserName && entryName && currentUserName === entryName) return true;
+    return false;
   };
 
   const isHostedEntry = (entry) => {
@@ -349,8 +365,16 @@ export default function PuttingRecords() {
                     <tbody>
                       {sortedEntries.map((entry, idx) => {
                         const absoluteRank = pageStart + idx + 1;
+                        const isCurrentUser = isCurrentUserEntry(entry);
+                        const isTopRank = absoluteRank <= 3;
+                        const rowBase = isTopRank ? 'bg-amber-50' : (isCurrentUser ? 'bg-emerald-50/70' : '');
+                        const rowHover = isCurrentUser ? 'hover:bg-emerald-100/70' : 'hover:bg-slate-50';
+                        const rowHighlight = isCurrentUser ? 'ring-1 ring-emerald-200/70' : '';
                         return (
-                        <tr key={entry.id} className={`border-b border-slate-100 ${absoluteRank <= 3 ? 'bg-amber-50' : 'hover:bg-slate-50'} cursor-pointer transition-colors`}>
+                        <tr
+                          key={entry.id}
+                          className={`border-b border-slate-100 ${rowBase} ${rowHover} ${rowHighlight} cursor-pointer transition-colors`}
+                        >
                           <td className="py-3 px-2">
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${

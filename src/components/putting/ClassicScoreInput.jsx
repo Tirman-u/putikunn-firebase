@@ -93,7 +93,17 @@ export default function ClassicScoreInput({
           <div className="text-4xl sm:text-5xl font-bold text-slate-800 mb-1 sm:mb-2">{currentDistance}m</div>
           <div className="text-[11px] sm:text-xs text-slate-500">Puti stiil</div>
           <div className="text-sm font-semibold text-slate-800">
-            {puttType === 'regular' ? 'Tavaline' : puttType === 'straddle' ? 'Straddle' : 'Turbo'}
+            {puttType === 'regular'
+              ? 'Tavaline'
+              : puttType === 'straddle'
+              ? 'Straddle'
+              : puttType === 'turbo'
+              ? 'Turbo'
+              : puttType === 'kneeling'
+              ? 'Põlvelt'
+              : puttType === 'marksman'
+              ? 'Marksman'
+              : 'Tavaline'}
           </div>
         </div>
       </div>

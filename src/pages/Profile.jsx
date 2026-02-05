@@ -206,7 +206,9 @@ export default function Profile() {
   const puttTypeStats = {
     regular: { made: 0, total: 0, score: 0, count: 0 },
     straddle: { made: 0, total: 0, score: 0, count: 0 },
-    turbo: { made: 0, total: 0, score: 0, count: 0 }
+    turbo: { made: 0, total: 0, score: 0, count: 0 },
+    kneeling: { made: 0, total: 0, score: 0, count: 0 },
+    marksman: { made: 0, total: 0, score: 0, count: 0 }
   };
   
   myGames.forEach(game => {
@@ -485,10 +487,18 @@ export default function Profile() {
               Puti stiili statistika
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {['regular', 'straddle', 'turbo'].map((style) => {
+              {['regular', 'straddle', 'turbo', 'kneeling', 'marksman'].map((style) => {
                 const stats = puttTypeStats[style];
                 const accuracy = stats.total > 0 ? ((stats.made / stats.total) * 100).toFixed(1) : 0;
-                const styleName = style === 'regular' ? 'Tavaline' : style === 'straddle' ? 'Straddle' : 'Turbo';
+                const styleName = style === 'regular'
+                  ? 'Tavaline'
+                  : style === 'straddle'
+                  ? 'Straddle'
+                  : style === 'turbo'
+                  ? 'Turbo'
+                  : style === 'kneeling'
+                  ? 'Põlvelt'
+                  : 'Marksman';
                 return (
                   <div key={style} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="text-sm font-semibold text-slate-700 mb-2">{styleName}</div>
@@ -655,6 +665,8 @@ export default function Profile() {
                    <SelectItem value="regular">Tavaline</SelectItem>
                    <SelectItem value="straddle">Straddle</SelectItem>
                    <SelectItem value="turbo">Turbo</SelectItem>
+                   <SelectItem value="kneeling">Põlvelt</SelectItem>
+                   <SelectItem value="marksman">Marksman</SelectItem>
                  </SelectContent>
                </Select>
                <Select value={sortBy} onValueChange={setSortBy}>
@@ -709,7 +721,17 @@ export default function Profile() {
                            </td>
                            <td className="py-3 px-2">
                              <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                               {game.putt_type === 'regular' ? 'Tavaline' : game.putt_type === 'straddle' ? 'Straddle' : 'Turbo'}
+                               {game.putt_type === 'regular'
+                                 ? 'Tavaline'
+                                 : game.putt_type === 'straddle'
+                                 ? 'Straddle'
+                                 : game.putt_type === 'turbo'
+                                 ? 'Turbo'
+                                 : game.putt_type === 'kneeling'
+                                 ? 'Põlvelt'
+                                 : game.putt_type === 'marksman'
+                                 ? 'Marksman'
+                                 : 'Tavaline'}
                              </span>
                            </td>
                            <td className="py-3 px-2 text-right font-bold text-emerald-600">

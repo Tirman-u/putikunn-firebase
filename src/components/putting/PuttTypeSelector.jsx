@@ -5,7 +5,9 @@ export default function PuttTypeSelector({ selectedType, onSelect }) {
   const puttTypes = [
     { id: 'regular', label: 'Tavaline', icon: '🎯' },
     { id: 'straddle', label: 'Straddle', icon: '🦵' },
-    { id: 'turbo', label: 'Turbo', icon: '⚡' }
+    { id: 'turbo', label: 'Turbo', icon: '⚡' },
+    { id: 'kneeling', label: 'Põlvelt', icon: '🧎' },
+    { id: 'marksman', label: 'Marksman', icon: '🏹' }
   ];
 
   return (

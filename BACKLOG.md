@@ -27,7 +27,7 @@ Staatus: ☐ Open, ⏳ In Progress, ✅ Done
 - ✅ Hostitud mängu lõppvaates tavakasutaja näeb “Submit to Leaderboard” nuppu (peita, ainult host/admin)
 - ✅ ATW reset: Attempts loendur resetib igal restartil (peab näitama kogukatsete arvu)
 - ✅ Uus mäng: "Mini Liiga" (Classic 50% mahust)
-- ☐ Mängu ajal näita skoori kõrval "potentsiaalne max skoor" (dünaamiline, muutub vastavalt tabamustele)
+- ✅ Mängu ajal näita skoori kõrval "potentsiaalne max skoor" (dünaamiline, muutub vastavalt tabamustele)
 - ☐ My Profile: putt % trendigraafik (nt viimased 10 mängu, näita tõusu/langust)
 - ☐ Distance Performance analüüs: defineeri "mugavus tsoon" kõige sagedamini esinevate distantside põhjal, ja "languse põhjus" (millisel distantsil tabamused kukuvad nii, et viib madalamale; nt 10m/9m mis tõmbab alla 8m/7m tsooni)
 - ☐ Puti stiilid: lisa juurde "Põlvelt putt" ja "Marksman"

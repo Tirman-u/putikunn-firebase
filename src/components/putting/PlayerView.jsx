@@ -747,6 +747,22 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const canUndo = playerPutts.length > 0;
   const currentStreaks = currentState?.player_current_streaks || {};
   const currentStreak = currentStreaks[playerName] || 0;
+  const currentScore = gameType === 'streak_challenge'
+    ? (currentState.player_highest_streaks?.[playerName] || 0)
+    : (currentState.total_points?.[playerName] || 0);
+  const isPotentialMaxEnabled = !format.singlePuttMode && gameType !== 'streak_challenge';
+  let potentialMaxScore = null;
+  if (isPotentialMaxEnabled) {
+    const totalRoundsForGame = getTotalRounds(gameType);
+    const roundsCompleted = Math.floor(playerPutts.length / format.puttsPerRound);
+    const roundsRemaining = Math.max(0, totalRoundsForGame - roundsCompleted);
+    const puttsPerRound = format.puttsPerRound || 5;
+    const maxRoundScore = format.maxDistance * puttsPerRound;
+    const firstRoundScore = currentDistance * puttsPerRound;
+    potentialMaxScore = currentScore + (roundsRemaining > 0
+      ? firstRoundScore + Math.max(0, roundsRemaining - 1) * maxRoundScore
+      : 0);
+  }
   const isComplete = Boolean(currentState) && (
     isGameComplete(gameType, playerPutts.length) ||
     (gameType === 'streak_challenge' && (currentState.status === 'completed' || streakComplete))
@@ -868,8 +884,13 @@ export default function PlayerView({ gameId, playerName, onExit }) {
               <div>
                 <div className="text-[11px] sm:text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Parim seeria' : 'Punktid'}</div>
                 <div className="text-xl sm:text-2xl font-bold text-emerald-600">
-                  {hideScore ? '***' : (gameType === 'streak_challenge' ? (currentState.player_highest_streaks?.[playerName] || 0) : (currentState.total_points[playerName] || 0))}
+                  {hideScore ? '***' : currentScore}
                 </div>
+                {isPotentialMaxEnabled && (
+                  <div className="text-[10px] sm:text-xs text-slate-400">
+                    Max skoor: {hideScore ? '***' : potentialMaxScore}
+                  </div>
+                )}
               </div>
               <div className="h-8 sm:h-10 w-px bg-slate-200" />
               <div>

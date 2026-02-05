@@ -16,6 +16,7 @@ Staatus: ☐ Open, ⏳ In Progress, ✅ Done
 - ☐ Putting Records paginatsioon: Classic näitab 16 kirjet ja järgmisele lehele ei saa
 - ☐ Putting Records sünk: teistes tabelites puuduvad nimed (nt 4. veebr Back & Forth, 24 mängijat, tabelis vähem)
 - ☐ DG.ee tab tühi (peab näitama hostitud Classic rekordid)
+- ☐ ATW rekordid: näita kettade arvu märget (nt 1 ketas / 3 ketast)
 - ☐ Putting Records dublikaadid: sama mängu sama kasutaja mitmes reas (DG.ee/üldtabel)
 - ✅ Solo mängu tulemuste vaade: default tulemuste vaade peab olema tabel/host style (mitte “täpikesed” player view)
 - ✅ Join Game: aktiivsete mängude list näitab ka suletud mänge (peab näitama ainult aktiivseid)

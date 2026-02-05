@@ -27,7 +27,7 @@ export default function PuttingRecords() {
     { id: 'general_streak_challenge', label: 'Streak', leaderboardType: 'general', gameType: 'streak_challenge' },
     { id: 'general_random_distance', label: 'Random', leaderboardType: 'general', gameType: 'random_distance' },
     { id: 'general_around_the_world', label: 'Around the World', leaderboardType: 'general', gameType: 'around_the_world' },
-    { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'discgolf_ee', gameType: 'all' }
+    { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'general', gameType: 'classic', hostedOnly: true }
   ];
 
   const { data: user } = useQuery({
@@ -71,12 +71,8 @@ export default function PuttingRecords() {
       if (!currentView) return [];
       const filter = {
         leaderboard_type: currentView.leaderboardType,
+        game_type: currentView.gameType
       };
-      if (currentView.leaderboardType === 'discgolf_ee') {
-        filter.game_type = 'classic';
-      } else {
-        filter.game_type = currentView.gameType;
-      }
       return fetchLeaderboardRows(filter);
     },
     refetchInterval: 30000
@@ -218,12 +214,8 @@ export default function PuttingRecords() {
     if (entry.leaderboard_type !== currentView.leaderboardType) return false;
     if (!entry?.game_id || !gamesById?.[entry.game_id]) return false;
     
-    if (currentView.leaderboardType === 'discgolf_ee') {
-      if (entry.game_type !== 'classic') return false;
-      if (!isHostedEntry(entry)) return false;
-    } else {
-      if (entry.game_type !== currentView.gameType) return false;
-    }
+    if (entry.game_type !== currentView.gameType) return false;
+    if (currentView.hostedOnly && !isHostedEntry(entry)) return false;
     
     const resolvedGender = getResolvedGender(entry);
     if (selectedGender !== 'all') {
@@ -243,6 +235,13 @@ export default function PuttingRecords() {
   });
 
   const isATWView = currentView?.gameType === 'around_the_world';
+  const getAtwDiscsLabel = (entry) => {
+    if (!isATWView) return null;
+    const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
+    const discs = game?.atw_config?.discs_per_turn;
+    if (!discs) return null;
+    return discs === 1 ? '1 ketas' : `${discs} ketast`;
+  };
 
   const getPlayerKey = (entry) => {
     const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
@@ -389,12 +388,17 @@ export default function PuttingRecords() {
                           </td>
                           <td className="py-3 px-2 font-medium text-slate-700">
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span>{getResolvedPlayerName(entry)}</span>
                                 {isHostedEntry(entry) && (
                                   <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
                                     <Award className="w-3 h-3" />
                                     DG.ee
+                                  </span>
+                                )}
+                                {getAtwDiscsLabel(entry) && (
+                                  <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded">
+                                    {getAtwDiscsLabel(entry)}
                                   </span>
                                 )}
                               </div>

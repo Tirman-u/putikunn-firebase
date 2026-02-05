@@ -9,7 +9,6 @@ import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import {
-  buildLeaderboardIdentityFilter,
   deleteGameAndLeaderboardEntries,
   getLeaderboardEmail,
   getLeaderboardStats,
@@ -86,6 +85,36 @@ export default function ManageGames() {
     }
   });
 
+  const WRITE_THROTTLE_MS = 75;
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const normalizeEmail = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+  const normalizeIdentityEmail = (value) => {
+    const normalized = normalizeEmail(value);
+    if (!normalized || normalized === 'unknown') return '';
+    return normalized;
+  };
+  const isRateLimitError = (error) => {
+    const status = error?.status || error?.response?.status;
+    const message = String(error?.message || '');
+    return status === 429 || message.includes('429') || message.toLowerCase().includes('too many');
+  };
+  const withRateLimitRetry = async (fn, { retries = 3, delayMs = 300 } = {}) => {
+    let attempt = 0;
+    let waitMs = delayMs;
+    while (true) {
+      try {
+        return await fn();
+      } catch (error) {
+        if (!isRateLimitError(error) || attempt >= retries) {
+          throw error;
+        }
+        await sleep(waitMs);
+        waitMs *= 2;
+        attempt += 1;
+      }
+    }
+  };
+
   const resolveGamePlayers = (game) => {
     const fromPlayers = Array.isArray(game.players) ? game.players : [];
     const fromPutts = Object.keys(game.player_putts || {});
@@ -93,10 +122,79 @@ export default function ManageGames() {
     return Array.from(new Set([...fromPlayers, ...fromPutts, ...fromAtw].filter(Boolean)));
   };
 
+  const getEntryIdentityKey = (entry) => {
+    if (entry?.player_uid) return `uid:${entry.player_uid}`;
+    const email = normalizeIdentityEmail(entry?.player_email);
+    if (email) return `email:${email}`;
+    if (entry?.player_name) return `name:${entry.player_name.trim().toLowerCase()}`;
+    return `id:${entry?.id}`;
+  };
+
+  const getResolvedIdentityKey = (resolvedPlayer) => {
+    if (resolvedPlayer?.playerUid) return `uid:${resolvedPlayer.playerUid}`;
+    const email = normalizeIdentityEmail(resolvedPlayer?.playerEmail);
+    if (email) return `email:${email}`;
+    if (resolvedPlayer?.playerName) return `name:${resolvedPlayer.playerName.trim().toLowerCase()}`;
+    return '';
+  };
+
+  const fetchLeaderboardEntries = async (filter) => {
+    const entries = [];
+    let skip = 0;
+    const limit = 200;
+    while (entries.length < 2000) {
+      const chunk = await withRateLimitRetry(
+        () => base44.entities.LeaderboardEntry.filter(filter, '-score', limit, skip),
+        { retries: 4, delayMs: 350 }
+      );
+      if (!chunk?.length) break;
+      entries.push(...chunk);
+      if (chunk.length < limit) break;
+      skip += chunk.length;
+    }
+    return entries;
+  };
+
   const syncGameToLeaderboards = async (game, profileCache = {}) => {
     const results = [];
     const players = resolveGamePlayers(game);
     let eligiblePlayers = 0;
+    const generalByKey = new Map();
+    const discgolfByKey = new Map();
+
+    try {
+      const existingGeneralEntries = await fetchLeaderboardEntries({
+        game_id: game.id,
+        game_type: game.game_type,
+        leaderboard_type: 'general'
+      });
+      existingGeneralEntries.forEach((entry) => {
+        const key = getEntryIdentityKey(entry);
+        if (!key) return;
+        const current = generalByKey.get(key);
+        if (!current || entry.score > current.score) {
+          generalByKey.set(key, entry);
+        }
+      });
+
+      if (isHostedClassicGame(game)) {
+        const existingDgEntries = await fetchLeaderboardEntries({
+          game_id: game.id,
+          game_type: game.game_type,
+          leaderboard_type: 'discgolf_ee'
+        });
+        existingDgEntries.forEach((entry) => {
+          const key = getEntryIdentityKey(entry);
+          if (!key) return;
+          const current = discgolfByKey.get(key);
+          if (!current || entry.score > current.score) {
+            discgolfByKey.set(key, entry);
+          }
+        });
+      }
+    } catch (error) {
+      console.warn(`[Sync] "${game?.name}" olemasolevate kirjete laadimine ebaõnnestus:`, error);
+    }
 
     for (const rawPlayerName of players) {
       if (!rawPlayerName) continue;
@@ -108,7 +206,6 @@ export default function ManageGames() {
         playerName: rawPlayerName,
         cache: profileCache
       });
-      const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
       const normalizedDate = new Date(game.date || new Date().toISOString()).toISOString();
       const basePayload = {
         game_id: game.id,
@@ -134,52 +231,78 @@ export default function ManageGames() {
       eligiblePlayers += 1;
 
       try {
-        const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
-          ...identityFilter,
-          game_type: game.game_type,
-          leaderboard_type: 'general'
-        });
+        const identityKey = getResolvedIdentityKey(resolvedPlayer);
+        const existingGeneral = identityKey ? generalByKey.get(identityKey) : null;
+        let didWrite = false;
 
         if (existingGeneral) {
           if (score > existingGeneral.score) {
-            await base44.entities.LeaderboardEntry.update(existingGeneral.id, {
-              ...basePayload,
-              leaderboard_type: 'general'
-            });
+            await withRateLimitRetry(
+              () => base44.entities.LeaderboardEntry.update(existingGeneral.id, {
+                ...basePayload,
+                leaderboard_type: 'general'
+              }),
+              { retries: 4, delayMs: 350 }
+            );
             results.push({ player: resolvedPlayer.playerName, action: 'updated' });
+            didWrite = true;
+            if (identityKey) {
+              generalByKey.set(identityKey, { ...existingGeneral, ...basePayload, leaderboard_type: 'general' });
+            }
           } else {
             results.push({ player: resolvedPlayer.playerName, action: 'skipped', reason: 'lower_score' });
           }
         } else {
-          await base44.entities.LeaderboardEntry.create({
-            ...basePayload,
-            leaderboard_type: 'general',
-          });
+          const created = await withRateLimitRetry(
+            () => base44.entities.LeaderboardEntry.create({
+              ...basePayload,
+              leaderboard_type: 'general',
+            }),
+            { retries: 4, delayMs: 350 }
+          );
           results.push({ player: resolvedPlayer.playerName, action: 'created' });
+          didWrite = true;
+          if (identityKey) {
+            generalByKey.set(identityKey, created || { ...basePayload, leaderboard_type: 'general' });
+          }
         }
 
         if (isHostedClassicGame(game)) {
-          const [existingDg] = await base44.entities.LeaderboardEntry.filter({
-            ...identityFilter,
-            game_type: game.game_type,
-            leaderboard_type: 'discgolf_ee'
-          });
+          const existingDg = identityKey ? discgolfByKey.get(identityKey) : null;
 
           if (existingDg) {
             if (score > existingDg.score) {
-              await base44.entities.LeaderboardEntry.update(existingDg.id, {
+              await withRateLimitRetry(
+                () => base44.entities.LeaderboardEntry.update(existingDg.id, {
+                  ...basePayload,
+                  leaderboard_type: 'discgolf_ee',
+                  submitted_by: user?.email
+                }),
+                { retries: 4, delayMs: 350 }
+              );
+              didWrite = true;
+              if (identityKey) {
+                discgolfByKey.set(identityKey, { ...existingDg, ...basePayload, leaderboard_type: 'discgolf_ee' });
+              }
+            }
+          } else {
+            const createdDg = await withRateLimitRetry(
+              () => base44.entities.LeaderboardEntry.create({
                 ...basePayload,
                 leaderboard_type: 'discgolf_ee',
                 submitted_by: user?.email
-              });
+              }),
+              { retries: 4, delayMs: 350 }
+            );
+            didWrite = true;
+            if (identityKey) {
+              discgolfByKey.set(identityKey, createdDg || { ...basePayload, leaderboard_type: 'discgolf_ee' });
             }
-          } else {
-            await base44.entities.LeaderboardEntry.create({
-              ...basePayload,
-              leaderboard_type: 'discgolf_ee',
-              submitted_by: user?.email
-            });
           }
+        }
+
+        if (didWrite) {
+          await sleep(WRITE_THROTTLE_MS);
         }
       } catch (error) {
         results.push({ player: resolvedPlayer.playerName, action: 'error', error });

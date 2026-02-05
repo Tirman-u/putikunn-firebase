@@ -516,7 +516,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     // Calculate round score
     const roundScore = calculateRoundScore(currentDistance, madeCount);
     
-    const newTotalPoints = { ...currentState.total_points };
+    const newTotalPoints = { ...(currentState.total_points || {}) };
     newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) + roundScore;
 
     // Calculate next distance
@@ -579,7 +579,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     }
     allPlayerPutts[playerName].push(newPutt);
 
-    const newTotalPoints = { ...currentState.total_points };
+    const newTotalPoints = { ...(currentState.total_points || {}) };
     newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) + points;
 
     // For Streak Challenge, handle streak tracking
@@ -682,7 +682,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       const allPlayerPutts = { ...currentState.player_putts };
       allPlayerPutts[playerName] = newPutts;
 
-      const newTotalPoints = { ...currentState.total_points };
+      const newTotalPoints = { ...(currentState.total_points || {}) };
       newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) - lastPutt.points;
 
       // Recalculate distance - if there was a previous putt, check if it was made/missed
@@ -710,7 +710,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       const allPlayerPutts = { ...currentState.player_putts };
       allPlayerPutts[playerName] = newPutts;
 
-      const newTotalPoints = { ...currentState.total_points };
+      const newTotalPoints = { ...(currentState.total_points || {}) };
       newTotalPoints[playerName] = (newTotalPoints[playerName] || 0) - roundScore;
 
       // Recalculate distance from previous round
@@ -738,7 +738,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   };
 
   // Use local state for solo games, otherwise use game data
-  const currentState = localGameState || game;
+  const currentState = localGameState || game || {};
   const gameType = currentState?.game_type || 'classic';
   const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
   const playerPutts = currentState?.player_putts?.[playerName] || [];
@@ -748,8 +748,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const currentStreaks = currentState?.player_current_streaks || {};
   const currentStreak = currentStreaks[playerName] || 0;
   const currentScore = gameType === 'streak_challenge'
-    ? (currentState.player_highest_streaks?.[playerName] || 0)
-    : (currentState.total_points?.[playerName] || 0);
+    ? (currentState?.player_highest_streaks?.[playerName] || 0)
+    : (currentState?.total_points?.[playerName] || 0);
   const isPotentialMaxEnabled = !format.singlePuttMode && gameType !== 'streak_challenge';
   let potentialMaxScore = null;
   if (isPotentialMaxEnabled) {
@@ -787,7 +787,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     window.location.href = `${createPageUrl('GameResult')}?id=${game.id}`;
   }, [currentState, game?.id, hasAskedSoloSubmit, isComplete, isSoloGame, redirectedToResults]);
 
-  if (isLoading || !game || !currentState) {
+  if (isLoading || !game) {
     return <LoadingState />;
   }
 
@@ -806,7 +806,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             </div>
             <h1 className="text-4xl font-bold text-slate-800 mb-4">🎉 Lõpetatud!</h1>
             <p className="text-xl text-slate-600 mb-2">Lõpetasid kõik ringid</p>
-            <p className="text-4xl font-bold text-emerald-600">{currentState.total_points[playerName]} punkti</p>
+            <p className="text-4xl font-bold text-emerald-600">{currentScore} punkti</p>
             </motion.div>
 
             {/* Performance Analysis */}
@@ -942,7 +942,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
                onUndo={handleUndo}
                putts={playerPutts}
                puttType={game.putt_type || 'regular'}
-               totalPoints={currentState.total_points[playerName] || 0}
+               totalPoints={currentScore}
                hideScore={hideScore}
              />
            ) : (

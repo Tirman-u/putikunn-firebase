@@ -21,6 +21,7 @@ export default function ManageGames() {
   const [newGroupName, setNewGroupName] = useState('');
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('all');
+  const [selectedSyncGameIds, setSelectedSyncGameIds] = useState([]);
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -290,6 +291,22 @@ export default function ManageGames() {
     ? completedGames 
     : groupedByMonth[selectedMonth] || [];
 
+  React.useEffect(() => {
+    setSelectedSyncGameIds([]);
+  }, [selectedMonth]);
+
+  const allCompletedSelected =
+    filteredCompletedGames.length > 0 &&
+    filteredCompletedGames.every((game) => selectedSyncGameIds.includes(game.id));
+
+  const toggleSelectAllCompleted = () => {
+    if (allCompletedSelected) {
+      setSelectedSyncGameIds([]);
+    } else {
+      setSelectedSyncGameIds(filteredCompletedGames.map((game) => game.id));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <div className="max-w-4xl mx-auto p-4">
@@ -448,13 +465,17 @@ export default function ManageGames() {
               <h2 className="text-lg font-bold text-slate-800">Completed Games</h2>
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={() => bulkSyncMutation.mutate(filteredCompletedGames)}
-                  disabled={bulkSyncMutation.isPending || filteredCompletedGames.length === 0}
+                  onClick={() =>
+                    bulkSyncMutation.mutate(
+                      filteredCompletedGames.filter((game) => selectedSyncGameIds.includes(game.id))
+                    )
+                  }
+                  disabled={bulkSyncMutation.isPending || selectedSyncGameIds.length === 0}
                   size="sm"
                   className="bg-indigo-600 hover:bg-indigo-700 text-xs"
                 >
                   <RefreshCw className={`w-3 h-3 mr-1 ${bulkSyncMutation.isPending ? 'animate-spin' : ''}`} />
-                  {bulkSyncMutation.isPending ? 'Syncing...' : `Bulk Resync (${filteredCompletedGames.length})`}
+                  {bulkSyncMutation.isPending ? 'Syncing...' : `Sync Selected (${selectedSyncGameIds.length})`}
                 </Button>
                 <select
                   value={selectedMonth}
@@ -475,6 +496,15 @@ export default function ManageGames() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200">
+                    <th className="text-center py-3 px-4 text-slate-600 font-semibold w-10">
+                      <input
+                        type="checkbox"
+                        checked={allCompletedSelected}
+                        onChange={toggleSelectAllCompleted}
+                        aria-label="Select all completed games"
+                        className="w-4 h-4 rounded"
+                      />
+                    </th>
                     <th className="text-left py-3 px-4 text-slate-600 font-semibold">Game</th>
                     <th className="text-left py-3 px-4 text-slate-600 font-semibold">Date</th>
                     <th className="text-left py-3 px-4 text-slate-600 font-semibold">Format</th>
@@ -485,6 +515,21 @@ export default function ManageGames() {
                 <tbody>
                   {filteredCompletedGames.map((game) => (
                     <tr key={game.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-3 px-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedSyncGameIds.includes(game.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedSyncGameIds([...selectedSyncGameIds, game.id]);
+                            } else {
+                              setSelectedSyncGameIds(selectedSyncGameIds.filter((id) => id !== game.id));
+                            }
+                          }}
+                          aria-label={`Select ${game.name}`}
+                          className="w-4 h-4 rounded"
+                        />
+                      </td>
                       <td className="py-3 px-4">
                         <Link to={`${createPageUrl('GameResult')}?id=${game.id}`} className="text-emerald-600 hover:text-emerald-700 font-medium">
                           {game.name}

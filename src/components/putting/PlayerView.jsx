@@ -119,7 +119,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const mergeIncomingGame = React.useCallback((incoming) => {
     if (!incoming) return localGameStateRef.current || incoming;
     const localState = localGameStateRef.current || {};
-    const merged = { ...incoming };
+    const merged = { ...localState, ...incoming };
     if (!merged.game_type && localState.game_type) {
       merged.game_type = localState.game_type;
     }
@@ -344,7 +344,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const current = getLatestState();
     if (isSoloGame) {
       // For solo games, update local state only
-      const nextState = { ...current, ...data };
+      const baseGame = queryClient.getQueryData(['game', gameId]) || game || current;
+      const nextState = { ...baseGame, ...current, ...data };
       const liveStats = buildLiveStats(nextState);
       nextState.live_stats = {
         ...(nextState.live_stats || {}),

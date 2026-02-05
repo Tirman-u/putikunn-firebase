@@ -55,7 +55,12 @@ export default function PlayerDuelPreview() {
             <div className="text-lg font-semibold text-slate-800">Marko</div>
           </div>
         </div>
-        <div className="mt-3 text-xs text-slate-500">Režiim: {discCount} ketast • Distants 5–10m</div>
+        <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+          <span>Režiim: {discCount} ketast • Distants 5–10m</span>
+          <span className="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-700">
+            Punktid: 4
+          </span>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
@@ -118,7 +123,7 @@ export default function PlayerDuelPreview() {
             type="single"
             value={viewMode}
             onValueChange={(value) => value && setViewMode(value)}
-            className="grid grid-cols-2 gap-1"
+            className="grid grid-cols-3 gap-1"
           >
             <ToggleGroupItem value="active" className="rounded-full text-[11px]">
               Duell käib
@@ -126,19 +131,59 @@ export default function PlayerDuelPreview() {
             <ToggleGroupItem value="ready" className="rounded-full text-[11px]">
               Uus paariline
             </ToggleGroupItem>
+            <ToggleGroupItem value="summary" className="rounded-full text-[11px]">
+              Raport
+            </ToggleGroupItem>
           </ToggleGroup>
         </div>
 
-        {viewMode === 'active' ? (
+        {viewMode === 'active' && (
           <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
             Ootab vastase sisestust…
           </div>
-        ) : (
+        )}
+
+        {viewMode === 'ready' && (
           <div className="space-y-3">
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-slate-700">
               Uus vastane: Marko • Jaam 2 • 9m
             </div>
             <Button className="w-full rounded-xl">Kinnita jaam</Button>
+          </div>
+        )}
+
+        {viewMode === 'summary' && (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-slate-700">
+              Võitja: Oscar • Punktid: 9 • Kõrgeim jaam: 1
+            </div>
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              <div className="grid grid-cols-4 bg-slate-50 text-[11px] font-semibold text-slate-600 px-3 py-2">
+                <div>Mängija</div>
+                <div className="text-center">Punktid</div>
+                <div className="text-center">V/K</div>
+                <div className="text-center">Jaam</div>
+              </div>
+              {[
+                { name: 'Oscar', points: 9, wins: 8, losses: 4, station: 1 },
+                { name: 'Marko', points: 7, wins: 6, losses: 5, station: 2 },
+                { name: 'Liis', points: 5, wins: 4, losses: 6, station: 3 }
+              ].map((row, idx) => (
+                <div
+                  key={row.name}
+                  className={cn(
+                    'grid grid-cols-4 items-center px-3 py-2 text-xs',
+                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
+                  )}
+                >
+                  <div className="font-semibold text-slate-800">{row.name}</div>
+                  <div className="text-center font-semibold text-emerald-600">{row.points}</div>
+                  <div className="text-center text-slate-600">{row.wins}/{row.losses}</div>
+                  <div className="text-center text-slate-600">{row.station}</div>
+                </div>
+              ))}
+            </div>
+            <Button variant="outline" className="w-full rounded-xl">Tagasi avalehele</Button>
           </div>
         )}
       </div>

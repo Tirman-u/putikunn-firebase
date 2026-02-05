@@ -12,6 +12,13 @@ const stations = [
 ];
 
 const queue = ['Peeter', 'Anu', 'Kristjan', 'Sander'];
+const leaderboard = [
+  { name: 'Rasmus', points: 7, wins: 6, losses: 2, station: 1 },
+  { name: 'Oscar', points: 6, wins: 5, losses: 3, station: 2 },
+  { name: 'Katrin', points: 5, wins: 4, losses: 2, station: 2 },
+  { name: 'Marko', points: 4, wins: 3, losses: 3, station: 3 },
+  { name: 'Liis', points: 3, wins: 2, losses: 4, station: 4 }
+];
 
 export default function HostDuelPreview() {
   return (
@@ -104,6 +111,35 @@ export default function HostDuelPreview() {
                   </div>
                 ))}
               </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-semibold text-slate-800">Live edetabel</div>
+          <div className="text-xs text-slate-500">Punktid + võidud/kaotused</div>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200">
+          <div className="grid grid-cols-4 bg-slate-50 text-xs font-semibold text-slate-600 px-3 py-2">
+            <div>Mängija</div>
+            <div className="text-center">Punktid</div>
+            <div className="text-center">V/K</div>
+            <div className="text-center">Jaam</div>
+          </div>
+          {leaderboard.map((row, idx) => (
+            <div
+              key={row.name}
+              className={cn(
+                'grid grid-cols-4 items-center px-3 py-2 text-sm',
+                idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
+              )}
+            >
+              <div className="font-semibold text-slate-800">{row.name}</div>
+              <div className="text-center font-semibold text-emerald-600">{row.points}</div>
+              <div className="text-center text-slate-600">{row.wins}/{row.losses}</div>
+              <div className="text-center text-slate-600">{row.station}</div>
             </div>
           ))}
         </div>

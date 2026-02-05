@@ -12,6 +12,20 @@ const stations = [
 ];
 
 const queue = ['Peeter', 'Anu', 'Kristjan', 'Sander'];
+const playerStats = {
+  Rasmus: { wins: 6, draws: 1, losses: 2, points: 8 },
+  Oscar: { wins: 5, draws: 2, losses: 3, points: 7 },
+  Sten: { wins: 4, draws: 1, losses: 4, points: 5 },
+  Katrin: { wins: 4, draws: 0, losses: 3, points: 4 },
+  Marko: { wins: 3, draws: 2, losses: 4, points: 4 },
+  Liis: { wins: 3, draws: 1, losses: 5, points: 4 },
+  Urmas: { wins: 2, draws: 1, losses: 4, points: 3 },
+  Marge: { wins: 2, draws: 0, losses: 4, points: 2 },
+  Jaan: { wins: 1, draws: 1, losses: 4, points: 2 },
+  Mari: { wins: 1, draws: 2, losses: 3, points: 3 },
+  Karl: { wins: 0, draws: 1, losses: 4, points: 1 },
+  Grete: { wins: 0, draws: 2, losses: 3, points: 2 }
+};
 const leaderboard = [
   { name: 'Rasmus', points: 7, wins: 6, losses: 2, station: 1 },
   { name: 'Oscar', points: 6, wins: 5, losses: 3, station: 2 },
@@ -83,8 +97,10 @@ export default function HostDuelPreview() {
                 {station.players.map((player, index) => (
                   <div key={player} className="rounded-xl bg-white px-3 py-3 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold">{player}</span>
-                      <span className="text-[11px] font-semibold text-slate-500">{station.distance}m</span>
+                      <span className="font-semibold text-slate-800">{player}</span>
+                      <span className="text-[11px] text-slate-400">
+                        V {playerStats[player]?.wins ?? 0} · Viik {playerStats[player]?.draws ?? 0} · K {playerStats[player]?.losses ?? 0} · P {playerStats[player]?.points ?? 0}
+                      </span>
                     </div>
                     <div className="grid grid-cols-6 gap-1.5 text-[9px] text-slate-400">
                       {[5, 6, 7, 8, 9, 10].map((step) => (

@@ -95,11 +95,13 @@ export default function ManageGames() {
   const syncGameToLeaderboards = async (game, profileCache = {}) => {
     const results = [];
     const players = resolveGamePlayers(game);
+    let eligiblePlayers = 0;
 
     for (const rawPlayerName of players) {
       if (!rawPlayerName) continue;
 
       const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, rawPlayerName);
+      const hasStats = totalPutts > 0 || score > 0;
       const resolvedPlayer = await resolveLeaderboardPlayer({
         game,
         playerName: rawPlayerName,
@@ -124,10 +126,11 @@ export default function ManageGames() {
         date: normalizedDate
       };
 
-      if (!totalPutts && !score) {
-        results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
+      if (!hasStats) {
+        results.push({ player: resolvedPlayer.playerName, action: 'skipped', reason: 'no_stats' });
         continue;
       }
+      eligiblePlayers += 1;
 
       try {
         const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
@@ -144,7 +147,7 @@ export default function ManageGames() {
             });
             results.push({ player: resolvedPlayer.playerName, action: 'updated' });
           } else {
-            results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
+            results.push({ player: resolvedPlayer.playerName, action: 'skipped', reason: 'lower_score' });
           }
         } else {
           await base44.entities.LeaderboardEntry.create({
@@ -182,21 +185,44 @@ export default function ManageGames() {
       }
     }
 
-    return results;
+    return { results, players, eligiblePlayers };
   };
 
   const submitToDiscgolfMutation = useMutation({
-    mutationFn: async (game) => syncGameToLeaderboards(game, {}),
-    onSuccess: (results) => {
+    mutationFn: async (game) => {
+      const payload = await syncGameToLeaderboards(game, {});
+      return { ...payload, game };
+    },
+    onSuccess: ({ results, eligiblePlayers, players, game }) => {
       const updated = results.filter(r => r.action === 'updated').length;
       const created = results.filter(r => r.action === 'created').length;
-      const skipped = results.filter(r => r.action === 'skipped').length;
       const errors = results.filter(r => r.action === 'error').length;
+      const skippedNoStats = results.filter(r => r.action === 'skipped' && r.reason === 'no_stats').map(r => r.player);
+      const skippedLowerScore = results.filter(r => r.action === 'skipped' && r.reason === 'lower_score').length;
+      const totalPlayers = players?.length || 0;
       
       let message = 'Edetabelitesse saadetud';
-      if (updated > 0 || skipped > 0 || errors > 0 || created > 0) {
-        message += ` (${created} uusi, ${updated} uuendatud, ${skipped} vahele jäetud, ${errors} viga)`;
+      const detailParts = [];
+      if (created > 0) detailParts.push(`${created} uusi`);
+      if (updated > 0) detailParts.push(`${updated} uuendatud`);
+      if (skippedLowerScore > 0) detailParts.push(`${skippedLowerScore} rekord parem olemas`);
+      if (skippedNoStats.length > 0) detailParts.push(`${skippedNoStats.length} stats puudub`);
+      if (errors > 0) detailParts.push(`${errors} viga`);
+      if (detailParts.length > 0) {
+        message += ` (${detailParts.join(', ')})`;
       }
+      if (totalPlayers > 0) {
+        message += ` • Mängijaid: ${totalPlayers}, statsiga: ${eligiblePlayers}`;
+      }
+
+      if (skippedNoStats.length > 0) {
+        console.warn(`[Sync] "${game?.name}" - puuduvad stats:`, skippedNoStats);
+      }
+      const errorPlayers = results.filter(r => r.action === 'error');
+      if (errorPlayers.length > 0) {
+        console.error(`[Sync] "${game?.name}" - vead:`, errorPlayers);
+      }
+
       if (errors > 0) {
         toast.error(message);
       } else {
@@ -215,24 +241,49 @@ export default function ManageGames() {
       const profileCache = {};
       const summary = {
         games: gamesToSync.length,
+        players: 0,
+        eligiblePlayers: 0,
         created: 0,
         updated: 0,
-        skipped: 0,
+        skippedNoStats: 0,
+        skippedLowerScore: 0,
         errors: 0
       };
 
       for (const game of gamesToSync) {
-        const results = await syncGameToLeaderboards(game, profileCache);
+        const payload = await syncGameToLeaderboards(game, profileCache);
+        const { results, eligiblePlayers, players } = payload;
         summary.created += results.filter(r => r.action === 'created').length;
         summary.updated += results.filter(r => r.action === 'updated').length;
-        summary.skipped += results.filter(r => r.action === 'skipped').length;
         summary.errors += results.filter(r => r.action === 'error').length;
+        summary.players += players?.length || 0;
+        summary.eligiblePlayers += eligiblePlayers || 0;
+
+        const skippedNoStats = results.filter(r => r.action === 'skipped' && r.reason === 'no_stats').map(r => r.player);
+        summary.skippedNoStats += skippedNoStats.length;
+        summary.skippedLowerScore += results.filter(r => r.action === 'skipped' && r.reason === 'lower_score').length;
+        if (skippedNoStats.length > 0) {
+          console.warn(`[Bulk Sync] "${game?.name}" - puuduvad stats:`, skippedNoStats);
+        }
+        const errorPlayers = results.filter(r => r.action === 'error');
+        if (errorPlayers.length > 0) {
+          console.error(`[Bulk Sync] "${game?.name}" - vead:`, errorPlayers);
+        }
       }
 
       return summary;
     },
     onSuccess: (summary) => {
-      const message = `Mass-sünk valmis (${summary.games} mängu, ${summary.created} uusi, ${summary.updated} uuendatud, ${summary.skipped} vahele jäetud, ${summary.errors} viga)`;
+      const detailParts = [`${summary.games} mängu`];
+      if (summary.created > 0) detailParts.push(`${summary.created} uusi`);
+      if (summary.updated > 0) detailParts.push(`${summary.updated} uuendatud`);
+      if (summary.skippedLowerScore > 0) detailParts.push(`${summary.skippedLowerScore} rekord parem olemas`);
+      if (summary.skippedNoStats > 0) detailParts.push(`${summary.skippedNoStats} stats puudub`);
+      if (summary.errors > 0) detailParts.push(`${summary.errors} viga`);
+      let message = `Mass-sünk valmis (${detailParts.join(', ')})`;
+      if (summary.players > 0) {
+        message += ` • Mängijaid: ${summary.players}, statsiga: ${summary.eligiblePlayers}`;
+      }
       if (summary.errors > 0) {
         toast.error(message);
       } else {

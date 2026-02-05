@@ -245,21 +245,20 @@ export default function PuttingRecords() {
 
   const getPlayerKey = (entry) => {
     const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
-    const mappedUid = entry?.player_name ? game?.player_uids?.[entry.player_name] : null;
+    const profile = resolveEntryUser(entry);
+    if (profile?.id) return `uid:${profile.id}`;
+
     const mappedEmail = entry?.player_name ? game?.player_emails?.[entry.player_name] : null;
-    const uidKey = entry?.player_uid || mappedUid ? `uid:${entry.player_uid || mappedUid}` : null;
-    if (uidKey) return uidKey;
-
     const hostEmail = game?.host_user;
-    const email = entry?.player_email && entry.player_email !== 'unknown'
-      ? entry.player_email
-      : (mappedEmail || null);
-    const emailKey = email && email !== hostEmail ? `email:${email}` : null;
-    const nameKey = entry?.player_name
-      ? `name:${entry.player_name.trim().toLowerCase()}`
-      : null;
+    const email = normalizeText(profile?.email || entry?.player_email || mappedEmail);
+    if (email && email !== 'unknown' && email !== normalizeText(hostEmail)) {
+      return `email:${email}`;
+    }
 
-    return emailKey || nameKey || `id:${entry.id}`;
+    const resolvedName = normalizeText(profile?.full_name || entry?.player_name);
+    if (resolvedName) return `name:${resolvedName}`;
+
+    return `id:${entry.id}`;
   };
 
   // Group by player and keep only the best score for each

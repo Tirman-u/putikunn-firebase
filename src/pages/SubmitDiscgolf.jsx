@@ -51,7 +51,7 @@ export default function SubmitDiscgolf() {
       });
     },
     onSuccess: () => {
-      toast.success('Result submitted to Discgolf.ee leaderboard!');
+      toast.success('Tulemus saadetud Discgolf.ee edetabelisse!');
       setPlayerEmail('');
       setScore('');
       setMadePutts('');
@@ -65,7 +65,7 @@ export default function SubmitDiscgolf() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!playerEmail || !score || !madePutts || !totalPutts) {
-      toast.error('Please fill in all fields');
+      toast.error('Täida kõik väljad');
       return;
     }
     submitMutation.mutate();
@@ -78,9 +78,9 @@ export default function SubmitDiscgolf() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-red-50 to-white flex items-center justify-center p-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">Access Denied</h1>
-          <p className="text-slate-600 mb-6">You need trainer privileges to submit results.</p>
-          <Button onClick={() => navigate(-1)}>Go Back</Button>
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Ligipääs keelatud</h1>
+          <p className="text-slate-600 mb-6">Tulemuste sisestamiseks on vaja treeneri õigusi.</p>
+          <Button onClick={() => navigate(-1)}>Tagasi</Button>
         </div>
       </div>
     );
@@ -95,7 +95,7 @@ export default function SubmitDiscgolf() {
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back</span>
+            <span className="font-medium">Tagasi</span>
           </button>
           <div className="w-16" />
         </div>
@@ -104,16 +104,16 @@ export default function SubmitDiscgolf() {
           <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Upload className="w-8 h-8 text-blue-600" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Submit to Discgolf.ee</h1>
-          <p className="text-slate-600">Submit player results to the training table</p>
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Saada Discgolf.ee-sse</h1>
+          <p className="text-slate-600">Sisesta mängijate tulemused treeningtabelisse</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Player Email</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Mängija e-post</label>
             <Select value={playerEmail} onValueChange={setPlayerEmail}>
               <SelectTrigger>
-                <SelectValue placeholder="Select player" />
+                <SelectValue placeholder="Vali mängija" />
               </SelectTrigger>
               <SelectContent>
                 {allUsers.map(u => (
@@ -126,49 +126,49 @@ export default function SubmitDiscgolf() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Game Type</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Mängu formaat</label>
             <Select value={gameType} onValueChange={setGameType}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="classic">Classic</SelectItem>
-                <SelectItem value="back_and_forth">Back and Forth</SelectItem>
+                <SelectItem value="back_and_forth">Back &amp; Forth</SelectItem>
                 <SelectItem value="short">Short</SelectItem>
                 <SelectItem value="long">Long</SelectItem>
-                <SelectItem value="streak_challenge">Streak Challenge</SelectItem>
-                <SelectItem value="random_distance">Random Distance</SelectItem>
+                <SelectItem value="streak_challenge">Seeria</SelectItem>
+                <SelectItem value="random_distance">Juhuslik distants</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Gender</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Sugu</label>
             <Select value={gender} onValueChange={setGender}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="M">Male</SelectItem>
-                <SelectItem value="N">Female</SelectItem>
+                <SelectItem value="M">Mees</SelectItem>
+                <SelectItem value="N">Naine</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Score</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Skoor</label>
             <Input
               type="number"
               value={score}
               onChange={(e) => setScore(e.target.value)}
-              placeholder="Total points"
+              placeholder="Koguskoor"
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Made Putts</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Sees putid</label>
               <Input
                 type="number"
                 value={madePutts}
@@ -178,7 +178,7 @@ export default function SubmitDiscgolf() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Total Putts</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Putte kokku</label>
               <Input
                 type="number"
                 value={totalPutts}
@@ -195,7 +195,7 @@ export default function SubmitDiscgolf() {
             className="w-full h-12 bg-blue-600 hover:bg-blue-700"
           >
             <Upload className="w-5 h-5 mr-2" />
-            Submit to Discgolf.ee Table
+            Saada Discgolf.ee tabelisse
           </Button>
         </form>
       </div>

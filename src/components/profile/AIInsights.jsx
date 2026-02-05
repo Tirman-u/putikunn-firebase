@@ -41,22 +41,22 @@ export default function AIInsights({ games, userName }) {
         attempts: stats.attempts
       }));
 
-      const prompt = `Analyze this disc golf putting performance data and provide actionable insights:
+      const prompt = `Analüüsi neid discgolfi puttimise andmeid ja anna praktilised soovitused eesti keeles.
 
-Performance by format:
+Tulemused formaadi lõikes:
 ${JSON.stringify(performanceData, null, 2)}
 
-Performance by distance:
+Tulemused distantsi lõikes:
 ${JSON.stringify(distancePerformance, null, 2)}
 
-Provide a JSON response with:
-1. strengths: array of 2-3 key strengths
-2. weaknesses: array of 2-3 areas needing improvement
-3. practice_routine: recommended weekly practice schedule (array of 3-4 specific drills)
-4. focus_areas: specific distance ranges or formats to prioritize
-5. training_drills: array of 3 personalized drills with name, description, and target metrics
+Tagasta JSON vastus järgmiste võtmetega:
+1. strengths: 2-3 tugevust
+2. weaknesses: 2-3 parendusvaldkonda
+3. practice_routine: soovituslik nädalane treeningkava (3-4 konkreetset harjutust)
+4. focus_areas: distantsid või formaadid, millele keskenduda
+5. training_drills: 3 isikupärastatud harjutust (name, description, target)
 
-Be specific with distances, percentages, and actionable advice.`;
+Ole konkreetne distantside, protsentide ja tegevussoovitustega.`;
 
       const result = await base44.integrations.Core.InvokeLLM({
         prompt,
@@ -85,7 +85,7 @@ Be specific with distances, percentages, and actionable advice.`;
       setInsights(result);
     } catch (error) {
       console.error('Failed to generate insights:', error);
-      alert('Failed to generate insights. Please try again.');
+      alert('Soovituste loomine ebaõnnestus. Palun proovi uuesti.');
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,7 @@ Be specific with distances, percentages, and actionable advice.`;
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-purple-500" />
-          AI Performance Insights
+          AI sooritusanalüüs
         </h3>
         <Button 
           onClick={generateInsights} 
@@ -104,14 +104,14 @@ Be specific with distances, percentages, and actionable advice.`;
           size="sm"
           className="bg-purple-600 hover:bg-purple-700"
         >
-          {loading ? 'Analyzing...' : 'Generate Insights'}
+          {loading ? 'Analüüsib...' : 'Loo soovitused'}
         </Button>
       </div>
 
       {!insights && !loading && (
         <div className="text-center py-8 text-slate-400">
           <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p>Click "Generate Insights" to get AI-powered recommendations</p>
+          <p>Vajuta “Loo soovitused”, et saada AI soovitused</p>
         </div>
       )}
 
@@ -121,7 +121,7 @@ Be specific with distances, percentages, and actionable advice.`;
           <div>
             <h4 className="font-semibold text-slate-800 mb-2 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-green-600" />
-              Your Strengths
+              Tugevused
             </h4>
             <div className="space-y-2">
               {insights.strengths?.map((strength, i) => (
@@ -136,7 +136,7 @@ Be specific with distances, percentages, and actionable advice.`;
           <div>
             <h4 className="font-semibold text-slate-800 mb-2 flex items-center gap-2">
               <Target className="w-4 h-4 text-amber-600" />
-              Focus Areas
+              Fookusvaldkonnad
             </h4>
             <div className="space-y-2">
               {insights.weaknesses?.map((weakness, i) => (
@@ -151,7 +151,7 @@ Be specific with distances, percentages, and actionable advice.`;
           <div>
             <h4 className="font-semibold text-slate-800 mb-2 flex items-center gap-2">
               <Lightbulb className="w-4 h-4 text-blue-600" />
-              Recommended Practice Routine
+              Soovitatud treeningkava
             </h4>
             <div className="space-y-2">
               {insights.practice_routine?.map((routine, i) => (
@@ -167,13 +167,13 @@ Be specific with distances, percentages, and actionable advice.`;
 
           {/* Training Drills */}
           <div>
-            <h4 className="font-semibold text-slate-800 mb-3">Personalized Training Drills</h4>
+            <h4 className="font-semibold text-slate-800 mb-3">Isikupärastatud harjutused</h4>
             <div className="grid gap-3">
               {insights.training_drills?.map((drill, i) => (
                 <div key={i} className="p-4 bg-purple-50 rounded-xl border border-purple-200">
                   <div className="font-bold text-purple-900 mb-1">{drill.name}</div>
                   <div className="text-sm text-purple-800 mb-2">{drill.description}</div>
-                  <div className="text-xs text-purple-600 font-medium">Target: {drill.target}</div>
+                  <div className="text-xs text-purple-600 font-medium">Eesmärk: {drill.target}</div>
                 </div>
               ))}
             </div>

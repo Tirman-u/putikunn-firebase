@@ -1,7 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Undo, Target, CheckCircle2, XCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Undo } from 'lucide-react';
 
 const DISTANCE_COLORS = {
   3: 'from-red-300 to-red-400',
@@ -38,10 +37,10 @@ export default function ClassicScoreInput({
   const currentFrameIndex = Math.floor(currentRoundPutts.length / 5);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Visual Frames Display - 20 boxes */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <div className="grid grid-cols-10 gap-2.5">
+      <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-100">
+        <div className="grid grid-cols-10 gap-2 sm:gap-2.5">
           {Array.from({ length: totalFrames }).map((_, frameIdx) => {
             const isCurrent = frameIdx === currentFrameIndex;
             const isCompleted = frameIdx < currentFrameIndex;
@@ -68,7 +67,7 @@ export default function ClassicScoreInput({
                     return (
                       <div
                         key={puttIdx}
-                        className={`w-1.5 h-1.5 rounded-full ${
+                        className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full ${
                           puttResult === 'made'
                             ? 'bg-emerald-500'
                             : puttResult === 'missed'
@@ -81,7 +80,7 @@ export default function ClassicScoreInput({
                 </div>
                 
                 {/* Frame number */}
-                <div className="text-[9px] text-slate-400 mt-1">{frameIdx + 1}</div>
+                <div className="text-[8px] sm:text-[9px] text-slate-400 mt-1">{frameIdx + 1}</div>
               </div>
             );
           })}
@@ -89,19 +88,19 @@ export default function ClassicScoreInput({
       </div>
 
       {/* Current Distance and Putt Style */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+      <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-100">
         <div className="text-center">
-          <div className="text-5xl font-bold text-slate-800 mb-2">{currentDistance}m</div>
-          <div className="text-xs text-slate-500">Putt Style</div>
+          <div className="text-4xl sm:text-5xl font-bold text-slate-800 mb-1 sm:mb-2">{currentDistance}m</div>
+          <div className="text-[11px] sm:text-xs text-slate-500">Puti stiil</div>
           <div className="text-sm font-semibold text-slate-800">
-            {puttType === 'regular' ? 'Regular' : puttType === 'straddle' ? 'Straddle' : 'Turbo'}
+            {puttType === 'regular' ? 'Tavaline' : puttType === 'straddle' ? 'Straddle' : 'Turbo'}
           </div>
         </div>
       </div>
 
       {/* Instructions */}
-      <div className="text-center text-sm text-slate-500">
-        Tap how many putts you made (out of 5)
+      <div className="text-center text-xs sm:text-sm text-slate-500">
+        Vali mitu putti läks sisse (5-st)
       </div>
 
       {/* One-Click Score Buttons */}
@@ -113,14 +112,17 @@ export default function ClassicScoreInput({
           return (
             <button
               key={num}
-              onClick={() => handleScoreClick(num)}
-              className="relative py-6 rounded-2xl active:scale-95 transition-all border-2 shadow-sm bg-gradient-to-br from-slate-50 to-slate-100 hover:from-emerald-50 hover:to-emerald-100 border-slate-200 hover:border-emerald-300"
+              onClick={(event) => {
+                handleScoreClick(num);
+                event.currentTarget.blur();
+              }}
+              className="relative py-4 sm:py-6 rounded-2xl active:scale-95 transition-all border-2 shadow-sm bg-gradient-to-br from-slate-50 to-slate-100 [@media(hover:hover)]:hover:from-emerald-50 [@media(hover:hover)]:hover:to-emerald-100 border-slate-200 [@media(hover:hover)]:hover:border-emerald-300 focus:outline-none"
             >
-              <div className="text-3xl font-bold text-slate-800 mb-1">{num}</div>
-              <div className="text-xs font-medium text-slate-500 mb-0.5">
-                {potentialPoints} pts
+              <div className="text-2xl sm:text-3xl font-bold text-slate-800 mb-1">{num}</div>
+              <div className="text-[10px] sm:text-xs font-medium text-slate-500 mb-0.5">
+                {potentialPoints} p
               </div>
-              <div className="text-[10px] text-slate-400">
+              <div className="text-[9px] sm:text-[10px] text-slate-400">
                 → {nextDistance ? `${nextDistance}m` : '?m'}
               </div>
             </button>
@@ -133,10 +135,10 @@ export default function ClassicScoreInput({
         <Button
           onClick={onUndo}
           variant="outline"
-          className="w-full h-14 rounded-xl text-base"
+          className="w-full h-12 sm:h-14 rounded-xl text-sm sm:text-base"
         >
           <Undo className="w-5 h-5 mr-2" />
-          Undo Last Round
+          Võta viimane ring tagasi
         </Button>
       )}
     </div>

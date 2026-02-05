@@ -123,7 +123,7 @@ export default function TournamentRulesDialog({ onClose }) {
 
         <div className="flex-1 overflow-y-auto p-6">
           {isLoading ? (
-            <div className="text-center text-slate-400">Loading...</div>
+            <div className="text-center text-slate-400">Laen...</div>
           ) : isEditing ? (
             <div className="min-h-[400px]">
               <ReactQuill

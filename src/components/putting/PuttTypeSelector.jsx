@@ -3,14 +3,14 @@ import { Button } from '@/components/ui/button';
 
 export default function PuttTypeSelector({ selectedType, onSelect }) {
   const puttTypes = [
-    { id: 'regular', label: 'Regular', icon: '🎯' },
+    { id: 'regular', label: 'Tavaline', icon: '🎯' },
     { id: 'straddle', label: 'Straddle', icon: '🦵' },
     { id: 'turbo', label: 'Turbo', icon: '⚡' }
   ];
 
   return (
     <div className="mb-4">
-      <div className="text-sm text-slate-600 mb-2 text-center">Putt Type:</div>
+      <div className="text-sm text-slate-600 mb-2 text-center">Puti stiil:</div>
       <div className="grid grid-cols-3 gap-2">
         {puttTypes.map(type => (
           <Button

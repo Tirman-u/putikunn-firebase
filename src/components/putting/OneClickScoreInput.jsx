@@ -36,7 +36,7 @@ export default function OneClickScoreInput({ player, currentDistance, onSubmit, 
 
       {/* Instructions */}
       <div className="text-center text-sm text-slate-500 mb-4">
-        Tap how many putts you made (out of 5)
+        Vali mitu putti läks sisse (5-st)
       </div>
 
       {/* One-Click Score Buttons */}
@@ -48,12 +48,15 @@ export default function OneClickScoreInput({ player, currentDistance, onSubmit, 
           return (
             <button
               key={num}
-              onClick={() => handleScoreClick(num)}
-              className="relative py-8 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 hover:from-emerald-50 hover:to-emerald-100 active:scale-95 transition-all border-2 border-slate-200 hover:border-emerald-300 shadow-sm"
+              onClick={(event) => {
+                handleScoreClick(num);
+                event.currentTarget.blur();
+              }}
+              className="relative py-8 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 [@media(hover:hover)]:hover:from-emerald-50 [@media(hover:hover)]:hover:to-emerald-100 active:scale-95 transition-all border-2 border-slate-200 [@media(hover:hover)]:hover:border-emerald-300 shadow-sm"
             >
               <div className="text-4xl font-bold text-slate-800 mb-2">{num}</div>
               <div className="text-xs font-medium text-slate-500 mb-1">
-                {potentialPoints} pts
+                {potentialPoints} p
               </div>
               <div className="text-[10px] text-slate-400">
                 → {nextDistance}m
@@ -71,7 +74,7 @@ export default function OneClickScoreInput({ player, currentDistance, onSubmit, 
           className="w-full h-12 rounded-xl border-2"
         >
           <Undo className="w-4 h-4 mr-2" />
-          Undo Last Score
+          Võta viimane tagasi
         </Button>
       )}
     </div>

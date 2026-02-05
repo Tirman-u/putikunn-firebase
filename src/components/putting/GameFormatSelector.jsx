@@ -7,49 +7,49 @@ const GAME_FORMATS = [
     id: 'classic',
     name: 'Classic',
     distance: '5-10m',
-    description: 'Standard format',
+    description: 'Standardne formaat',
     color: 'emerald'
   },
   {
     id: 'back_and_forth',
     name: 'Back & Forth',
     distance: '5-10m',
-    description: 'Made→farther, Miss→closer',
+    description: 'Sees→kaugemale, Mööda→lähemale',
     color: 'blue'
   },
   {
     id: 'short',
     name: 'Short',
     distance: '3-8m',
-    description: 'Close range practice',
+    description: 'Lähedalt harjutus',
     color: 'amber'
   },
   {
     id: 'long',
     name: 'Long',
     distance: '10-15m',
-    description: 'Distance challenge',
+    description: 'Pika distantsi väljakutse',
     color: 'purple'
   },
   {
     id: 'streak_challenge',
     name: 'Streak',
     distance: '3-15m',
-    description: 'Select distance, ends on miss',
+    description: 'Vali distants, lõpeb möödalöögiga',
     color: 'red'
   },
   {
     id: 'random_distance',
     name: 'Random',
     distance: '3-10m',
-    description: 'Random distances each round',
+    description: 'Juhuslik distants igas ringis',
     color: 'indigo'
   },
   {
     id: 'around_the_world',
     name: 'Around the World',
     distance: '5-10m',
-    description: 'Move through stations',
+    description: 'Liigu jaamade kaupa',
     color: 'emerald',
     badge: 'BETA'
   }

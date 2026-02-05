@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Check, Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -18,11 +18,15 @@ export default function ScoreInput({ player, maxScore = 10, onSubmit, currentSco
     setScore(value);
   };
 
+  useEffect(() => {
+    setScore(currentScore ?? 0);
+  }, [currentScore]);
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
       <div className="text-center mb-6">
         <h3 className="text-lg font-bold text-slate-800">{player}</h3>
-        <p className="text-sm text-slate-400">Enter putts made</p>
+        <p className="text-sm text-slate-400">Sisesta sisse läinud putid</p>
       </div>
 
       {/* Score Display */}
@@ -51,7 +55,10 @@ export default function ScoreInput({ player, maxScore = 10, onSubmit, currentSco
         {Array.from({ length: maxScore + 1 }, (_, i) => (
           <button
             key={i}
-            onClick={() => handleQuickScore(i)}
+            onClick={(event) => {
+              handleQuickScore(i);
+              event.currentTarget.blur();
+            }}
             className={cn(
               "py-2 rounded-lg text-sm font-medium transition-all",
               score === i 
@@ -66,11 +73,14 @@ export default function ScoreInput({ player, maxScore = 10, onSubmit, currentSco
 
       {/* Submit Button */}
       <Button 
-        onClick={() => onSubmit(score)} 
+        onClick={() => {
+          onSubmit(score);
+          setScore(0);
+        }} 
         className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-lg font-semibold rounded-xl shadow-lg shadow-emerald-200"
       >
         <Check className="w-5 h-5 mr-2" />
-        Confirm Score
+        Kinnita tulemus
       </Button>
     </div>
   );

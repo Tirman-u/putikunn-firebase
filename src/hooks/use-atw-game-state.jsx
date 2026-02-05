@@ -39,7 +39,9 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       const games = await base44.entities.Game.filter({ id: gameId });
       return games[0];
     },
-    refetchInterval: false
+    refetchInterval: false,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true
   });
 
   const getLatestGame = useCallback(() => {
@@ -207,6 +209,10 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
   const handleSubmitPutts = useCallback((madePutts) => {
     lastActionRef.current = { type: madePutts === 0 ? 'missed' : 'made', at: Date.now() };
     const latestGame = getLatestGame();
+    if (!latestGame || latestGame.status === 'closed' || latestGame.join_closed === true) {
+      toast.error('Mäng on suletud');
+      return;
+    }
     const config = latestGame.atw_config;
     const playerState = { ...defaultPlayerState, ...(latestGame.atw_state?.[playerName] || {}) };
 
@@ -251,6 +257,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       total_putts: playerState.total_putts + discsPerTurn,
       current_distance_points: newDistancePoints,
       current_round_draft: { attempts: [], is_finalized: false },
+      attempts_count: playerState.attempts_count || 0,
       history: [...playerState.history, {
         turn_number: playerState.turns_played + 1,
         distance: currentDistance,
@@ -383,7 +390,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       return await base44.entities.LeaderboardEntry.create(payload);
     },
     onSuccess: () => {
-      toast.success('Result submitted to leaderboard!');
+      toast.success('Tulemus edetabelisse saadetud!');
     }
   });
 

@@ -109,6 +109,13 @@ export default function PuttingKingOverview() {
   const canStartNextRound = allMatchesFinished;
   const isTournamentFinished = tournament?.status === 'finished';
   const displayStatus = isTournamentFinished ? 'finished' : tournament?.status;
+  const displayStatusLabel = displayStatus === 'finished'
+    ? 'lõpetatud'
+    : displayStatus === 'active'
+    ? 'aktiivne'
+    : displayStatus === 'setup'
+    ? 'seadistus'
+    : displayStatus;
 
   const scoreMutation = useMutation({
     mutationFn: async ({ matchId, scoreData }) => {
@@ -167,7 +174,7 @@ export default function PuttingKingOverview() {
       // Bust logic
       if (newScore > tournament.target_score) {
         newScore = tournament.bust_reset_score;
-        toast.error(`Bust! Score reset to ${tournament.bust_reset_score}`);
+        toast.error(`Lõhki! Skoor taastati ${tournament.bust_reset_score} peale`);
       }
 
       const updateData = {
@@ -229,7 +236,7 @@ export default function PuttingKingOverview() {
       }
     }
 
-    toast.success('Match finished!');
+    toast.success('Mäng lõpetatud!');
   };
 
   const handleSuddenDeathWinner = async (winnerTeam) => {
@@ -293,7 +300,7 @@ export default function PuttingKingOverview() {
     onSuccess: () => {
       queryClient.invalidateQueries();
       setNewPlayerEmail('');
-      toast.success('Player added!');
+      toast.success('Mängija lisatud!');
     }
   });
 
@@ -301,7 +308,7 @@ export default function PuttingKingOverview() {
     mutationFn: (playerId) => base44.entities.PuttingKingPlayer.delete(playerId),
     onSuccess: () => {
       queryClient.invalidateQueries();
-      toast.success('Player removed');
+      toast.success('Mängija eemaldatud');
     }
   });
 
@@ -322,7 +329,7 @@ export default function PuttingKingOverview() {
 
       const minRequired = tournamentStations.length * 4;
       if (tournamentPlayers.length < minRequired) {
-        throw new Error(`Need at least ${minRequired} players (${tournamentStations.length} stations × 4 players)`);
+        throw new Error(`Vaja vähemalt ${minRequired} mängijat (${tournamentStations.length} jaama × 4 mängijat)`);
       }
 
       const playersPerStation = 4;
@@ -369,10 +376,10 @@ export default function PuttingKingOverview() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries();
-      toast.success('Tournament started!');
+      toast.success('Turniir alustatud!');
     },
     onError: (error) => {
-      toast.error(error.message || 'Failed to start tournament');
+      toast.error(error.message || 'Turniiri käivitamine ebaõnnestus');
     }
   });
 
@@ -479,7 +486,7 @@ export default function PuttingKingOverview() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries();
-      toast.success(`Round ${tournament.current_round + 1} started!`);
+      toast.success(`Ring ${tournament.current_round + 1} alustatud!`);
     }
     });
 
@@ -491,7 +498,7 @@ export default function PuttingKingOverview() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries();
-      toast.success('Tournament finished!');
+      toast.success('Turniir lõpetatud!');
     }
     });
 
@@ -520,7 +527,7 @@ export default function PuttingKingOverview() {
           className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Back</span>
+          <span className="font-medium">Tagasi</span>
         </button>
 
         <div className="text-center mb-8">
@@ -529,10 +536,10 @@ export default function PuttingKingOverview() {
             <div className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${
               displayStatus === 'finished' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
             }`}>
-              {displayStatus}
+              {displayStatusLabel}
             </div>
             <div className="inline-block px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold">
-              Round {tournament.current_round}
+              Ring {tournament.current_round}
             </div>
           </div>
 
@@ -540,7 +547,7 @@ export default function PuttingKingOverview() {
           {tournament.status === 'setup' ? (
             <div className="flex flex-col items-center gap-3">
               <div className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
-                Setup Mode - Add players to start
+                Seadistusrežiim – lisa mängijad alustamiseks
               </div>
               {canManage && (
                 <Button
@@ -549,7 +556,7 @@ export default function PuttingKingOverview() {
                   className="bg-purple-600 hover:bg-purple-700"
                 >
                   <Play className="w-4 h-4 mr-2" />
-                  {players.length < minPlayersRequired ? `Start Tournament (${players.length}/${minPlayersRequired} players)` : 'Start Tournament'}
+                  {players.length < minPlayersRequired ? `Alusta turniiri (${players.length}/${minPlayersRequired} mängijat)` : 'Alusta turniiri'}
                 </Button>
               )}
             </div>
@@ -562,7 +569,7 @@ export default function PuttingKingOverview() {
                   className="bg-purple-600 hover:bg-purple-700"
                 >
                   <Play className="w-4 h-4 mr-2" />
-                  Start Round {tournament.current_round + 1}
+                  Alusta ringi {tournament.current_round + 1}
                 </Button>
               )}
               {!isTournamentFinished && tournament.status === 'active' && (
@@ -573,12 +580,12 @@ export default function PuttingKingOverview() {
                   className="mt-2"
                 >
                   <Trophy className="w-4 h-4 mr-2" />
-                  Finish Tournament
+                  Lõpeta turniir
                 </Button>
               )}
               {isTournamentFinished && (
                 <div className="px-4 py-2 bg-amber-100 text-amber-700 rounded-full text-sm font-semibold">
-                  Tournament Complete!
+                  Turniir lõpetatud!
                 </div>
               )}
             </div>
@@ -586,19 +593,19 @@ export default function PuttingKingOverview() {
           
           {/* PIN Display */}
           <div className="flex items-center justify-center gap-2 mt-4">
-            <div className="text-sm text-slate-500">Tournament PIN:</div>
+            <div className="text-sm text-slate-500">Turniiri PIN:</div>
             <div className="px-4 py-2 bg-purple-100 rounded-lg">
               <div className="text-xl font-bold text-purple-700 tracking-wider">{tournament.pin}</div>
             </div>
             <Button
               onClick={() => {
                 navigator.clipboard.writeText(tournament.pin);
-                toast.success('PIN copied!');
+                toast.success('PIN kopeeritud!');
               }}
               variant="outline"
               size="sm"
             >
-              Copy
+              Kopeeri
             </Button>
           </div>
         </div>
@@ -609,18 +616,18 @@ export default function PuttingKingOverview() {
             {tournament.status === 'setup' ? (
               <>
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                  <h2 className="text-xl font-bold text-slate-800 mb-4">Tournament Setup</h2>
+                  <h2 className="text-xl font-bold text-slate-800 mb-4">Turniiri seadistus</h2>
                   <p className="text-slate-600 mb-4">
-                    Share the PIN with players to join, or add them manually below. 
-                    You need at least {minPlayersRequired} players ({stations.length} station{stations.length > 1 ? 's' : ''} × 4 players) to start the tournament.
+                    Jaga PIN-i mängijatega liitumiseks või lisa neid all käsitsi.
+                    Turniiri alustamiseks on vaja vähemalt {minPlayersRequired} mängijat ({stations.length} jaama × 4 mängijat).
                   </p>
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <Users className="w-5 h-5 text-blue-600" />
-                      <span className="font-semibold text-blue-800">Players: {players.length}</span>
+                      <span className="font-semibold text-blue-800">Mängijaid: {players.length}</span>
                     </div>
                     <div className="text-sm text-blue-600">
-                      {players.length < minPlayersRequired ? `Need ${minPlayersRequired - players.length} more player${minPlayersRequired - players.length > 1 ? 's' : ''}` : 'Ready to start!'}
+                      {players.length < minPlayersRequired ? `Vaja veel ${minPlayersRequired - players.length} mängijat` : 'Valmis alustama!'}
                     </div>
                   </div>
                 </div>
@@ -638,7 +645,7 @@ export default function PuttingKingOverview() {
               </>
             ) : (
               <>
-                <h2 className="text-xl font-bold text-slate-800">Stations</h2>
+                <h2 className="text-xl font-bold text-slate-800">Jaamad</h2>
             {stations.map(station => {
               const match = getStationMatch(station.id);
               const isActiveScoring = activeScoringMatchId === match?.id;
@@ -653,7 +660,10 @@ export default function PuttingKingOverview() {
                         match.status === 'finished' ? 'bg-amber-100 text-amber-700' :
                         'bg-slate-100 text-slate-600'
                       }`}>
-                        {match.status === 'finished' ? 'Finished' : match.status}
+                        {match.status === 'playing' ? 'Mängus' :
+                         match.status === 'ready' ? 'Valmis' :
+                         match.status === 'finished' ? 'Lõpetatud' :
+                         match.status}
                       </div>
                     )}
                   </div>
@@ -662,14 +672,14 @@ export default function PuttingKingOverview() {
                     <>
                       <div className="grid grid-cols-2 gap-3 mb-3">
                         <div className="p-3 bg-purple-50 rounded-xl">
-                          <div className="text-xs text-purple-600 font-semibold mb-1">Team A</div>
+                          <div className="text-xs text-purple-600 font-semibold mb-1">Tiim A</div>
                           {match.team_a_players.map(email => (
                             <div key={email} className="text-sm text-slate-800">{getPlayerName(email)}</div>
                           ))}
                           <div className="text-2xl font-bold text-purple-600 mt-2">{match.score_a}</div>
                         </div>
                         <div className="p-3 bg-blue-50 rounded-xl">
-                          <div className="text-xs text-blue-600 font-semibold mb-1">Team B</div>
+                          <div className="text-xs text-blue-600 font-semibold mb-1">Tiim B</div>
                           {match.team_b_players.map(email => (
                             <div key={email} className="text-sm text-slate-800">{getPlayerName(email)}</div>
                           ))}
@@ -692,7 +702,7 @@ export default function PuttingKingOverview() {
                             onClick={() => setActiveScoringMatchId(match.id)}
                             className="w-full bg-purple-600 hover:bg-purple-700"
                           >
-                            Score This Match
+                            Sisesta selle mängu skoor
                           </Button>
                         )
                       )}
@@ -700,7 +710,7 @@ export default function PuttingKingOverview() {
                       {match.status === 'finished' && (
                         <div className="space-y-2">
                           <div className="text-center py-2 text-sm text-slate-500">
-                            Winner: Team {match.winner_team}
+                            Võitja: Tiim {match.winner_team}
                           </div>
                           {canManage && (
                             <Button
@@ -717,7 +727,7 @@ export default function PuttingKingOverview() {
                               size="sm"
                               className="w-full"
                             >
-                              Edit Score
+                              Muuda skoori
                             </Button>
                           )}
                         </div>
@@ -725,7 +735,7 @@ export default function PuttingKingOverview() {
                     </>
                   ) : (
                     <div className="text-center py-8 text-slate-400">
-                      Waiting for players...
+                      Ootame mängijaid...
                     </div>
                   )}
                 </div>
@@ -735,7 +745,7 @@ export default function PuttingKingOverview() {
             {/* Match History */}
             {tournament.status !== 'setup' && (
               <div className="mt-6">
-                <h2 className="text-xl font-bold text-slate-800 mb-3">All Matches</h2>
+                <h2 className="text-xl font-bold text-slate-800 mb-3">Kõik mängud</h2>
               <div className="space-y-2">
                 {matches
                   .filter(m => m.tournament_id === tournament.id)
@@ -747,19 +757,22 @@ export default function PuttingKingOverview() {
                       <div key={match.id} className="bg-white rounded-lg p-3 shadow-sm border border-slate-200">
                         <div className="flex items-center justify-between mb-2">
                           <div className="text-sm font-semibold text-slate-700">
-                            {station?.name} - Round {match.round_number}
+                            {station?.name} - Ring {match.round_number}
                           </div>
                           <div className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                             match.status === 'finished' ? 'bg-amber-100 text-amber-700' :
                             match.status === 'playing' ? 'bg-green-100 text-green-700' :
                             'bg-blue-100 text-blue-700'
                           }`}>
-                            {match.status}
+                            {match.status === 'finished' ? 'Lõpetatud' :
+                             match.status === 'playing' ? 'Mängus' :
+                             match.status === 'ready' ? 'Valmis' :
+                             match.status}
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className={`p-2 rounded ${isWinner === 'A' ? 'bg-purple-100' : 'bg-slate-50'}`}>
-                            <div className="text-slate-600 mb-0.5">Team A</div>
+                            <div className="text-slate-600 mb-0.5">Tiim A</div>
                             <div className="font-semibold text-slate-700">
                               {match.team_a_players.map(e => getPlayerName(e)).join(', ')}
                             </div>
@@ -768,7 +781,7 @@ export default function PuttingKingOverview() {
                             </div>
                           </div>
                           <div className={`p-2 rounded ${isWinner === 'B' ? 'bg-blue-100' : 'bg-slate-50'}`}>
-                            <div className="text-slate-600 mb-0.5">Team B</div>
+                            <div className="text-slate-600 mb-0.5">Tiim B</div>
                             <div className="font-semibold text-slate-700">
                               {match.team_b_players.map(e => getPlayerName(e)).join(', ')}
                             </div>
@@ -792,12 +805,12 @@ export default function PuttingKingOverview() {
             {/* Add Player (Host Only) */}
             {canManage && (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                <h2 className="text-xl font-bold text-slate-800 mb-4">Add Player</h2>
+                <h2 className="text-xl font-bold text-slate-800 mb-4">Lisa mängija</h2>
                 <div className="flex gap-2 mb-2">
                   <Input
                     value={newPlayerEmail}
                     onChange={(e) => setNewPlayerEmail(e.target.value)}
-                    placeholder="Email or name"
+                    placeholder="E-post või nimi"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter' && newPlayerEmail.trim()) {
                         addPlayerMutation.mutate(newPlayerEmail);
@@ -811,20 +824,20 @@ export default function PuttingKingOverview() {
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-slate-500">Add players by email or name</p>
+                <p className="text-xs text-slate-500">Lisa mängijaid e-posti või nimega</p>
               </div>
             )}
 
             {/* Players List */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
               <h2 className="text-xl font-bold text-slate-800 mb-4">
-                Players ({players.length})
+                Mängijad ({players.length})
               </h2>
               <div className="space-y-2">
                 {players.length === 0 ? (
                   <div className="text-center py-8 text-slate-400">
                     <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No players yet</p>
+                    <p className="text-sm">Mängijaid veel pole</p>
                   </div>
                 ) : (
                   players.map((player) => {
@@ -836,11 +849,11 @@ export default function PuttingKingOverview() {
                         <div className="flex-1">
                           <div className="font-semibold text-slate-800">
                             {player.user_name}
-                            {isCurrentUser && <span className="ml-2 text-xs text-emerald-600">(You)</span>}
+                            {isCurrentUser && <span className="ml-2 text-xs text-emerald-600">(Sina)</span>}
                           </div>
                           {tournament.status !== 'setup' && (
                             <div className="text-xs text-slate-500">
-                              {player.wins}W-{player.losses}L • {player.tournament_points} pts
+                              {player.wins}V-{player.losses}K • {player.tournament_points} p
                             </div>
                           )}
                         </div>
@@ -864,7 +877,7 @@ export default function PuttingKingOverview() {
             {/* Leaderboard (Active Tournament) */}
             {tournament.status !== 'setup' && (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                <h2 className="text-xl font-bold text-slate-800 mb-4">Leaderboard</h2>
+                <h2 className="text-xl font-bold text-slate-800 mb-4">Edetabel</h2>
                               <div className="space-y-2">
                                 {leaderboard.map((player, idx) => (
                                   <div key={player.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors rounded-lg">
@@ -879,7 +892,7 @@ export default function PuttingKingOverview() {
                                     <div className="flex-1 min-w-0">
                                       <div className="font-semibold text-slate-800 truncate">{player.user_name}</div>
                                       <div className="text-xs text-slate-500">
-                                        {player.wins}W-{player.losses}L • {player.total_attempts > 0 ? ((player.total_made_putts / player.total_attempts) * 100).toFixed(0) : 0}%
+                                        {player.wins}V-{player.losses}K • {player.total_attempts > 0 ? ((player.total_made_putts / player.total_attempts) * 100).toFixed(0) : 0}%
                                       </div>
                                     </div>
                                     <div className="text-lg font-bold text-purple-600 flex-shrink-0">{player.tournament_points}</div>

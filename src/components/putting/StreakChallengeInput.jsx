@@ -28,11 +28,11 @@ export default function StreakChallengeInput({
 
   if (showDistanceSelector && !confirmed) {
     return (
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-4">
-        <h3 className="text-lg font-bold text-slate-800 mb-4">Select Distance</h3>
-        <div className="flex items-center justify-between mb-6">
-          <span className="text-sm text-slate-600">Distance</span>
-          <span className="text-3xl font-bold text-emerald-600">{selectedDistance}m</span>
+      <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-4">
+        <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-3 sm:mb-4">Vali distants</h3>
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <span className="text-xs sm:text-sm text-slate-600">Distants</span>
+          <span className="text-2xl sm:text-3xl font-bold text-emerald-600">{selectedDistance}m</span>
         </div>
         <Slider
           value={[selectedDistance || 8]}
@@ -40,51 +40,57 @@ export default function StreakChallengeInput({
           min={3}
           max={15}
           step={1}
-          className="mb-6"
+          className="mb-4 sm:mb-6"
         />
         <Button
           onClick={handleSelectDistance}
-          className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-base font-semibold"
+          className="w-full h-11 sm:h-12 bg-emerald-600 [@media(hover:hover)]:hover:bg-emerald-700 text-sm sm:text-base font-semibold"
         >
-          Start Streak at {selectedDistance}m
+          Alusta seeriat {selectedDistance}m
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Streak Display */}
       <motion.div
         animate={{ scale: currentStreak > 0 ? 1.05 : 1 }}
-        className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 border-2 border-amber-200 text-center"
+        className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-4 sm:p-6 border-2 border-amber-200 text-center"
       >
-        <div className="text-sm text-slate-600 mb-2">Current Streak</div>
-        <div className="text-5xl font-bold text-amber-600 mb-2">{currentStreak}</div>
-        <div className="text-sm text-slate-600">made putts in a row</div>
+        <div className="text-xs sm:text-sm text-slate-600 mb-2">Praegune seeria</div>
+        <div className="text-4xl sm:text-5xl font-bold text-amber-600 mb-2">{currentStreak}</div>
+        <div className="text-xs sm:text-sm text-slate-600">järjest sisse</div>
       </motion.div>
 
       {/* Distance Display */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-        <div className="text-xs text-slate-500 mb-1">Distance</div>
-        <div className="text-3xl font-bold text-slate-800">{currentDistance}m</div>
+      <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-slate-100">
+        <div className="text-[11px] sm:text-xs text-slate-500 mb-1">Distants</div>
+        <div className="text-2xl sm:text-3xl font-bold text-slate-800">{currentDistance}m</div>
       </div>
 
       {/* Make/Miss Buttons */}
-      <div className="space-y-3">
+      <div className="space-y-2 sm:space-y-3">
         <Button
-          onClick={onMade}
-          className="w-full h-16 bg-emerald-600 hover:bg-emerald-700 rounded-xl flex items-center justify-center gap-3 text-lg font-bold"
+          onClick={(event) => {
+            onMade();
+            event.currentTarget.blur();
+          }}
+          className="w-full h-14 sm:h-16 bg-emerald-600 [@media(hover:hover)]:hover:bg-emerald-700 rounded-xl flex items-center justify-center gap-3 text-base sm:text-lg font-bold"
         >
-          <Check className="w-6 h-6" />
-          Made
+          <Check className="w-5 h-5 sm:w-6 sm:h-6" />
+          Sees
         </Button>
         <Button
-            onClick={onMissed}
-            className="w-full h-16 bg-red-600 hover:bg-red-700 rounded-xl flex items-center justify-center gap-3 text-lg font-bold text-white"
+            onClick={(event) => {
+              onMissed();
+              event.currentTarget.blur();
+            }}
+            className="w-full h-14 sm:h-16 bg-red-600 [@media(hover:hover)]:hover:bg-red-700 rounded-xl flex items-center justify-center gap-3 text-base sm:text-lg font-bold text-white"
           >
-            <X className="w-6 h-6" />
-            Missed
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+            Mööda
           </Button>
       </div>
 
@@ -93,10 +99,10 @@ export default function StreakChallengeInput({
         <Button
           onClick={onUndo}
           variant="outline"
-          className="w-full h-12 rounded-xl flex items-center justify-center gap-2"
+          className="w-full h-11 sm:h-12 rounded-xl flex items-center justify-center gap-2 text-sm sm:text-base"
         >
           <Undo2 className="w-4 h-4" />
-          Undo Last Putt
+          Võta viimane tagasi
         </Button>
       )}
 
@@ -104,9 +110,9 @@ export default function StreakChallengeInput({
       {canUndo && (
         <Button
           onClick={onFinishTraining}
-          className="w-full h-12 bg-slate-600 hover:bg-slate-700 rounded-xl font-semibold"
+          className="w-full h-11 sm:h-12 bg-slate-600 [@media(hover:hover)]:hover:bg-slate-700 rounded-xl font-semibold text-sm sm:text-base"
         >
-          Finish Training
+          Lõpeta treening
         </Button>
       )}
       </div>

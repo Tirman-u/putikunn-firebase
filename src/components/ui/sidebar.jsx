@@ -237,7 +237,7 @@ const SidebarTrigger = React.forwardRef(({ className, onClick, asChild = false, 
       ) : (
         <>
           <PanelLeft />
-          <span className="sr-only">Toggle Sidebar</span>
+          <span className="sr-only">Lülita külgriba</span>
         </>
       )}
     </Button>)
@@ -252,10 +252,10 @@ const SidebarRail = React.forwardRef(({ className, ...props }, ref) => {
     (<button
       ref={ref}
       data-sidebar="rail"
-      aria-label="Toggle Sidebar"
+      aria-label="Lülita külgriba"
       tabIndex={-1}
       onClick={toggleSidebar}
-      title="Toggle Sidebar"
+      title="Lülita külgriba"
       className={cn(
         "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex",
         "[[data-side=left]_&]:cursor-w-resize [[data-side=right]_&]:cursor-e-resize",

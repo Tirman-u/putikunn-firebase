@@ -42,7 +42,7 @@ export default function GameResult() {
     queryFn: async () => {
       const games = await base44.entities.Game.filter({ id: gameId });
       const found = games?.[0];
-      if (!found) throw new Error('Game not found');
+      if (!found) throw new Error('Mängu ei leitud');
       return found;
     },
     enabled: !!gameId,
@@ -153,9 +153,9 @@ export default function GameResult() {
     },
     onSuccess: (result) => {
       if (result.updated) {
-        toast.success('Result submitted to leaderboard!');
+        toast.success('Tulemus edetabelisse saadetud!');
       } else {
-        toast.info(`Your best score (${result.existing}) is higher than this game`);
+        toast.info(`Sinu parim tulemus (${result.existing}) on sellest mängust kõrgem`);
       }
       setShowSubmitDialog(false);
     }
@@ -248,9 +248,9 @@ export default function GameResult() {
       const created = results.filter(r => r.action === 'created').length;
       const skipped = results.filter(r => r.action === 'skipped').length;
       
-      let message = 'Submitted to Discgolf.ee & General leaderboards';
+      let message = 'Discgolf.ee ja üldedetabelisse saadetud';
       if (updated > 0 || skipped > 0) {
-        message += ` (${created} new, ${updated} updated, ${skipped} skipped)`;
+        message += ` (${created} uusi, ${updated} uuendatud, ${skipped} vahele jäetud)`;
       }
       toast.success(message);
       setShowDiscgolfDialog(false);
@@ -265,8 +265,8 @@ export default function GameResult() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="text-slate-400 mb-4">Game not found</div>
-          <Button onClick={() => navigate(-1)}>Go Back</Button>
+          <div className="text-slate-400 mb-4">Mängu ei leitud</div>
+          <Button onClick={() => navigate(-1)}>Tagasi</Button>
         </div>
       </div>
     );
@@ -300,7 +300,10 @@ export default function GameResult() {
 
   const gameType = game.game_type || 'classic';
   const gameFormat = GAME_FORMATS[gameType];
+  const isHostedGame = Boolean(game.pin && game.pin !== '0000');
   const canSubmitDgForGame = canSubmitDiscgolf && isHostedClassicGame(game);
+  const canAdminSubmit = ['trainer', 'admin', 'super_admin'].includes(userRole);
+  const canSubmitGeneral = !isHostedGame || user?.email === game?.host_user || canAdminSubmit;
   const canDelete = ['admin', 'super_admin'].includes(userRole) || user?.email === game?.host_user;
 
   // Calculate statistics for each player
@@ -334,8 +337,8 @@ export default function GameResult() {
   }).sort((a, b) => b.totalPoints - a.totalPoints);
 
   const handleShare = async () => {
-    const shareText = `${game.name} - ${gameFormat.name}\n\nResults:\n${playerStats.map(p => 
-      `${p.name}: ${p.totalPoints} pts (${p.puttingPercentage}%)`
+    const shareText = `${game.name} - ${gameFormat.name}\n\nTulemused:\n${playerStats.map(p => 
+      `${p.name}: ${p.totalPoints} punkti (${p.puttingPercentage}%)`
     ).join('\n')}`;
     
     try {
@@ -343,21 +346,21 @@ export default function GameResult() {
         await navigator.share({ text: shareText });
       } else {
         await navigator.clipboard.writeText(shareText);
-        alert('Results copied to clipboard!');
+        alert('Tulemused kopeeriti lõikelauale!');
       }
     } catch (error) {
       // Fallback to clipboard if share fails
       try {
         await navigator.clipboard.writeText(shareText);
-        alert('Results copied to clipboard!');
+        alert('Tulemused kopeeriti lõikelauale!');
       } catch {
-        alert('Unable to share. Please copy manually.');
+        alert('Jagamine ebaõnnestus. Palun kopeeri käsitsi.');
       }
     }
   };
 
   const handleDelete = () => {
-    if (confirm('Delete this game? This cannot be undone.')) {
+    if (confirm('Kas kustutame selle mängu? Seda ei saa tagasi võtta.')) {
       deleteGameMutation.mutate(game.id);
     }
   };
@@ -386,7 +389,7 @@ export default function GameResult() {
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back</span>
+            <span className="font-medium">Tagasi</span>
           </button>
           <h1 className="text-2xl font-bold text-slate-800">{game.name}</h1>
           <div className="w-16" />
@@ -396,17 +399,17 @@ export default function GameResult() {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <div className="text-sm text-slate-500 mb-1">Format</div>
+              <div className="text-sm text-slate-500 mb-1">Formaat</div>
               <div className="font-bold text-slate-800">{gameFormat.name}</div>
               <div className="text-xs text-slate-500">{gameFormat.minDistance}m - {gameFormat.maxDistance}m</div>
             </div>
             <div>
               <div className="text-sm text-slate-500 mb-1 flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
-                Date
+                Kuupäev
               </div>
               <div className="font-bold text-slate-800">
-                {game.date ? formatDate(new Date(game.date), 'MMM d, yyyy') : 'No date'}
+                {game.date ? formatDate(new Date(game.date), 'MMM d, yyyy') : 'Kuupäev puudub'}
               </div>
             </div>
           </div>
@@ -414,24 +417,24 @@ export default function GameResult() {
             <div className="flex gap-3">
               <Button onClick={handleShare} variant="outline" className="flex-1">
                 <Share2 className="w-4 h-4 mr-2" />
-                Share Results
+                Jaga tulemusi
               </Button>
               {canDelete && (
                 <Button onClick={handleDelete} variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
                   <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
+                  Kustuta
                 </Button>
               )}
             </div>
             <div className="flex gap-3">
-              {!isSoloATW && (
+              {!isSoloATW && canSubmitGeneral && (
                 <Button 
                   onClick={() => submitToLeaderboardMutation.mutate()}
                   disabled={submitToLeaderboardMutation.isPending || isSubmittedToLeaderboard}
                   className={isSubmittedToLeaderboard ? "flex-1 bg-slate-400" : "flex-1 bg-emerald-600 hover:bg-emerald-700"}
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  {isSubmittedToLeaderboard ? 'Submitted' : 'Submit to Leaderboard'}
+                  {isSubmittedToLeaderboard ? 'Saadetud' : 'Saada edetabelisse'}
                 </Button>
               )}
               {canSubmitDgForGame && (
@@ -441,7 +444,7 @@ export default function GameResult() {
                   className={isSubmittedToDgEe ? "flex-1 bg-slate-400" : "flex-1 bg-blue-600 hover:bg-blue-700"}
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  {isSubmittedToDgEe ? 'Submitted' : 'Submit to Discgolf.ee'}
+                  {isSubmittedToDgEe ? 'Saadetud' : 'Saada Discgolf.ee-sse'}
                 </Button>
               )}
             </div>
@@ -461,13 +464,13 @@ export default function GameResult() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="text-left p-4 font-semibold text-slate-700 bg-slate-50 sticky left-0 z-10">Player</th>
+                    <th className="text-left p-4 font-semibold text-slate-700 bg-slate-50 sticky left-0 z-10">Mängija</th>
                     {[...Array(20)].map((_, i) => (
                       <th key={i} className="text-center p-2 font-semibold text-slate-700 bg-slate-50 text-sm min-w-[60px]">
                         {i + 1}
                       </th>
                     ))}
-                    <th className="text-center p-4 font-semibold text-slate-700 bg-slate-50 sticky right-0 z-10">Total</th>
+                    <th className="text-center p-4 font-semibold text-slate-700 bg-slate-50 sticky right-0 z-10">Kokku</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -519,13 +522,13 @@ export default function GameResult() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="text-left p-4 font-semibold text-slate-700 bg-slate-50 sticky left-0 z-10">Player</th>
+                    <th className="text-left p-4 font-semibold text-slate-700 bg-slate-50 sticky left-0 z-10">Mängija</th>
                     {[...Array(20)].map((_, i) => (
                       <th key={i} className="text-center p-2 font-semibold text-slate-700 bg-slate-50 text-sm min-w-[60px]">
                         {i + 1}
                       </th>
                     ))}
-                    <th className="text-center p-4 font-semibold text-slate-700 bg-slate-50 sticky right-0 z-10">Total</th>
+                    <th className="text-center p-4 font-semibold text-slate-700 bg-slate-50 sticky right-0 z-10">Kokku</th>
                   </tr>
                 </thead>
                 <tbody>

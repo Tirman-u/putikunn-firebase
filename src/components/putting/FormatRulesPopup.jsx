@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { HelpCircle } from 'lucide-react';
 import {
   Dialog,
@@ -10,68 +10,68 @@ import {
 
 const FORMAT_RULES = {
   classic: {
-    title: 'Classic Rules',
+    title: 'Classic reeglid',
     range: '5m - 10m',
     start: '10m',
     rules: [
-      'Start at 10m, throw 5 discs',
-      'Based on makes, next distance:',
-      '0 makes → 5m',
-      '1 make → 6m',
-      '2 makes → 7m',
-      '3 makes → 8m',
-      '4 makes → 9m',
-      '5 makes → 10m',
-      'Points = distance × makes',
-      'Play 20 rounds (100 putts total)'
+      'Alusta 10m pealt, viska 5 ketast',
+      'Sees puttide põhjal järgmine distants:',
+      '0 sees → 5m',
+      '1 sees → 6m',
+      '2 sees → 7m',
+      '3 sees → 8m',
+      '4 sees → 9m',
+      '5 sees → 10m',
+      'Punktid = distants × sees',
+      'Mängi 20 ringi (kokku 100 putti)'
     ]
   },
   short: {
-    title: 'Short Rules',
+    title: 'Short reeglid',
     range: '3m - 8m',
     start: '8m',
     rules: [
-      'Start at 8m, throw 5 discs',
-      'Based on makes, next distance:',
-      '0 makes → 3m',
-      '1 make → 4m',
-      '2 makes → 5m',
-      '3 makes → 6m',
-      '4 makes → 7m',
-      '5 makes → 8m',
-      'Points = distance × makes',
-      'Play 20 rounds (100 putts total)'
+      'Alusta 8m pealt, viska 5 ketast',
+      'Sees puttide põhjal järgmine distants:',
+      '0 sees → 3m',
+      '1 sees → 4m',
+      '2 sees → 5m',
+      '3 sees → 6m',
+      '4 sees → 7m',
+      '5 sees → 8m',
+      'Punktid = distants × sees',
+      'Mängi 20 ringi (kokku 100 putti)'
     ]
   },
   long: {
-    title: 'Long Rules',
+    title: 'Long reeglid',
     range: '10m - 15m',
     start: '15m',
     rules: [
-      'Start at 15m, throw 5 discs',
-      'Based on makes, next distance:',
-      '0 makes → 10m',
-      '1 make → 11m',
-      '2 makes → 12m',
-      '3 makes → 13m',
-      '4 makes → 14m',
-      '5 makes → 15m',
-      'Points = distance × makes',
-      'Play 20 rounds (100 putts total)'
+      'Alusta 15m pealt, viska 5 ketast',
+      'Sees puttide põhjal järgmine distants:',
+      '0 sees → 10m',
+      '1 sees → 11m',
+      '2 sees → 12m',
+      '3 sees → 13m',
+      '4 sees → 14m',
+      '5 sees → 15m',
+      'Punktid = distants × sees',
+      'Mängi 20 ringi (kokku 100 putti)'
     ]
   },
   back_and_forth: {
-    title: 'Back & Forth Rules',
+    title: 'Back & Forth reeglid',
     range: '5m - 10m',
     start: '5m',
     rules: [
-      'Start at 5m, throw 1 disc at a time',
-      'If made → distance +1m',
-      'If missed → distance -1m',
-      'Distance stays between 5m-10m',
-      'Each made putt scores its distance',
-      'Example: make from 7m = 7 points',
-      'Play 20 rounds (100 putts total)'
+      'Alusta 5m pealt, viska 1 ketas korraga',
+      'Sees → distants +1m',
+      'Mööda → distants -1m',
+      'Distants jääb 5–10m vahele',
+      'Iga sees putt annab oma distantsi punktid',
+      'Näide: 7m pealt sees = 7 punkti',
+      'Mängi 20 ringi (kokku 100 putti)'
     ]
   }
 };
@@ -90,7 +90,7 @@ export default function FormatRulesPopup({ format }) {
         <DialogHeader>
           <DialogTitle className="text-xl">{rules.title}</DialogTitle>
           <div className="text-sm text-slate-500">
-            Range: {rules.range} • Start: {rules.start}
+            Vahemik: {rules.range} • Algus: {rules.start}
           </div>
         </DialogHeader>
         <ul className="space-y-2 text-sm text-slate-700 mt-4">

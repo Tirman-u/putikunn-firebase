@@ -54,17 +54,17 @@ export default function PuttingKingScoring() {
 
         if (isShortestDistance) {
           newScore -= 1;
-          toast.info('Missed the shortest! -1');
+          toast.info('Lühim mööda! -1');
         } else if (isFarthestDistance) {
           newScore += 1;
-          toast.success('Good effort from far away! +1');
+          toast.success('Hea katse kaugelt! +1');
         }
       }
 
       // Bust logic
       if (newScore > tournament.target_score) {
         newScore = tournament.bust_reset_score;
-        toast.error(`Bust! Score reset to ${tournament.bust_reset_score}`);
+        toast.error(`Lõhki! Skoor taastati ${tournament.bust_reset_score} peale`);
       }
 
       // Update match
@@ -121,7 +121,7 @@ export default function PuttingKingScoring() {
       }
     }
 
-    toast.success('Match finished!');
+    toast.success('Mäng lõpetatud!');
     setTimeout(() => navigate(-1), 1500);
   };
 
@@ -141,9 +141,9 @@ export default function PuttingKingScoring() {
           <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-16 h-16 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Match Finished!</h1>
-          <p className="text-slate-600 mb-6">Winner: Team {match.winner_team}</p>
-          <Button onClick={() => navigate(-1)}>Back to Overview</Button>
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Mäng lõpetatud!</h1>
+          <p className="text-slate-600 mb-6">Võitja: Tiim {match.winner_team}</p>
+          <Button onClick={() => navigate(-1)}>Tagasi ülevaatesse</Button>
         </div>
       </div>
     );
@@ -159,7 +159,7 @@ export default function PuttingKingScoring() {
           className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Back</span>
+          <span className="font-medium">Tagasi</span>
         </button>
 
         {/* Team Cards with Integrated Scoring */}
@@ -167,7 +167,7 @@ export default function PuttingKingScoring() {
           {/* Team A */}
           <div className="bg-white rounded-2xl shadow-sm border-2 border-purple-300 overflow-hidden">
             <div className="bg-purple-500 text-white p-4 text-center">
-              <div className="text-xs font-semibold mb-1 opacity-90">Team A</div>
+              <div className="text-xs font-semibold mb-1 opacity-90">Tiim A</div>
               <div className="text-4xl font-bold mb-2">{match.score_a}</div>
               {match.team_a_players.map(email => (
                 <div key={email} className="text-xs opacity-90">{getPlayerName(email)}</div>
@@ -177,7 +177,7 @@ export default function PuttingKingScoring() {
               {distances.map(distance => (
                 <div key={distance.id} className="flex items-center gap-2">
                   <div className="flex-1 font-medium text-slate-700 text-sm">
-                    {distance.label} ({distance.points}pts)
+                    {distance.label} ({distance.points} p)
                   </div>
                   <Button
                     onClick={() => scoreMutation.mutate({ team: 'A', distance, made: true })}
@@ -185,7 +185,7 @@ export default function PuttingKingScoring() {
                     className="bg-green-600 hover:bg-green-700 flex-1"
                     disabled={scoreMutation.isPending}
                   >
-                    Made
+                    Sees
                   </Button>
                   <Button
                     onClick={() => scoreMutation.mutate({ team: 'A', distance, made: false })}
@@ -194,7 +194,7 @@ export default function PuttingKingScoring() {
                     className="flex-1"
                     disabled={scoreMutation.isPending}
                   >
-                    Miss
+                    Mööda
                   </Button>
                 </div>
               ))}
@@ -204,7 +204,7 @@ export default function PuttingKingScoring() {
           {/* Team B */}
           <div className="bg-white rounded-2xl shadow-sm border-2 border-blue-300 overflow-hidden">
             <div className="bg-blue-500 text-white p-4 text-center">
-              <div className="text-xs font-semibold mb-1 opacity-90">Team B</div>
+              <div className="text-xs font-semibold mb-1 opacity-90">Tiim B</div>
               <div className="text-4xl font-bold mb-2">{match.score_b}</div>
               {match.team_b_players.map(email => (
                 <div key={email} className="text-xs opacity-90">{getPlayerName(email)}</div>
@@ -214,7 +214,7 @@ export default function PuttingKingScoring() {
               {distances.map(distance => (
                 <div key={distance.id} className="flex items-center gap-2">
                   <div className="flex-1 font-medium text-slate-700 text-sm">
-                    {distance.label} ({distance.points}pts)
+                    {distance.label} ({distance.points} p)
                   </div>
                   <Button
                     onClick={() => scoreMutation.mutate({ team: 'B', distance, made: true })}
@@ -222,7 +222,7 @@ export default function PuttingKingScoring() {
                     className="bg-green-600 hover:bg-green-700 flex-1"
                     disabled={scoreMutation.isPending}
                   >
-                    Made
+                    Sees
                   </Button>
                   <Button
                     onClick={() => scoreMutation.mutate({ team: 'B', distance, made: false })}
@@ -231,7 +231,7 @@ export default function PuttingKingScoring() {
                     className="flex-1"
                     disabled={scoreMutation.isPending}
                   >
-                    Miss
+                    Mööda
                   </Button>
                 </div>
               ))}

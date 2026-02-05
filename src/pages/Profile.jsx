@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Camera, Trophy, Target, TrendingUp, Edit2, Save, X, Award, ExternalLink, Filter } from 'lucide-react';
+import { ArrowLeft, Camera, Trophy, Target, TrendingUp, Edit2, Save, X, Award, ExternalLink } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
@@ -88,7 +88,7 @@ export default function Profile() {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       setEditData({ ...editData, profile_picture: file_url });
     } catch (error) {
-      alert('Failed to upload image');
+      alert('Pildi üleslaadimine ebaõnnestus');
     } finally {
       setUploading(false);
     }
@@ -272,9 +272,9 @@ export default function Profile() {
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back</span>
+            <span className="font-medium">Tagasi</span>
           </button>
-          <h1 className="text-2xl font-bold text-slate-800">My Profile</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Minu profiil</h1>
           <div className="w-16" />
         </div>
 
@@ -303,14 +303,14 @@ export default function Profile() {
                 <p className="text-slate-500">{user.email}</p>
                 {user.gender && (
                   <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-semibold mt-1">
-                    {user.gender === 'M' ? 'Male' : 'Female'}
+                    {user.gender === 'M' ? 'Mees' : 'Naine'}
                   </span>
                 )}
                 {user.bio && <p className="text-slate-600 mt-2">{user.bio}</p>}
               </div>
               <Button onClick={handleEdit} variant="outline" size="sm">
                 <Edit2 className="w-4 h-4 mr-2" />
-                Edit
+                Muuda
               </Button>
             </div>
           ) : (
@@ -320,7 +320,7 @@ export default function Profile() {
                   {editData.profile_picture ? (
                     <img 
                       src={editData.profile_picture} 
-                      alt="Profile"
+                      alt="Profiil"
                       className="w-20 h-20 rounded-full object-cover border-2 border-emerald-100"
                     />
                   ) : (
@@ -335,7 +335,7 @@ export default function Profile() {
                   </div>
                   <div className="flex-1 space-y-3">
                   <div>
-                   <label className="text-sm text-slate-600 mb-1 block">Display Name</label>
+                   <label className="text-sm text-slate-600 mb-1 block">Kuvatav nimi</label>
                    <Input 
                      value={editData.display_name}
                      onChange={(e) => setEditData({ ...editData, display_name: e.target.value })}
@@ -343,27 +343,27 @@ export default function Profile() {
                    />
                   </div>
                   <div>
-                    <label className="text-sm text-slate-600 mb-1 block">Gender</label>
+                    <label className="text-sm text-slate-600 mb-1 block">Sugu</label>
                     <Select 
                       value={editData.gender || 'none'}
                       onValueChange={(value) => setEditData({ ...editData, gender: value === 'none' ? '' : value })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select gender" />
+                        <SelectValue placeholder="Vali sugu" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">Not specified</SelectItem>
-                        <SelectItem value="M">Male</SelectItem>
-                        <SelectItem value="N">Female</SelectItem>
+                        <SelectItem value="none">Määramata</SelectItem>
+                        <SelectItem value="M">Mees</SelectItem>
+                        <SelectItem value="N">Naine</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <label className="text-sm text-slate-600 mb-1 block">Bio</label>
+                    <label className="text-sm text-slate-600 mb-1 block">Tutvustus</label>
                     <Textarea 
                       value={editData.bio}
                       onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
-                      placeholder="Tell us about yourself..."
+                      placeholder="Kirjelda ennast..."
                       rows={3}
                     />
                   </div>
@@ -372,11 +372,11 @@ export default function Profile() {
               <div className="flex gap-3">
                 <Button onClick={handleSave} disabled={uploading || updateUserMutation.isPending}>
                   <Save className="w-4 h-4 mr-2" />
-                  Save
+                  Salvesta
                 </Button>
                 <Button onClick={() => setIsEditing(false)} variant="outline">
                   <X className="w-4 h-4 mr-2" />
-                  Cancel
+                  Tühista
                 </Button>
               </div>
             </div>
@@ -388,7 +388,7 @@ export default function Profile() {
            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
              <div className="flex items-center gap-2 mb-2">
                <Trophy className="w-5 h-5 text-emerald-600" />
-               <span className="text-sm text-slate-500">Games</span>
+               <span className="text-sm text-slate-500">Mängud</span>
              </div>
              <div className="text-2xl font-bold text-slate-800">{totalGames}</div>
            </div>
@@ -396,7 +396,7 @@ export default function Profile() {
              <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
                <div className="flex items-center gap-2 mb-2">
                  <Trophy className="w-5 h-5 text-emerald-600" />
-                 <span className="text-sm text-slate-500">ATW Laps</span>
+                 <span className="text-sm text-slate-500">ATW ringe</span>
                </div>
                <div className="text-2xl font-bold text-emerald-600">{atwStats.totalLaps}</div>
              </div>
@@ -404,21 +404,21 @@ export default function Profile() {
            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
              <div className="flex items-center gap-2 mb-2">
                <Target className="w-5 h-5 text-emerald-600" />
-               <span className="text-sm text-slate-500">Accuracy</span>
+               <span className="text-sm text-slate-500">Täpsus</span>
              </div>
              <div className="text-2xl font-bold text-slate-800">{puttingPercentage}%</div>
            </div>
            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
              <div className="flex items-center gap-2 mb-2">
                <TrendingUp className="w-5 h-5 text-emerald-600" />
-               <span className="text-sm text-slate-500">Avg Score</span>
+               <span className="text-sm text-slate-500">Keskmine skoor</span>
              </div>
              <div className="text-2xl font-bold text-slate-800">{avgScore}</div>
            </div>
            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
              <div className="flex items-center gap-2 mb-2">
                <Trophy className="w-5 h-5 text-amber-500" />
-               <span className="text-sm text-slate-500">Best Score</span>
+               <span className="text-sm text-slate-500">Parim skoor</span>
              </div>
              <div className="text-2xl font-bold text-slate-800">{bestScore}</div>
            </div>
@@ -428,16 +428,16 @@ export default function Profile() {
          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
             <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-500" />
-              Best Scores by Format
+              Parimad skoorid formaadi järgi
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
-                { key: 'classic', label: 'Classic', unit: 'pts' },
-                { key: 'short', label: 'Short', unit: 'pts' },
-                { key: 'long', label: 'Long', unit: 'pts' },
-                { key: 'back_and_forth', label: 'Back & Forth', unit: 'pts' },
-                { key: 'streak_challenge', label: 'Streak', unit: 'putts' },
-                { key: 'random_distance', label: 'Random', unit: 'pts' }
+                { key: 'classic', label: 'Classic', unit: 'p' },
+                { key: 'short', label: 'Short', unit: 'p' },
+                { key: 'long', label: 'Long', unit: 'p' },
+                { key: 'back_and_forth', label: 'Back & Forth', unit: 'p' },
+                { key: 'streak_challenge', label: 'Streak', unit: 'putti' },
+                { key: 'random_distance', label: 'Random', unit: 'p' }
               ].map((format) => (
                 <div key={format.key} className="p-3 bg-gradient-to-br from-amber-50 to-emerald-50 rounded-xl border border-amber-100">
                   <div className="text-xs font-semibold text-slate-600 mb-1">{format.label}</div>
@@ -450,15 +450,15 @@ export default function Profile() {
               
               {/* Around The World with all difficulties */}
               <div className="p-3 bg-gradient-to-br from-amber-50 to-emerald-50 rounded-xl border border-amber-100">
-                <div className="text-xs font-semibold text-slate-600 mb-1">Around The World</div>
+                <div className="text-xs font-semibold text-slate-600 mb-1">ATW</div>
                 <div className="space-y-1">
                   {Object.entries(atwStatsByDifficulty).map(([difficulty, score]) => {
                     const labels = {
-                      easy: 'Easy',
-                      medium: 'Med',
-                      hard: 'Hard',
+                      easy: 'Lihtne',
+                      medium: 'Kesk',
+                      hard: 'Raske',
                       ultra_hard: 'Ultra',
-                      impossible: 'Imp'
+                      impossible: 'Võimatu'
                     };
                     if (score === 0) return null;
                     return (
@@ -470,7 +470,7 @@ export default function Profile() {
                   })}
                   {Object.values(atwStatsByDifficulty).every(s => s === 0) && (
                     <div className="text-2xl font-bold text-emerald-600">
-                      0<span className="text-xs ml-1 text-slate-500">pts</span>
+                      0<span className="text-xs ml-1 text-slate-500">p</span>
                     </div>
                   )}
                 </div>
@@ -482,20 +482,20 @@ export default function Profile() {
          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
             <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
               <Target className="w-5 h-5" />
-              Putt Style Performance
+              Puti stiili statistika
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {['regular', 'straddle', 'turbo'].map((style) => {
                 const stats = puttTypeStats[style];
                 const accuracy = stats.total > 0 ? ((stats.made / stats.total) * 100).toFixed(1) : 0;
-                const styleName = style === 'regular' ? 'Regular' : style === 'straddle' ? 'Straddle' : 'Turbo';
+                const styleName = style === 'regular' ? 'Tavaline' : style === 'straddle' ? 'Straddle' : 'Turbo';
                 return (
                   <div key={style} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="text-sm font-semibold text-slate-700 mb-2">{styleName}</div>
                     <div className="text-2xl font-bold text-emerald-600 mb-1">{stats.score}</div>
-                    <div className="text-xs text-slate-500 mb-2">Best: {stats.count} games</div>
+                    <div className="text-xs text-slate-500 mb-2">Parim: {stats.count} mängu</div>
                     <div className="text-xs text-slate-600">
-                      {stats.total > 0 ? `${accuracy}% (${stats.made}/${stats.total})` : 'No games'}
+                      {stats.total > 0 ? `${accuracy}% (${stats.made}/${stats.total})` : 'Mänge pole'}
                     </div>
                   </div>
                 );
@@ -507,32 +507,32 @@ export default function Profile() {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
           <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
             <Target className="w-5 h-5" />
-            Performance Analysis
+            Soorituse analüüs
           </h2>
           
           {sweetSpot && (
             <div className="mb-4 p-4 bg-emerald-50 rounded-xl">
-              <div className="text-sm text-emerald-700 font-semibold mb-1">Sweet Spot</div>
+              <div className="text-sm text-emerald-700 font-semibold mb-1">Parim tsoon</div>
               <div className="text-2xl font-bold text-emerald-600">
                 {sweetSpot.distance}m • {sweetSpot.percentage}%
               </div>
-              <div className="text-xs text-emerald-600">{sweetSpot.attempts} attempts</div>
+              <div className="text-xs text-emerald-600">{sweetSpot.attempts} katset</div>
             </div>
           )}
 
           {challengeArea && (
             <div className="mb-4 p-4 bg-amber-50 rounded-xl">
-              <div className="text-sm text-amber-700 font-semibold mb-1">Challenge Area</div>
+              <div className="text-sm text-amber-700 font-semibold mb-1">Väljakutse tsoon</div>
               <div className="text-2xl font-bold text-amber-600">
                 {challengeArea.distance}m • {challengeArea.percentage}%
               </div>
-              <div className="text-xs text-amber-600">{challengeArea.attempts} attempts</div>
+              <div className="text-xs text-amber-600">{challengeArea.attempts} katset</div>
             </div>
           )}
 
           {/* Distance Breakdown */}
           <div>
-            <div className="text-sm font-semibold text-slate-700 mb-2">Distance Performance</div>
+            <div className="text-sm font-semibold text-slate-700 mb-2">Distantstulemused</div>
             <div className="space-y-2">
               {distancePercentages.map((stat) => (
                 <div key={stat.distance} className="flex items-center gap-3">
@@ -557,15 +557,15 @@ export default function Profile() {
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
             <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
               <Award className="w-5 h-5" />
-              Group Game Stats
+              Grupimängude statistika
             </h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-slate-50 rounded-xl">
-                <div className="text-sm text-slate-500 mb-1">Average Score</div>
+                <div className="text-sm text-slate-500 mb-1">Keskmine skoor</div>
                 <div className="text-3xl font-bold text-slate-700">{avgGroupScore}</div>
               </div>
               <div className="p-4 bg-slate-50 rounded-xl">
-                <div className="text-sm text-slate-500 mb-1">Best Score</div>
+                <div className="text-sm text-slate-500 mb-1">Parim skoor</div>
                 <div className="text-3xl font-bold text-emerald-600">{bestScore}</div>
               </div>
             </div>
@@ -577,17 +577,17 @@ export default function Profile() {
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
             <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
               <Trophy className="w-5 h-5 text-purple-600" />
-              Tournament Results
+              Turniiri tulemused
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="text-left py-3 px-2 text-slate-600 font-semibold">Tournament</th>
-                    <th className="text-center py-3 px-2 text-slate-600 font-semibold">Wins</th>
-                    <th className="text-center py-3 px-2 text-slate-600 font-semibold">Losses</th>
-                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Points</th>
-                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Accuracy</th>
+                    <th className="text-left py-3 px-2 text-slate-600 font-semibold">Turniir</th>
+                    <th className="text-center py-3 px-2 text-slate-600 font-semibold">Võidud</th>
+                    <th className="text-center py-3 px-2 text-slate-600 font-semibold">Kaotused</th>
+                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Punktid</th>
+                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Täpsus</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -600,7 +600,7 @@ export default function Profile() {
                     return (
                       <tr key={player.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="py-3 px-2 font-medium text-slate-700">
-                          {tournament?.name || 'Unknown'}
+                          {tournament?.name || 'Teadmata'}
                         </td>
                         <td className="py-3 px-2 text-center text-slate-700 font-semibold">
                           {player.wins}
@@ -629,14 +629,14 @@ export default function Profile() {
         {/* Game History with Filters */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-4">
-             <h3 className="text-lg font-bold text-slate-800">Game History</h3>
+             <h3 className="text-lg font-bold text-slate-800">Mängude ajalugu</h3>
              <div className="flex flex-wrap gap-2">
                <Select value={filterFormat} onValueChange={() => { setFilterFormat(arguments[0]); setCurrentPage(1); }}>
                  <SelectTrigger className="w-32">
                    <SelectValue />
                  </SelectTrigger>
                  <SelectContent>
-                   <SelectItem value="all">All Formats</SelectItem>
+                   <SelectItem value="all">Kõik formaadid</SelectItem>
                    <SelectItem value="classic">Classic</SelectItem>
                    <SelectItem value="short">Short</SelectItem>
                    <SelectItem value="long">Long</SelectItem>
@@ -651,8 +651,8 @@ export default function Profile() {
                    <SelectValue />
                  </SelectTrigger>
                  <SelectContent>
-                   <SelectItem value="all">All Styles</SelectItem>
-                   <SelectItem value="regular">Regular</SelectItem>
+                   <SelectItem value="all">Kõik stiilid</SelectItem>
+                   <SelectItem value="regular">Tavaline</SelectItem>
                    <SelectItem value="straddle">Straddle</SelectItem>
                    <SelectItem value="turbo">Turbo</SelectItem>
                  </SelectContent>
@@ -662,29 +662,29 @@ export default function Profile() {
                    <SelectValue />
                  </SelectTrigger>
                  <SelectContent>
-                   <SelectItem value="date">Date</SelectItem>
-                   <SelectItem value="score">Score</SelectItem>
-                   <SelectItem value="format">Format</SelectItem>
+                   <SelectItem value="date">Kuupäev</SelectItem>
+                   <SelectItem value="score">Skoor</SelectItem>
+                   <SelectItem value="format">Formaat</SelectItem>
                  </SelectContent>
                </Select>
              </div>
            </div>
 
           {filteredGames.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">No games found</div>
+            <div className="text-center py-8 text-slate-400">Mänge ei leitud</div>
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                      <tr className="border-b border-slate-200">
-                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Game</th>
-                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Date</th>
-                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Format</th>
-                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Style</th>
-                       <th className="text-right py-3 px-2 text-slate-600 font-semibold">Score</th>
+                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Mäng</th>
+                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Kuupäev</th>
+                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Formaat</th>
+                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Stiil</th>
+                       <th className="text-right py-3 px-2 text-slate-600 font-semibold">Skoor</th>
                        <th className="text-right py-3 px-2 text-slate-600 font-semibold">%</th>
-                       <th className="text-center py-3 px-2 text-slate-600 font-semibold">Status</th>
+                       <th className="text-center py-3 px-2 text-slate-600 font-semibold">Staatus</th>
                        <th className="text-center py-3 px-2 text-slate-600 font-semibold"></th>
                      </tr>
                    </thead>
@@ -709,7 +709,7 @@ export default function Profile() {
                            </td>
                            <td className="py-3 px-2">
                              <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                               {game.putt_type === 'regular' ? 'Regular' : game.putt_type === 'straddle' ? 'Straddle' : 'Turbo'}
+                               {game.putt_type === 'regular' ? 'Tavaline' : game.putt_type === 'straddle' ? 'Straddle' : 'Turbo'}
                              </span>
                            </td>
                            <td className="py-3 px-2 text-right font-bold text-emerald-600">
@@ -724,7 +724,7 @@ export default function Profile() {
                                  ? 'bg-amber-100 text-amber-700' 
                                  : 'bg-slate-100 text-slate-600'
                              }`}>
-                               {game.status === 'active' ? 'In Progress' : 'Completed'}
+                               {game.status === 'active' ? 'Käimas' : 'Lõpetatud'}
                              </span>
                            </td>
                            <td className="py-3 px-2 text-center">
@@ -756,7 +756,7 @@ export default function Profile() {
               {/* Pagination */}
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
                 <div className="text-sm text-slate-500">
-                  Showing {Math.min((currentPage - 1) * GAMES_PER_PAGE + 1, filteredGames.length)} - {Math.min(currentPage * GAMES_PER_PAGE, filteredGames.length)} of {filteredGames.length} games
+                  Kuvatakse {Math.min((currentPage - 1) * GAMES_PER_PAGE + 1, filteredGames.length)}–{Math.min(currentPage * GAMES_PER_PAGE, filteredGames.length)} / {filteredGames.length} mängu
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -765,7 +765,7 @@ export default function Profile() {
                     variant="outline"
                     size="sm"
                   >
-                    Previous
+                    Eelmine
                   </Button>
                   <div className="flex items-center gap-1">
                     {Array.from({ length: Math.ceil(filteredGames.length / GAMES_PER_PAGE) }).map((_, i) => (
@@ -786,7 +786,7 @@ export default function Profile() {
                     variant="outline"
                     size="sm"
                   >
-                    Next
+                    Järgmine
                   </Button>
                 </div>
               </div>
@@ -798,7 +798,7 @@ export default function Profile() {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-slate-800">
-              Achievements ({unlockedAchievements.length}/{achievements.length})
+              Saavutused ({unlockedAchievements.length}/{achievements.length})
             </h3>
           </div>
           <AchievementsList achievements={achievements} />

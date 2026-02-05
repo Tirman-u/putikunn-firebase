@@ -13,7 +13,9 @@ export default function usePlayerGameState({ gameId }) {
       const games = await base44.entities.Game.filter({ id: gameId });
       return games[0];
     },
-    refetchInterval: false
+    refetchInterval: false,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true
   });
 
   const isSoloGame = game?.pin === '0000';

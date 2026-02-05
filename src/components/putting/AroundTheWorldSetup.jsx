@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Copy, Check } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import PuttTypeSelector from './PuttTypeSelector';
 
 const DIFFICULTY_PRESETS = {
-  easy: { label: 'Easy', threshold: 1, discs: 1 },
-  medium: { label: 'Medium', threshold: 2, discs: 3 },
-  hard: { label: 'Hard', threshold: 3, discs: 5 },
-  ultra_hard: { label: 'Ultra Hard', threshold: 4, discs: 7 },
-  impossible: { label: 'Impossible', threshold: 5, discs: 10 }
+  easy: { label: 'Lihtne', threshold: 1, discs: 1 },
+  medium: { label: 'Keskmine', threshold: 2, discs: 3 },
+  hard: { label: 'Raske', threshold: 3, discs: 5 },
+  ultra_hard: { label: 'Väga raske', threshold: 4, discs: 7 },
+  impossible: { label: 'Võimatu', threshold: 5, discs: 10 }
 };
 
 export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPin, initialName, initialPuttType }) {
@@ -83,7 +83,7 @@ export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPi
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-3">
-            Putt Style
+            Puti stiil
           </label>
           <PuttTypeSelector selectedType={puttType} onSelect={setPuttType} />
         </div>
@@ -107,7 +107,7 @@ export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPi
                   <div>
                     <div className="font-semibold text-slate-800">{preset.label}</div>
                     <div className="text-sm text-slate-600">
-                      {preset.discs} {preset.discs === 1 ? 'Putt' : 'Putti'} sisse
+                      {preset.discs} {preset.discs === 1 ? 'putt' : 'putti'} sisse
                     </div>
                   </div>
                   {difficulty === key && (

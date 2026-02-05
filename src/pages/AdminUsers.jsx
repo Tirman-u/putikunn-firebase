@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ export default function AdminUsers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['all-users'] });
-      toast.success('User role updated');
+      toast.success('Kasutaja roll uuendatud');
     }
   });
 
@@ -37,7 +37,7 @@ export default function AdminUsers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['current-user'] });
-      toast.success('You are now a Super Admin!');
+      toast.success('Sa oled nüüd superadmin!');
     }
   });
 
@@ -51,12 +51,12 @@ export default function AdminUsers() {
         <div className="text-center max-w-md">
           <Shield className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-slate-800 mb-2">
-            {hasSuperAdmin ? 'Access Denied' : 'Initial Setup'}
+            {hasSuperAdmin ? 'Ligipääs keelatud' : 'Esmane seadistus'}
           </h1>
           <p className="text-slate-600 mb-6">
             {hasSuperAdmin 
-              ? 'You need super admin privileges to access this page.'
-              : 'No super admin exists yet. Click below to become the first super admin.'
+              ? 'Sellele lehele pääseb ainult superadmin.'
+              : 'Superadmini pole veel. Vajuta all, et saada esimeseks superadminiks.'
             }
           </p>
           {!hasSuperAdmin ? (
@@ -66,12 +66,12 @@ export default function AdminUsers() {
                 disabled={makeCurrentUserSuperAdmin.isPending}
                 className="bg-red-600 hover:bg-red-700"
               >
-                Make Me Super Admin
+                Tee mind superadminiks
               </Button>
-              <Button onClick={() => navigate(-1)} variant="outline">Cancel</Button>
+              <Button onClick={() => navigate(-1)} variant="outline">Tühista</Button>
             </div>
           ) : (
-            <Button onClick={() => navigate(-1)}>Go Back</Button>
+            <Button onClick={() => navigate(-1)}>Tagasi</Button>
           )}
         </div>
       </div>
@@ -86,10 +86,10 @@ export default function AdminUsers() {
   };
 
   const roleLabels = {
-    user: 'User',
-    trainer: 'Trainer',
+    user: 'Kasutaja',
+    trainer: 'Treener',
     admin: 'Admin',
-    super_admin: 'Super Admin'
+    super_admin: 'Superadmin'
   };
 
   return (
@@ -101,34 +101,34 @@ export default function AdminUsers() {
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back</span>
+            <span className="font-medium">Tagasi</span>
           </button>
           <div className="flex items-center gap-2">
             <UserCog className="w-6 h-6 text-slate-700" />
-            <h1 className="text-2xl font-bold text-slate-800">User Management</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Kasutajate haldus</h1>
           </div>
           <div className="w-16" />
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <div className="mb-6">
-            <h2 className="text-lg font-bold text-slate-800 mb-2">Role Descriptions</h2>
+            <h2 className="text-lg font-bold text-slate-800 mb-2">Rollide kirjeldused</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div className="p-3 bg-slate-50 rounded-lg">
-                <div className="font-semibold text-slate-700 mb-1">👤 User</div>
-                <div className="text-slate-600">Join games, solo practice, view profile</div>
+                <div className="font-semibold text-slate-700 mb-1">👤 Kasutaja</div>
+                <div className="text-slate-600">Liitu mängudega, soolotreening, vaata profiili</div>
               </div>
               <div className="p-3 bg-blue-50 rounded-lg">
-                <div className="font-semibold text-blue-700 mb-1">🎓 Trainer</div>
-                <div className="text-slate-600">+ Host games, submit to Discgolf.ee leaderboard</div>
+                <div className="font-semibold text-blue-700 mb-1">🎓 Treener</div>
+                <div className="text-slate-600">+ Hosti mänge, saada Discgolf.ee edetabelisse</div>
               </div>
               <div className="p-3 bg-purple-50 rounded-lg">
                 <div className="font-semibold text-purple-700 mb-1">🛡️ Admin</div>
-                <div className="text-slate-600">+ Manage games, delete content, Putting King access</div>
+                <div className="text-slate-600">+ Halda mänge, kustuta sisu, Putting King ligipääs</div>
               </div>
               <div className="p-3 bg-red-50 rounded-lg">
-                <div className="font-semibold text-red-700 mb-1">👑 Super Admin</div>
-                <div className="text-slate-600">+ Manage user roles and permissions</div>
+                <div className="font-semibold text-red-700 mb-1">👑 Superadmin</div>
+                <div className="text-slate-600">+ Halda kasutajarolle ja õigusi</div>
               </div>
             </div>
           </div>
@@ -137,10 +137,10 @@ export default function AdminUsers() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b-2 border-slate-200">
-                  <th className="text-left py-3 px-2 text-slate-600 font-semibold">Name</th>
-                  <th className="text-left py-3 px-2 text-slate-600 font-semibold">Email</th>
-                  <th className="text-left py-3 px-2 text-slate-600 font-semibold">Current Role</th>
-                  <th className="text-left py-3 px-2 text-slate-600 font-semibold">Change Role</th>
+                  <th className="text-left py-3 px-2 text-slate-600 font-semibold">Nimi</th>
+                  <th className="text-left py-3 px-2 text-slate-600 font-semibold">E-post</th>
+                  <th className="text-left py-3 px-2 text-slate-600 font-semibold">Praegune roll</th>
+                  <th className="text-left py-3 px-2 text-slate-600 font-semibold">Muuda rolli</th>
                 </tr>
               </thead>
               <tbody>
@@ -150,7 +150,7 @@ export default function AdminUsers() {
                     <td className="py-3 px-2 text-slate-600">{user.email}</td>
                     <td className="py-3 px-2">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${roleColors[user.app_role] || roleColors.user}`}>
-                        {roleLabels[user.app_role] || 'User'}
+                        {roleLabels[user.app_role] || 'Kasutaja'}
                       </span>
                     </td>
                     <td className="py-3 px-2">
@@ -163,10 +163,10 @@ export default function AdminUsers() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="user">User</SelectItem>
-                          <SelectItem value="trainer">Trainer</SelectItem>
+                          <SelectItem value="user">Kasutaja</SelectItem>
+                          <SelectItem value="trainer">Treener</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="super_admin">Super Admin</SelectItem>
+                          <SelectItem value="super_admin">Superadmin</SelectItem>
                         </SelectContent>
                       </Select>
                     </td>

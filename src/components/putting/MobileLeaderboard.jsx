@@ -41,7 +41,7 @@ export default function MobileLeaderboard({ game, onClose }) {
         <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between rounded-t-3xl sm:rounded-t-2xl">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <Trophy className="w-5 h-5 text-amber-500" />
-            Leaderboard
+            Edetabel
           </h2>
           <button
             onClick={onClose}

@@ -1,8 +1,7 @@
 import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, Target, Calendar } from 'lucide-react';
+import { ArrowLeft, Trophy, Calendar } from 'lucide-react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
@@ -115,7 +114,7 @@ export default function GroupResult() {
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back</span>
+            <span className="font-medium">Tagasi</span>
           </button>
           <h1 className="text-2xl font-bold text-slate-800">{group.name}</h1>
           <div className="w-16" />
@@ -126,22 +125,22 @@ export default function GroupResult() {
           <div className="lg:col-span-2 space-y-6">
             {/* Group Summary */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-              <h2 className="text-lg font-bold text-slate-800 mb-4">Group Summary</h2>
+              <h2 className="text-lg font-bold text-slate-800 mb-4">Grupi kokkuvõte</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="text-center p-4 bg-emerald-50 rounded-xl">
-                  <div className="text-sm text-emerald-700 mb-1">Best Score</div>
+                  <div className="text-sm text-emerald-700 mb-1">Parim tulemus</div>
                   <div className="text-3xl font-bold text-emerald-600">{bestScore}</div>
                 </div>
                 <div className="text-center p-4 bg-amber-50 rounded-xl">
-                  <div className="text-sm text-amber-700 mb-1">Avg Score</div>
+                  <div className="text-sm text-amber-700 mb-1">Keskmine tulemus</div>
                   <div className="text-3xl font-bold text-amber-600">{avgScore}</div>
                 </div>
                 <div className="text-center p-4 bg-slate-50 rounded-xl">
-                  <div className="text-sm text-slate-600 mb-1">Avg Putting %</div>
+                  <div className="text-sm text-slate-600 mb-1">Keskmine täpsus</div>
                   <div className="text-3xl font-bold text-slate-700">{avgPuttingPercentage}%</div>
                 </div>
                 <div className="text-center p-4 bg-slate-50 rounded-xl">
-                  <div className="text-sm text-slate-600 mb-1">Games</div>
+                  <div className="text-sm text-slate-600 mb-1">Mänge</div>
                   <div className="text-3xl font-bold text-slate-700">{games.length}</div>
                 </div>
               </div>
@@ -149,10 +148,10 @@ export default function GroupResult() {
 
             {/* Games List */}
             <div>
-              <h2 className="text-lg font-bold text-slate-800 mb-3">Games in Group</h2>
+              <h2 className="text-lg font-bold text-slate-800 mb-3">Mängud grupis</h2>
               {gamesWithStats.length === 0 ? (
                 <div className="bg-white rounded-2xl p-12 text-center text-slate-400">
-                  No games in this group
+                  Grupi mänge pole
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -172,12 +171,12 @@ export default function GroupResult() {
                           </div>
                           <div className="text-sm text-slate-500 flex items-center gap-2">
                             <Calendar className="w-3 h-3" />
-                            {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'No date'}
+                            {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'Kuupäev puudub'}
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="text-2xl font-bold text-emerald-600">{game.bestScore}</div>
-                          <div className="text-xs text-slate-500">{game.puttingPercentage}% made</div>
+                          <div className="text-xs text-slate-500">{game.puttingPercentage}% sees</div>
                         </div>
                       </div>
                     </Link>
@@ -192,10 +191,10 @@ export default function GroupResult() {
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 sticky top-4">
               <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-amber-500" />
-                Group Ranking
+                Grupi edetabel
               </h2>
               {playerRanking.length === 0 ? (
-                <div className="text-center text-slate-400 py-8">No players yet</div>
+                <div className="text-center text-slate-400 py-8">Mängijaid veel pole</div>
               ) : (
                 <div className="space-y-2">
                   {playerRanking.map((player, index) => (
@@ -217,7 +216,7 @@ export default function GroupResult() {
                         </div>
                         <div className="flex-1">
                           <div className="font-bold text-slate-800">{player.name}</div>
-                          <div className="text-xs text-slate-500">{player.gamesPlayed} games</div>
+                          <div className="text-xs text-slate-500">{player.gamesPlayed} mängu</div>
                         </div>
                         <div className="text-right">
                           <div className={`text-xl font-bold ${

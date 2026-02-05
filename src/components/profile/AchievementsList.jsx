@@ -8,24 +8,24 @@ export function getAchievements(stats, isAdmin = false) {
     // Beginner Achievements
     { 
       id: 'first_game', 
-      name: 'First Steps', 
-      description: 'Complete your first game',
+      name: 'Esimesed sammud', 
+      description: 'Lõpeta oma esimene mäng',
       unlocked: totalGames > 0,
       icon: '🎯',
       tier: 'bronze'
     },
     { 
       id: 'five_games', 
-      name: 'Getting Started', 
-      description: 'Play 5 games',
+      name: 'Algus tehtud', 
+      description: 'Mängi 5 mängu',
       unlocked: totalGames >= 5,
       icon: '🎮',
       tier: 'bronze'
     },
     { 
       id: 'ten_games', 
-      name: 'Regular Player', 
-      description: 'Play 10 games',
+      name: 'Püsiv mängija', 
+      description: 'Mängi 10 mängu',
       unlocked: totalGames >= 10,
       icon: '🔥',
       tier: 'silver'
@@ -33,7 +33,7 @@ export function getAchievements(stats, isAdmin = false) {
     { 
       id: 'veteran', 
       name: 'Veteran', 
-      description: 'Play 25 games',
+      description: 'Mängi 25 mängu',
       unlocked: totalGames >= 25,
       icon: '⭐',
       tier: 'gold'
@@ -41,7 +41,7 @@ export function getAchievements(stats, isAdmin = false) {
     { 
       id: 'legend', 
       name: 'Legend', 
-      description: 'Play 50 games',
+      description: 'Mängi 50 mängu',
       unlocked: totalGames >= 50,
       icon: '👑',
       tier: 'platinum'
@@ -50,40 +50,40 @@ export function getAchievements(stats, isAdmin = false) {
     // Accuracy Achievements
     { 
       id: 'decent_shot', 
-      name: 'Decent Shot', 
-      description: 'Achieve 60%+ accuracy',
+      name: 'Hea tabamus', 
+      description: 'Saavuta 60%+ täpsus',
       unlocked: parseFloat(puttingPercentage) >= 60,
       icon: '🎪',
       tier: 'bronze'
     },
     { 
       id: 'sharp_eye', 
-      name: 'Sharp Eye', 
-      description: 'Achieve 70%+ accuracy',
+      name: 'Terav silm', 
+      description: 'Saavuta 70%+ täpsus',
       unlocked: parseFloat(puttingPercentage) >= 70,
       icon: '👁️',
       tier: 'silver'
     },
     { 
       id: 'marksman', 
-      name: 'Marksman', 
-      description: 'Achieve 80%+ accuracy',
+      name: 'Täpsuskütt', 
+      description: 'Saavuta 80%+ täpsus',
       unlocked: parseFloat(puttingPercentage) >= 80,
       icon: '🏹',
       tier: 'gold'
     },
     { 
       id: 'sharpshooter', 
-      name: 'Sharpshooter', 
-      description: 'Achieve 90%+ accuracy',
+      name: 'Meisterlaskur', 
+      description: 'Saavuta 90%+ täpsus',
       unlocked: parseFloat(puttingPercentage) >= 90,
       icon: '🎖️',
       tier: 'platinum'
     },
     { 
       id: 'perfect_aim', 
-      name: 'Perfect Aim', 
-      description: 'Achieve 95%+ accuracy',
+      name: 'Täiuslik siht', 
+      description: 'Saavuta 95%+ täpsus',
       unlocked: parseFloat(puttingPercentage) >= 95,
       icon: '💎',
       tier: 'diamond'
@@ -92,32 +92,32 @@ export function getAchievements(stats, isAdmin = false) {
     // Scoring Achievements
     { 
       id: 'century', 
-      name: 'Century', 
-      description: 'Score 300+ points in a game',
+      name: '300 klubi', 
+      description: 'Saavuta mängus 300+ punkti',
       unlocked: bestScore >= 300,
       icon: '💯',
       tier: 'bronze'
     },
     { 
       id: 'high_scorer', 
-      name: 'High Scorer', 
-      description: 'Score 500+ points in a game',
+      name: 'Kõrge tulemus', 
+      description: 'Saavuta mängus 500+ punkti',
       unlocked: bestScore >= 500,
       icon: '🏆',
       tier: 'silver'
     },
     { 
       id: 'point_machine', 
-      name: 'Point Machine', 
-      description: 'Score 600+ points in a game',
+      name: 'Punktimasin', 
+      description: 'Saavuta mängus 600+ punkti',
       unlocked: bestScore >= 600,
       icon: '🔴',
       tier: 'gold'
     },
     { 
       id: 'unstoppable', 
-      name: 'Unstoppable', 
-      description: 'Score 700+ points in a game',
+      name: 'Peatumatu', 
+      description: 'Saavuta mängus 700+ punkti',
       unlocked: bestScore >= 700,
       icon: '🚀',
       tier: 'platinum'
@@ -126,16 +126,16 @@ export function getAchievements(stats, isAdmin = false) {
     // Consistency Achievements
     { 
       id: 'consistent', 
-      name: 'Consistent', 
-      description: 'Average 350+ points per game',
+      name: 'Stabiilne', 
+      description: 'Keskmiselt 350+ punkti mängus',
       unlocked: avgScore >= 350,
       icon: '📊',
       tier: 'silver'
     },
     { 
       id: 'reliable', 
-      name: 'Reliable', 
-      description: 'Average 450+ points per game',
+      name: 'Usaldusväärne', 
+      description: 'Keskmiselt 450+ punkti mängus',
       unlocked: avgScore >= 450,
       icon: '⚖️',
       tier: 'gold'
@@ -144,64 +144,64 @@ export function getAchievements(stats, isAdmin = false) {
     // Special Achievements - Perfect Rounds
     { 
       id: 'perfect_round_5', 
-      name: 'Perfect Round', 
-      description: 'Make 5 consecutive putts',
+      name: 'Täiuslik ring', 
+      description: 'Sees 5 järjestikust putti',
       unlocked: checkStreak(allPutts, 5),
       icon: '⭐',
       tier: 'bronze'
     },
     { 
       id: 'perfect_round_10', 
-      name: 'Perfect Streak x2', 
-      description: 'Make 10 consecutive putts',
+      name: 'Täiuslik seeria x2', 
+      description: 'Sees 10 järjestikust putti',
       unlocked: checkStreak(allPutts, 10),
       icon: '⭐⭐',
       tier: 'silver'
     },
     { 
       id: 'perfect_round_15', 
-      name: 'Perfect Streak x3', 
-      description: 'Make 15 consecutive putts',
+      name: 'Täiuslik seeria x3', 
+      description: 'Sees 15 järjestikust putti',
       unlocked: checkStreak(allPutts, 15),
       icon: '⭐⭐⭐',
       tier: 'gold'
     },
     { 
       id: 'perfect_round_20', 
-      name: 'Perfect Streak Master', 
-      description: 'Make 20 consecutive putts',
+      name: 'Seeriameister', 
+      description: 'Sees 20 järjestikust putti',
       unlocked: checkStreak(allPutts, 20),
       icon: '✨',
       tier: 'platinum'
     },
     { 
       id: 'long_distance', 
-      name: 'Long Distance', 
-      description: 'Make a 12m+ putt',
+      name: 'Pikk distants', 
+      description: 'Sees 12m+ putt',
       unlocked: allPutts?.some(p => p.distance >= 12 && p.result === 'made'),
       icon: '🎯',
       tier: 'silver'
     },
     { 
       id: 'ultra_distance', 
-      name: 'Ultra Distance', 
-      description: 'Make a 15m putt',
+      name: 'Ülipikk distants', 
+      description: 'Sees 15m putt',
       unlocked: allPutts?.some(p => p.distance >= 15 && p.result === 'made'),
       icon: '🌟',
       tier: 'platinum'
     },
     { 
       id: 'five_hundred_makes', 
-      name: 'Century Club', 
-      description: 'Make 500 putts total',
+      name: '500 klubi', 
+      description: 'Sees kokku 500 putti',
       unlocked: allPutts?.filter(p => p.result === 'made').length >= 500,
       icon: '🎊',
       tier: 'silver'
     },
     { 
       id: 'thousand_makes', 
-      name: 'Elite 1000', 
-      description: 'Make 1000 putts total',
+      name: '1000 eliit', 
+      description: 'Sees kokku 1000 putti',
       unlocked: allPutts?.filter(p => p.result === 'made').length >= 1000,
       icon: '🏅',
       tier: 'gold'
@@ -210,16 +210,16 @@ export function getAchievements(stats, isAdmin = false) {
     // Format Mastery
     { 
       id: 'format_explorer', 
-      name: 'Format Explorer', 
-      description: 'Try 3 different formats',
+      name: 'Formaatide avastaja', 
+      description: 'Proovi 3 erinevat formaati',
       unlocked: new Set(myGames?.map(g => g.game_type)).size >= 3,
       icon: '🗺️',
       tier: 'bronze'
     },
     { 
       id: 'all_formats', 
-      name: 'Jack of All Trades', 
-      description: 'Play all game formats',
+      name: 'Mitme ala meister', 
+      description: 'Mängi kõiki formaate',
       unlocked: new Set(myGames?.map(g => g.game_type)).size >= 7,
       icon: '🃏',
       tier: 'platinum'
@@ -228,32 +228,32 @@ export function getAchievements(stats, isAdmin = false) {
     // Streak Achievements
     { 
       id: 'ten_streak', 
-      name: 'Hot Streak', 
-      description: 'Make 10 consecutive putts',
+      name: 'Kuum seeria', 
+      description: 'Sees 10 järjestikust putti',
       unlocked: checkStreak(allPutts, 10),
       icon: '🔥',
       tier: 'bronze'
     },
     { 
       id: 'twenty_streak', 
-      name: 'Unstoppable Streak', 
-      description: 'Make 20 consecutive putts',
+      name: 'Peatumatu seeria', 
+      description: 'Sees 20 järjestikust putti',
       unlocked: checkStreak(allPutts, 20),
       icon: '💥',
       tier: 'silver'
     },
     { 
       id: 'thirty_streak', 
-      name: 'Legendary Streak', 
-      description: 'Make 30 consecutive putts',
+      name: 'Legendaarne seeria', 
+      description: 'Sees 30 järjestikust putti',
       unlocked: checkStreak(allPutts, 30),
       icon: '⚡',
       tier: 'gold'
     },
     { 
       id: 'fifty_streak', 
-      name: 'Godlike Streak', 
-      description: 'Make 50 consecutive putts',
+      name: 'Jumalalik seeria', 
+      description: 'Sees 50 järjestikust putti',
       unlocked: checkStreak(allPutts, 50),
       icon: '👑',
       tier: 'platinum'
@@ -262,24 +262,24 @@ export function getAchievements(stats, isAdmin = false) {
     // Practice Achievements
     { 
       id: 'early_bird', 
-      name: 'Early Bird', 
-      description: 'Play a game before 9am',
+      name: 'Varajane ärkaja', 
+      description: 'Mängi mäng enne kella 9',
       unlocked: myGames?.some(g => new Date(g.date).getHours() < 9),
       icon: '🌅',
       tier: 'bronze'
     },
     { 
       id: 'night_owl', 
-      name: 'Night Owl', 
-      description: 'Play a game after 9pm',
+      name: 'Öökull', 
+      description: 'Mängi mäng pärast kella 21',
       unlocked: myGames?.some(g => new Date(g.date).getHours() >= 21),
       icon: '🦉',
       tier: 'bronze'
     },
     { 
       id: 'weekend_warrior', 
-      name: 'Weekend Warrior', 
-      description: 'Play 10 games on weekends',
+      name: 'Nädalavahetuse sõdur', 
+      description: 'Mängi nädalavahetustel 10 mängu',
       unlocked: myGames?.filter(g => {
         const day = new Date(g.date).getDay();
         return day === 0 || day === 6;
@@ -289,8 +289,8 @@ export function getAchievements(stats, isAdmin = false) {
     },
     { 
       id: 'daily_grinder', 
-      name: 'Daily Grinder', 
-      description: 'Play on 7 consecutive days',
+      name: 'Igapäevane tegija', 
+      description: 'Mängi 7 päeva järjest',
       unlocked: checkConsecutiveDays(myGames, 7),
       icon: '📅',
       tier: 'gold'

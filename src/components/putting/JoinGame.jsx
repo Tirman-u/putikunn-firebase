@@ -25,7 +25,7 @@ export default function JoinGame({ onJoin, onBack }) {
     queryKey: ['recent-games'],
     queryFn: async () => {
       const activeGames = await base44.entities.Game.filter({
-        status: { $in: ['setup', 'active', 'completed'] }
+        status: { $in: ['setup', 'active'] }
       }, '-date', 10);
       return activeGames.filter(g =>
         g.pin !== null &&
@@ -80,7 +80,7 @@ export default function JoinGame({ onJoin, onBack }) {
 
   const handleJoin = async () => {
     if (!pin.trim() || !playerName.trim()) {
-      setError('Please enter PIN and your name');
+      setError('Sisesta PIN ja oma nimi');
       return;
     }
 
@@ -92,7 +92,7 @@ export default function JoinGame({ onJoin, onBack }) {
       const games = await base44.entities.Game.filter({ pin: pin.trim() });
       
       if (games.length === 0) {
-        setError('Game not found. Check the PIN.');
+        setError('Mängu ei leitud. Kontrolli PIN-i.');
         setLoading(false);
         return;
       }
@@ -100,7 +100,7 @@ export default function JoinGame({ onJoin, onBack }) {
       const game = games[0];
 
       if (game.join_closed === true || game.status === 'closed') {
-        setError('Game is closed by host.');
+        setError('Mäng on hosti poolt suletud.');
         setLoading(false);
         return;
       }
@@ -180,14 +180,14 @@ export default function JoinGame({ onJoin, onBack }) {
         onJoin({ game: updatedGame, playerName: playerName.trim() });
       }
     } catch (err) {
-      setError('Failed to join game');
+      setError('Mänguga liitumine ebaõnnestus');
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
-      <div className="max-w-lg mx-auto pt-4">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-3 sm:p-4">
+      <div className="max-w-lg mx-auto pt-3 sm:pt-4">
         {/* Back Button */}
         <div className="mb-6">
           <button
@@ -195,32 +195,32 @@ export default function JoinGame({ onJoin, onBack }) {
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back</span>
+            <span className="font-medium">Tagasi</span>
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 space-y-3 sm:space-y-4">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Your Name
+              Sinu nimi
             </label>
             <Input
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="Enter your name"
-              className="h-14 rounded-xl border-slate-200 text-lg"
+              placeholder="Sisesta nimi"
+              className="h-12 sm:h-14 rounded-xl border-slate-200 text-base sm:text-lg"
             />
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Game PIN
+              Mängu PIN
             </label>
             <Input
               value={pin}
               onChange={(e) => setPin(e.target.value.toUpperCase())}
-              placeholder="Enter 4-digit PIN"
-              className="h-14 rounded-xl border-slate-200 text-center text-2xl tracking-widest font-bold"
+              placeholder="Sisesta 4-kohaline PIN"
+              className="h-12 sm:h-14 rounded-xl border-slate-200 text-center text-xl sm:text-2xl tracking-widest font-bold"
               maxLength={4}
             />
           </div>
@@ -234,10 +234,10 @@ export default function JoinGame({ onJoin, onBack }) {
           <Button
             onClick={handleJoin}
             disabled={loading || !pin.trim() || !playerName.trim()}
-            className="w-full h-16 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-xl font-bold rounded-2xl shadow-xl shadow-emerald-200"
+            className="w-full h-12 sm:h-16 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-base sm:text-xl font-bold rounded-2xl shadow-lg sm:shadow-xl shadow-emerald-200"
           >
-            <LogIn className="w-6 h-6 mr-3" />
-            Join Game
+            <LogIn className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
+            Liitu mänguga
           </Button>
         </div>
 
@@ -246,7 +246,7 @@ export default function JoinGame({ onJoin, onBack }) {
           <div className="mt-8">
             <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Active Games
+              Aktiivsed mängud
             </h3>
             <div className="space-y-2">
               {recentGames.map((game) => {
@@ -268,11 +268,11 @@ export default function JoinGame({ onJoin, onBack }) {
                             {getGameTypeName(game.game_type)}
                           </span>
                           <span className="text-xs text-slate-500">
-                            {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'No date'}
+                            {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'Kuupäev puudub'}
                           </span>
                           <span className="flex items-center gap-1 text-xs text-slate-500">
                             <Users className="w-3 h-3" />
-                            {playerCount} {playerCount === 1 ? 'player' : 'players'}
+                            {playerCount} {playerCount === 1 ? 'mängija' : 'mängijat'}
                           </span>
                         </div>
                       </div>

@@ -15,7 +15,7 @@ export default function PuttingRecordsPage() {
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back</span>
+            <span className="font-medium">Tagasi</span>
           </button>
           <div className="w-16" />
         </div>

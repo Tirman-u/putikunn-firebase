@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
 import { Users, UserPlus, Settings, User, Target, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -61,7 +60,7 @@ export default function Home() {
         if (!game) return;
         setIsSoloATW(game.pin === '0000');
         base44.auth.me().then(user => {
-          const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
+          const playerName = user?.display_name || user?.full_name || user?.email || 'Mängija';
           setPlayerName(playerName);
           setMode('atw-game');
         });
@@ -70,7 +69,7 @@ export default function Home() {
       // Continue regular game from profile
       setGameId(urlGameId);
       base44.auth.me().then(user => {
-        const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
+        const playerName = user?.display_name || user?.full_name || user?.email || 'Mängija';
         setPlayerName(playerName);
         setMode('player');
       });
@@ -137,9 +136,9 @@ export default function Home() {
         <div className="max-w-lg mx-auto pt-16">
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-slate-800 mb-2">
-              Welcome {user?.display_name || user?.full_name || 'Guest'}!
+              Tere tulemast, {user?.display_name || user?.full_name || 'Külaline'}!
             </h1>
-            <p className="text-slate-600 text-xl mb-8">Ready to make some putts?</p>
+            <p className="text-slate-600 text-xl mb-8">Valmis puttama?</p>
           </div>
 
           <div className="space-y-4">
@@ -153,8 +152,8 @@ export default function Home() {
                     <Users className="w-7 h-7 text-emerald-600" />
                   </div>
                   <div className="text-left flex-1">
-                    <h3 className="text-lg font-bold text-slate-800">Host Game</h3>
-                    <p className="text-sm text-slate-500">Create a session and get a PIN</p>
+                    <h3 className="text-lg font-bold text-slate-800">Hosti mäng</h3>
+                    <p className="text-sm text-slate-500">Loo sessioon ja saa PIN</p>
                   </div>
                 </div>
               </button>
@@ -169,8 +168,8 @@ export default function Home() {
                   <UserPlus className="w-7 h-7 text-emerald-600" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Join Game</h3>
-                  <p className="text-sm text-slate-500">Enter a PIN to join a session</p>
+                  <h3 className="text-lg font-bold text-slate-800">Liitu mänguga</h3>
+                  <p className="text-sm text-slate-500">Sisesta PIN, et liituda sessiooniga</p>
                 </div>
               </div>
             </button>
@@ -184,8 +183,8 @@ export default function Home() {
                   <Target className="w-7 h-7 text-emerald-600" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Solo Practice</h3>
-                  <p className="text-sm text-slate-500">Practice alone without hosting</p>
+                  <h3 className="text-lg font-bold text-slate-800">Soolotreening</h3>
+                  <p className="text-sm text-slate-500">Harjuta üksi ilma hostimata</p>
                 </div>
               </div>
             </button>
@@ -199,8 +198,8 @@ export default function Home() {
                   <Trophy className="w-7 h-7 text-amber-600" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Putting Records</h3>
-                  <p className="text-sm text-slate-500">View leaderboards and top scores</p>
+                  <h3 className="text-lg font-bold text-slate-800">Puttingu rekordid</h3>
+                  <p className="text-sm text-slate-500">Vaata edetabeleid ja parimaid tulemusi</p>
                 </div>
               </div>
             </button>
@@ -214,8 +213,8 @@ export default function Home() {
                   <Trophy className="w-7 h-7 text-purple-600" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Putting King</h3>
-                  <p className="text-sm text-slate-500">Join tournaments and compete</p>
+                  <h3 className="text-lg font-bold text-slate-800">Puttingu Kuningas</h3>
+                  <p className="text-sm text-slate-500">Liitu turniiridega ja võistle</p>
                 </div>
               </div>
             </button>
@@ -233,8 +232,8 @@ export default function Home() {
                     <Settings className="w-6 h-6 text-slate-600" />
                   </div>
                   <div className="text-left flex-1">
-                    <h3 className="text-base font-bold text-slate-800">Manage Games</h3>
-                    <p className="text-xs text-slate-500">View and organize your games</p>
+                    <h3 className="text-base font-bold text-slate-800">Halda mänge</h3>
+                    <p className="text-xs text-slate-500">Vaata ja halda oma mänge</p>
                   </div>
                 </div>
               </Link>
@@ -249,8 +248,8 @@ export default function Home() {
                   <User className="w-6 h-6 text-slate-600" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-base font-bold text-slate-800">My Profile</h3>
-                  <p className="text-xs text-slate-500">Stats and game history</p>
+                  <h3 className="text-base font-bold text-slate-800">Minu profiil</h3>
+                  <p className="text-xs text-slate-500">Statistika ja mänguajalugu</p>
                 </div>
               </div>
             </Link>
@@ -265,8 +264,8 @@ export default function Home() {
                     <User className="w-6 h-6 text-red-600" />
                   </div>
                   <div className="text-left flex-1">
-                    <h3 className="text-base font-bold text-slate-800">User Management</h3>
-                    <p className="text-xs text-slate-500">Manage roles and permissions</p>
+                    <h3 className="text-base font-bold text-slate-800">Kasutajate haldus</h3>
+                    <p className="text-xs text-slate-500">Halda rolle ja õigusi</p>
                   </div>
                 </div>
               </Link>
@@ -288,7 +287,7 @@ export default function Home() {
     return <HostSetup onStartGame={async (gameData) => {
       const user = await base44.auth.me();
       const game = await base44.entities.Game.create({
-        name: gameData.name || 'Solo Practice',
+        name: gameData.name || 'Soolotreening',
         pin: '0000',
         game_type: gameData.gameType || 'classic',
         putt_type: gameData.puttType || 'regular',

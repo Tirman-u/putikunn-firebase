@@ -34,7 +34,7 @@ export default function PuttingKingScoreInput({
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <div className="text-xs text-purple-600 font-semibold mb-1">Team A Score</div>
+          <div className="text-xs text-purple-600 font-semibold mb-1">Tiim A skoor</div>
           <Input
             type="number"
             value={manualScoreA}
@@ -44,7 +44,7 @@ export default function PuttingKingScoreInput({
           />
         </div>
         <div>
-          <div className="text-xs text-blue-600 font-semibold mb-1">Team B Score</div>
+          <div className="text-xs text-blue-600 font-semibold mb-1">Tiim B skoor</div>
           <Input
             type="number"
             value={manualScoreB}
@@ -59,7 +59,7 @@ export default function PuttingKingScoreInput({
         className="w-full bg-purple-600 hover:bg-purple-700"
         disabled={!manualScoreA || !manualScoreB}
       >
-        Submit Score
+        Kinnita skoor
       </Button>
     </div>
   );

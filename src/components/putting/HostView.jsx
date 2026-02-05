@@ -204,9 +204,9 @@ export default function HostView({ gameId, onExit }) {
       const created = results.filter(r => r.action === 'created').length;
       const skipped = results.filter(r => r.action === 'skipped').length;
       
-      let message = 'Submitted to Leaderboard';
+      let message = 'Edetabelisse saadetud';
       if (updated > 0 || skipped > 0) {
-        message += ` (${created} new, ${updated} updated, ${skipped} skipped)`;
+        message += ` (${created} uusi, ${updated} uuendatud, ${skipped} vahele jäetud)`;
       }
       toast.success(message);
     }
@@ -219,9 +219,9 @@ export default function HostView({ gameId, onExit }) {
       const created = results.filter(r => r.action === 'created').length;
       const skipped = results.filter(r => r.action === 'skipped').length;
       
-      let message = 'Submitted to Discgolf.ee';
+      let message = 'Discgolf.ee-sse saadetud';
       if (updated > 0 || skipped > 0) {
-        message += ` (${created} new, ${updated} updated, ${skipped} skipped)`;
+        message += ` (${created} uusi, ${updated} uuendatud, ${skipped} vahele jäetud)`;
       }
       toast.success(message);
     }
@@ -239,7 +239,9 @@ export default function HostView({ gameId, onExit }) {
   const isATWGame = gameType === 'around_the_world';
   const isCompleted = game?.status === 'completed';
   const canSubmitDiscgolfForGame = canSubmitDiscgolf && isHostedClassicGame(game);
-  const scoreLabel = gameType === 'streak_challenge' ? 'Best Streak' : 'Score';
+  const canSubmitGeneralForGame =
+    Boolean(user?.email && game?.host_user && user.email === game.host_user) || canSubmitDiscgolf;
+  const scoreLabel = gameType === 'streak_challenge' ? 'Parim seeria' : 'Tulemus';
 
   useEffect(() => {
     if (!gameId || !gameType || isATWGame) return undefined;
@@ -307,7 +309,7 @@ export default function HostView({ gameId, onExit }) {
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Exit</span>
+            <span className="font-medium">Välju</span>
           </button>
           <h2 className="text-xl font-bold text-slate-800">{game.name}</h2>
           <div className="w-16" />
@@ -317,7 +319,7 @@ export default function HostView({ gameId, onExit }) {
         <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg mb-6 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-semibold mb-1 opacity-90">Game PIN</div>
+              <div className="text-sm font-semibold mb-1 opacity-90">Mängu PIN</div>
               <div className="text-4xl font-bold tracking-widest">{game.pin}</div>
             </div>
             <div className="flex flex-col gap-2">
@@ -327,11 +329,11 @@ export default function HostView({ gameId, onExit }) {
                 className="bg-white/20 hover:bg-white/30 text-white border-white/30"
               >
                 {copied ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
-                {copied ? 'Copied' : 'Copy'}
+                {copied ? 'Kopeeritud' : 'Kopeeri'}
               </Button>
               <div className="flex items-center gap-2 text-sm opacity-90">
                 <Users className="w-4 h-4" />
-                <span>{game.players.length} players</span>
+                <span>{game.players.length} mängijat</span>
               </div>
             </div>
           </div>
@@ -343,20 +345,20 @@ export default function HostView({ gameId, onExit }) {
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Trophy className="w-5 h-5 text-amber-500" />
-                <div className="text-sm text-slate-600">Best Score</div>
+                <div className="text-sm text-slate-600">Parim tulemus</div>
               </div>
               <div className="text-3xl font-bold text-emerald-600">{bestPlayer.bestScore}</div>
               <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
-              <div className="text-sm text-slate-600 mb-2">Most Laps</div>
+              <div className="text-sm text-slate-600 mb-2">Enim ringe</div>
               <div className="text-3xl font-bold text-blue-600">{bestPlayer.bestLaps}</div>
               <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Target className="w-5 h-5 text-purple-500" />
-                <div className="text-sm text-slate-600">Attempts</div>
+                <div className="text-sm text-slate-600">Katseid</div>
               </div>
               <div className="text-3xl font-bold text-purple-600">{mostAttempts}</div>
               <div className="text-xs text-slate-500 mt-1">{mostAttemptsPlayer?.name}</div>
@@ -372,11 +374,11 @@ export default function HostView({ gameId, onExit }) {
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50">
                     <th className="text-left p-4 font-semibold text-slate-700">#</th>
-                    <th className="text-left p-4 font-semibold text-slate-700">Player</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Best Score</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Current</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Laps</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Attempts</th>
+                    <th className="text-left p-4 font-semibold text-slate-700">Mängija</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Parim tulemus</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Praegu</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Ringid</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Katseid</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -418,19 +420,19 @@ export default function HostView({ gameId, onExit }) {
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2 text-slate-800 font-semibold">
                 <Trophy className="w-4 h-4 text-amber-500" />
-                Live Results
+                Live tulemused
               </div>
-              <div className="text-xs text-slate-500">Auto-updating</div>
+              <div className="text-xs text-slate-500">Uueneb automaatselt</div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50">
                     <th className="text-left p-4 font-semibold text-slate-700">#</th>
-                    <th className="text-left p-4 font-semibold text-slate-700">Player</th>
+                    <th className="text-left p-4 font-semibold text-slate-700">Mängija</th>
                     <th className="text-center p-4 font-semibold text-slate-700">{scoreLabel}</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Putts</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Accuracy</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Putid</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Täpsus</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -472,7 +474,7 @@ export default function HostView({ gameId, onExit }) {
                 className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
               >
                 <XCircle className="w-4 h-4 mr-2" />
-                {game.join_closed === true ? 'Game Closed' : 'Close Game'}
+                {game.join_closed === true ? 'Mäng suletud' : 'Sulge mäng'}
               </Button>
             )}
 
@@ -489,14 +491,16 @@ export default function HostView({ gameId, onExit }) {
             
             {isCompleted && (
               <>
-                <Button 
-                  onClick={() => submitToLeaderboardMutation.mutate()}
-                  disabled={submitToLeaderboardMutation.isPending}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Submit to Leaderboard
-                </Button>
+                {canSubmitGeneralForGame && (
+                  <Button 
+                    onClick={() => submitToLeaderboardMutation.mutate()}
+                    disabled={submitToLeaderboardMutation.isPending}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Saada edetabelisse
+                  </Button>
+                )}
                 {canSubmitDiscgolfForGame && (
                   <Button 
                     onClick={() => submitToDiscgolfMutation.mutate()}
@@ -504,7 +508,7 @@ export default function HostView({ gameId, onExit }) {
                     className="w-full bg-blue-600 hover:bg-blue-700"
                   >
                     <Upload className="w-4 h-4 mr-2" />
-                    Submit to Discgolf.ee
+                    Saada Discgolf.ee-sse
                   </Button>
                 )}
               </>
@@ -512,7 +516,7 @@ export default function HostView({ gameId, onExit }) {
             
             <Link to={`${createPageUrl('GameResult')}?id=${game.id}`}>
               <Button variant="outline" className="w-full">
-                View Full Results
+                Vaata kõiki tulemusi
               </Button>
             </Link>
           </div>
@@ -521,8 +525,8 @@ export default function HostView({ gameId, onExit }) {
         {game.players.length === 0 && (
           <div className="bg-white rounded-2xl p-12 text-center text-slate-400 shadow-sm border border-slate-100">
             <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>Waiting for players to join...</p>
-            <p className="text-sm mt-2">Share the PIN: <span className="font-bold text-emerald-600">{game.pin}</span></p>
+            <p>Ootame mängijate liitumist...</p>
+            <p className="text-sm mt-2">Jaga PIN-i: <span className="font-bold text-emerald-600">{game.pin}</span></p>
           </div>
         )}
       </div>

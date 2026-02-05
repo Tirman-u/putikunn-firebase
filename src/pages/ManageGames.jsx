@@ -56,7 +56,7 @@ export default function ManageGames() {
     mutationFn: (gameId) => base44.entities.Game.update(gameId, { status: 'completed' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-games'] });
-      toast.success('Game marked as completed');
+      toast.success('Mäng märgitud lõpetatuks');
     }
   });
 
@@ -194,9 +194,9 @@ export default function ManageGames() {
       const skipped = results.filter(r => r.action === 'skipped').length;
       const errors = results.filter(r => r.action === 'error').length;
       
-      let message = 'Submitted to leaderboards';
+      let message = 'Edetabelitesse saadetud';
       if (updated > 0 || skipped > 0 || errors > 0 || created > 0) {
-        message += ` (${created} new, ${updated} updated, ${skipped} skipped, ${errors} errors)`;
+        message += ` (${created} uusi, ${updated} uuendatud, ${skipped} vahele jäetud, ${errors} viga)`;
       }
       if (errors > 0) {
         toast.error(message);
@@ -206,7 +206,7 @@ export default function ManageGames() {
       queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
     },
     onError: (error) => {
-      const message = error?.message || 'Submit failed';
+      const message = error?.message || 'Saatmine ebaõnnestus';
       toast.error(message);
     }
   });
@@ -233,7 +233,7 @@ export default function ManageGames() {
       return summary;
     },
     onSuccess: (summary) => {
-      const message = `Bulk sync valmis (${summary.games} mängu, ${summary.created} new, ${summary.updated} updated, ${summary.skipped} skipped, ${summary.errors} errors)`;
+      const message = `Mass-sünk valmis (${summary.games} mängu, ${summary.created} uusi, ${summary.updated} uuendatud, ${summary.skipped} vahele jäetud, ${summary.errors} viga)`;
       if (summary.errors > 0) {
         toast.error(message);
       } else {
@@ -242,7 +242,7 @@ export default function ManageGames() {
       queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
     },
     onError: (error) => {
-      toast.error(error?.message || 'Bulk sync failed');
+      toast.error(error?.message || 'Mass-sünk ebaõnnestus');
     }
   });
 
@@ -314,9 +314,9 @@ export default function ManageGames() {
         <div className="flex items-center justify-between mb-6 pt-4">
           <Link to={createPageUrl('Home')} className="flex items-center gap-2 text-slate-600 hover:text-slate-800">
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back</span>
+            <span className="font-medium">Tagasi</span>
           </Link>
-          <h1 className="text-2xl font-bold text-slate-800">Manage Games</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Halda mänge</h1>
           <div className="w-16" />
         </div>
 
@@ -329,7 +329,7 @@ export default function ManageGames() {
               className="w-full bg-emerald-600 hover:bg-emerald-700"
             >
               <FolderPlus className="w-4 h-4 mr-2" />
-              Create Group from Selected ({selectedGames.length})
+              Loo grupp valitutest ({selectedGames.length})
             </Button>
             
           </div>
@@ -340,7 +340,7 @@ export default function ManageGames() {
           <div className="mb-6">
             <h2 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
               <Folder className="w-5 h-5" />
-              My Groups
+              Minu grupid
             </h2>
             <div className="space-y-3">
               {groups.map((group) => (
@@ -356,13 +356,13 @@ export default function ManageGames() {
                             </div>
                             <div>
                               <div className="font-bold text-slate-800">{group.name}</div>
-                              <div className="text-sm text-slate-500">{group.game_ids?.length || 0} games</div>
+                              <div className="text-sm text-slate-500">{group.game_ids?.length || 0} mänge</div>
                             </div>
                           </div>
                           <button
                             onClick={(e) => {
                               e.preventDefault();
-                              if (confirm(`Delete group "${group.name}"?`)) {
+                              if (confirm(`Kustuta grupp "${group.name}"?`)) {
                                 deleteGroupMutation.mutate(group.id);
                               }
                             }}
@@ -380,10 +380,10 @@ export default function ManageGames() {
 
         {/* Active Games */}
         <div className="mb-8">
-          <h2 className="text-lg font-bold text-slate-800 mb-3">Active Games</h2>
+          <h2 className="text-lg font-bold text-slate-800 mb-3">Aktiivsed mängud</h2>
           {activeGames.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center text-slate-400">
-              <p>No active games</p>
+              <p>Aktiivseid mänge pole</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -418,10 +418,10 @@ export default function ManageGames() {
                       </div>
                       <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
                         <Calendar className="w-3 h-3" />
-                        {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'No date'}
+                        {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'Kuupäev puudub'}
                       </div>
                       <div className="text-xs text-slate-600 mt-1">
-                        {game.players?.length || 0} players • PIN: {game.pin}
+                        {game.players?.length || 0} mängijat • PIN: {game.pin}
                       </div>
                     </Link>
                     <div className="flex flex-col gap-2">
@@ -435,12 +435,12 @@ export default function ManageGames() {
                         className="bg-emerald-600 hover:bg-emerald-700 whitespace-nowrap text-xs"
                       >
                         <CheckCircle2 className="w-3 h-3 mr-1" />
-                        Close Game
+                        Sulge mäng
                       </Button>
                       <Button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm('Delete this game?')) {
+                          if (confirm('Kustuta see mäng?')) {
                             deleteGameMutation.mutate(game.id);
                           }
                         }}
@@ -462,7 +462,7 @@ export default function ManageGames() {
         {completedGames.length > 0 && (
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-slate-800">Completed Games</h2>
+              <h2 className="text-lg font-bold text-slate-800">Lõpetatud mängud</h2>
               <div className="flex items-center gap-2">
                 <Button
                   onClick={() =>
@@ -475,17 +475,17 @@ export default function ManageGames() {
                   className="bg-indigo-600 hover:bg-indigo-700 text-xs"
                 >
                   <RefreshCw className={`w-3 h-3 mr-1 ${bulkSyncMutation.isPending ? 'animate-spin' : ''}`} />
-                  {bulkSyncMutation.isPending ? 'Syncing...' : `Sync Selected (${selectedSyncGameIds.length})`}
+                  {bulkSyncMutation.isPending ? 'Sünkroniseerin...' : `Sünkroniseeri valitud (${selectedSyncGameIds.length})`}
                 </Button>
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium bg-white hover:border-emerald-300"
                 >
-                  <option value="all">All Months</option>
+                  <option value="all">Kõik kuud</option>
                   {sortedMonths.map((month) => {
                     const [year, monthNum] = month.split('-');
-                    const monthName = new Date(year, parseInt(monthNum) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    const monthName = new Date(year, parseInt(monthNum) - 1).toLocaleDateString('et-EE', { month: 'long', year: 'numeric' });
                     return <option key={month} value={month}>{monthName}</option>;
                   })}
                 </select>
@@ -501,15 +501,15 @@ export default function ManageGames() {
                         type="checkbox"
                         checked={allCompletedSelected}
                         onChange={toggleSelectAllCompleted}
-                        aria-label="Select all completed games"
+                        aria-label="Vali kõik lõpetatud mängud"
                         className="w-4 h-4 rounded"
                       />
                     </th>
-                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">Game</th>
-                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">Date</th>
-                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">Format</th>
-                    <th className="text-center py-3 px-4 text-slate-600 font-semibold">Players</th>
-                    <th className="text-right py-3 px-4 text-slate-600 font-semibold">Actions</th>
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">Mäng</th>
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">Kuupäev</th>
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">Formaat</th>
+                    <th className="text-center py-3 px-4 text-slate-600 font-semibold">Mängijad</th>
+                    <th className="text-right py-3 px-4 text-slate-600 font-semibold">Tegevused</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -526,7 +526,7 @@ export default function ManageGames() {
                               setSelectedSyncGameIds(selectedSyncGameIds.filter((id) => id !== game.id));
                             }
                           }}
-                          aria-label={`Select ${game.name}`}
+                          aria-label={`Vali ${game.name}`}
                           className="w-4 h-4 rounded"
                         />
                       </td>
@@ -554,11 +554,11 @@ export default function ManageGames() {
                             size="sm"
                             className="bg-blue-600 hover:bg-blue-700 text-xs"
                           >
-                            {isGameSubmitted(game.id) ? 'Resync' : 'Submit'}
+                            {isGameSubmitted(game.id) ? 'Sünkroniseeri uuesti' : 'Saada'}
                           </Button>
                           <Button
                             onClick={() => {
-                              if (confirm('Delete this game?')) {
+                              if (confirm('Kustuta see mäng?')) {
                                 deleteGameMutation.mutate(game.id);
                               }
                             }}
@@ -582,11 +582,11 @@ export default function ManageGames() {
         {showGroupDialog && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-              <h3 className="text-xl font-bold text-slate-800 mb-4">Create Game Group</h3>
+              <h3 className="text-xl font-bold text-slate-800 mb-4">Loo mängugrupp</h3>
               <Input
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="e.g., Thursday Training"
+                placeholder="nt Neljapäevane treening"
                 className="mb-4"
               />
               <div className="flex gap-3">
@@ -595,13 +595,13 @@ export default function ManageGames() {
                   variant="outline"
                   className="flex-1"
                 >
-                  Cancel
+                  Tühista
                 </Button>
                 <Button
                   onClick={handleCreateGroup}
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                 >
-                  Create
+                  Loo
                 </Button>
               </div>
             </div>

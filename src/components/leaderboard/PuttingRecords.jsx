@@ -273,7 +273,7 @@ export default function PuttingRecords() {
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
       <div className="flex items-center gap-3 mb-6">
         <Trophy className="w-6 h-6 text-amber-500" />
-        <h2 className="text-2xl font-bold text-slate-800">Putting Records</h2>
+        <h2 className="text-2xl font-bold text-slate-800">Puttingu rekordid</h2>
       </div>
 
       <Tabs value={selectedView} onValueChange={setSelectedView}>
@@ -291,10 +291,10 @@ export default function PuttingRecords() {
               <div className="flex gap-3 flex-wrap">
                 <Select value={selectedGender} onValueChange={setSelectedGender}>
                   <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Gender" />
+                    <SelectValue placeholder="Sugu" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="all">Kõik</SelectItem>
                     <SelectItem value="M">Mehed</SelectItem>
                     <SelectItem value="N">Naised</SelectItem>
                   </SelectContent>
@@ -302,10 +302,10 @@ export default function PuttingRecords() {
 
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                   <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Month" />
+                    <SelectValue placeholder="Kuu" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="all">Kogu aeg</SelectItem>
                     {monthOptions.map(opt => (
                       <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
@@ -322,7 +322,7 @@ export default function PuttingRecords() {
                 ) : (
                   <div className="text-center py-12 text-slate-400">
                     <Target className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No records yet. Be the first!</p>
+                    <p>Rekordeid veel pole. Ole esimene!</p>
                   </div>
                 )
               ) : (
@@ -331,17 +331,17 @@ export default function PuttingRecords() {
                     <thead>
                       <tr className="border-b-2 border-slate-200">
                         <th className="text-left py-3 px-2 text-slate-600 font-semibold">#</th>
-                        <th className="text-left py-3 px-2 text-slate-600 font-semibold">Player</th>
-                        <th className="text-center py-3 px-2 text-slate-600 font-semibold">Score</th>
+                        <th className="text-left py-3 px-2 text-slate-600 font-semibold">Mängija</th>
+                        <th className="text-center py-3 px-2 text-slate-600 font-semibold">Tulemus</th>
                         {!isATWView && (
                           <th className="text-center py-3 px-2 text-slate-600 font-semibold">
-                            {currentView.gameType === 'streak_challenge' ? 'Distance' : 'Accuracy'}
+                            {currentView.gameType === 'streak_challenge' ? 'Distants' : 'Täpsus'}
                           </th>
                         )}
                         {!isATWView && (
-                          <th className="text-center py-3 px-2 text-slate-600 font-semibold">Putts</th>
+                          <th className="text-center py-3 px-2 text-slate-600 font-semibold">Putid</th>
                         )}
-                        <th className="text-right py-3 px-2 text-slate-600 font-semibold">Date</th>
+                        <th className="text-right py-3 px-2 text-slate-600 font-semibold">Kuupäev</th>
                         {canDelete && (
                           <th className="text-right py-3 px-2 text-slate-600 font-semibold">Kustuta</th>
                         )}
@@ -409,7 +409,7 @@ export default function PuttingRecords() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const player = getResolvedPlayerName(entry) || 'unknown';
+                                  const player = getResolvedPlayerName(entry) || 'tundmatu';
                                   if (!confirm(`Kustuta "${player}" sellest tabelist?`)) {
                                     return;
                                   }

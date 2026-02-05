@@ -18,8 +18,8 @@ export default function PuttingKingSetup() {
   const [pin, setPin] = useState(() => Math.floor(1000 + Math.random() * 9000).toString());
   const [targetScore, setTargetScore] = useState(21);
   const [stations, setStations] = useState([
-    { name: 'Basket 1', order: 1 },
-    { name: 'Basket 2', order: 2 }
+    { name: 'Korv 1', order: 1 },
+    { name: 'Korv 2', order: 2 }
   ]);
 
   const { data: user } = useQuery({
@@ -93,7 +93,7 @@ export default function PuttingKingSetup() {
     },
     onSuccess: (tournament) => {
       queryClient.invalidateQueries({ queryKey: ['putting-king-tournaments'] });
-      toast.success('Tournament created!');
+      toast.success('Turniir loodud!');
       navigate(`${createPageUrl('PuttingKingOverview')}?id=${tournament.id}`);
     }
   });
@@ -139,19 +139,19 @@ export default function PuttingKingSetup() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries();
-      toast.success('Tournament updated!');
+      toast.success('Turniir uuendatud!');
       navigate(`${createPageUrl('PuttingKingOverview')}?id=${tournamentId}`);
     }
   });
 
   const handleSave = () => {
     if (!tournamentName.trim()) {
-      alert('Please enter tournament name');
+      alert('Sisesta turniiri nimi');
       return;
     }
 
     if (stations.length < 1) {
-      alert('Need at least 1 station');
+      alert('Vaja vähemalt 1 jaama');
       return;
     }
 
@@ -171,7 +171,7 @@ export default function PuttingKingSetup() {
 
   const addStation = () => {
     setStations([...stations, {
-      name: `Basket ${stations.length + 1}`,
+      name: `Korv ${stations.length + 1}`,
       order: stations.length + 1
     }]);
   };
@@ -184,33 +184,33 @@ export default function PuttingKingSetup() {
           className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Back</span>
+          <span className="font-medium">Tagasi</span>
         </button>
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">
-            {tournamentId ? 'Manage Tournament' : 'Setup Tournament'}
+            {tournamentId ? 'Halda turniiri' : 'Loo turniir'}
           </h1>
           <p className="text-slate-600">
-            {tournamentId ? 'Edit tournament settings' : 'Create tournament and add players afterwards'}
+            {tournamentId ? 'Muuda turniiri seadeid' : 'Loo turniir ja lisa mängijad hiljem'}
           </p>
         </div>
 
         <div className="space-y-6">
           {/* Basic Settings */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-            <h3 className="font-bold text-slate-800 mb-4">Basic Settings</h3>
+            <h3 className="font-bold text-slate-800 mb-4">Põhiseaded</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Tournament Name</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Turniiri nimi</label>
                 <Input
                   value={tournamentName}
                   onChange={(e) => setTournamentName(e.target.value)}
-                  placeholder="e.g., Friday Night Battles"
+                  placeholder="nt Reede õhtu lahingud"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">PIN Code</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">PIN-kood</label>
                 <div className="flex items-center gap-3">
                   <div className="flex-1 bg-purple-50 border-2 border-purple-200 rounded-xl p-4 text-center">
                     <div className="text-3xl font-bold text-purple-600 tracking-wider">{pin}</div>
@@ -218,19 +218,19 @@ export default function PuttingKingSetup() {
                   <Button
                     onClick={() => {
                       navigator.clipboard.writeText(pin);
-                      toast.success('PIN copied!');
+                      toast.success('PIN kopeeritud!');
                     }}
                     variant="outline"
                   >
-                    Copy
+                    Kopeeri
                   </Button>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  {tournamentId ? 'PIN cannot be changed' : 'Players will use this PIN to join'}
+                  {tournamentId ? 'PIN-i ei saa muuta' : 'Mängijad kasutavad seda PIN-i liitumiseks'}
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Target Score</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Eesmärk</label>
                 <Input
                   type="number"
                   value={targetScore}
@@ -243,10 +243,10 @@ export default function PuttingKingSetup() {
           {/* Stations */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-slate-800">Stations</h3>
+              <h3 className="font-bold text-slate-800">Jaamad</h3>
               <Button onClick={addStation} size="sm" variant="outline">
                 <Plus className="w-4 h-4 mr-1" />
-                Add
+                Lisa
               </Button>
             </div>
             <div className="space-y-3">
@@ -259,7 +259,7 @@ export default function PuttingKingSetup() {
                       newStations[idx].name = e.target.value;
                       setStations(newStations);
                     }}
-                    placeholder="Station name"
+                    placeholder="Jaama nimi"
                   />
                   {stations.length > 1 && (
                     <Button
@@ -284,11 +284,11 @@ export default function PuttingKingSetup() {
             {tournamentId ? (
               <>
                 <Save className="w-5 h-5 mr-2" />
-                {updateTournamentMutation.isPending ? 'Saving...' : 'Save Changes'}
+                {updateTournamentMutation.isPending ? 'Salvestan...' : 'Salvesta muudatused'}
               </>
             ) : (
               <>
-                {createTournamentMutation.isPending ? 'Creating...' : 'Create Tournament'}
+                {createTournamentMutation.isPending ? 'Loon...' : 'Loo turniir'}
               </>
             )}
           </Button>

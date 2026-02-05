@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Trophy, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
 
 export default function JoinPuttingKing({ onJoin, onBack }) {
   const [pin, setPin] = useState('');
@@ -27,13 +26,13 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
   const handleJoin = async () => {
     setError('');
     if (pin.length !== 4) {
-      setError('PIN must be 4 digits');
+      setError('PIN peab olema 4-kohaline');
       return;
     }
 
     const tournament = tournaments.find(t => t.pin === pin);
     if (!tournament) {
-      setError('Invalid PIN');
+      setError('Vale PIN');
       return;
     }
 
@@ -48,7 +47,7 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
     try {
       // Check if tournament is still joinable (setup or active only)
       if (tournament.status === 'finished' || tournament.status === 'paused') {
-        setError('This tournament is no longer accepting players');
+        setError('See turniir ei võta enam mängijaid vastu');
         return;
       }
 
@@ -59,7 +58,7 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
       const isTournamentComplete = tournament.current_round === tournament.total_rounds && allMatchesFinished;
       
       if (isTournamentComplete) {
-        setError('This tournament has already finished');
+        setError('See turniir on juba lõppenud');
         return;
       }
 
@@ -87,7 +86,7 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
 
       onJoin(tournament);
     } catch (error) {
-      setError('Failed to join tournament');
+      setError('Turniiriga liitumine ebaõnnestus');
     }
   };
 
@@ -99,20 +98,20 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
           className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-8"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Back</span>
+          <span className="font-medium">Tagasi</span>
         </button>
 
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Trophy className="w-10 h-10 text-purple-600" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Join Tournament</h1>
-          <p className="text-slate-600">Enter PIN to join a Putting King tournament</p>
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Liitu turniiriga</h1>
+          <p className="text-slate-600">Sisesta PIN, et liituda Putting King turniiriga</p>
         </div>
 
         {/* PIN Input */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-6">
-          <label className="block text-sm font-medium text-slate-700 mb-2">Tournament PIN</label>
+          <label className="block text-sm font-medium text-slate-700 mb-2">Turniiri PIN</label>
           <div className="flex gap-3">
             <Input
               type="text"
@@ -123,7 +122,7 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
               maxLength={4}
             />
             <Button onClick={handleJoin} className="bg-purple-600 hover:bg-purple-700 px-8">
-              Join
+              Liitu
             </Button>
           </div>
           {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
@@ -132,7 +131,7 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
         {/* Active Tournaments */}
         {tournaments.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Active Tournaments</h3>
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Käimasolevad turniirid</h3>
             <div className="space-y-3">
               {tournaments.map(tournament => (
                 <button
@@ -145,7 +144,7 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
                       <h4 className="font-bold text-slate-800">{tournament.name}</h4>
                       <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
                         <Calendar className="w-3 h-3" />
-                        <span>Round {tournament.current_round} of {tournament.total_rounds}</span>
+                        <span>Ring {tournament.current_round}/{tournament.total_rounds}</span>
                       </div>
                     </div>
                     <div className="bg-purple-100 px-3 py-1 rounded-lg">
@@ -159,8 +158,8 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
                       tournament.status === 'setup' ? 'bg-blue-100 text-blue-700' : 
                       'bg-slate-100 text-slate-700'
                     }`}>
-                      {tournament.status === 'active' ? 'Active' : 
-                       tournament.status === 'setup' ? 'Setup' : 
+                      {tournament.status === 'active' ? 'Aktiivne' : 
+                       tournament.status === 'setup' ? 'Seadistus' : 
                        tournament.status}
                     </span>
                   </div>

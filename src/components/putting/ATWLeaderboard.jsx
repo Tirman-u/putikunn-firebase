@@ -31,7 +31,7 @@ export default function ATWLeaderboard({ game }) {
             <Trophy className="w-5 h-5 text-amber-500" />
           </div>
           <div className="text-2xl font-bold text-amber-600">{bestScore}</div>
-          <div className="text-xs text-slate-500 mt-1">Best Score</div>
+          <div className="text-xs text-slate-500 mt-1">Parim tulemus</div>
           <div className="text-xs text-slate-600 font-medium mt-1">
             {bestScorePlayer?.name}
           </div>
@@ -42,7 +42,7 @@ export default function ATWLeaderboard({ game }) {
             <RotateCcw className="w-5 h-5 text-blue-500" />
           </div>
           <div className="text-2xl font-bold text-blue-600">{bestLaps}</div>
-          <div className="text-xs text-slate-500 mt-1">Most Laps</div>
+          <div className="text-xs text-slate-500 mt-1">Enim ringe</div>
           <div className="text-xs text-slate-600 font-medium mt-1">
             {bestLapsPlayer?.name}
           </div>
@@ -53,7 +53,7 @@ export default function ATWLeaderboard({ game }) {
             <Target className="w-5 h-5 text-purple-500" />
           </div>
           <div className="text-2xl font-bold text-purple-600">{bestAttempts}</div>
-          <div className="text-xs text-slate-500 mt-1">Attempts</div>
+          <div className="text-xs text-slate-500 mt-1">Katseid</div>
           <div className="text-xs text-slate-600 font-medium mt-1">
             {bestAttemptsPlayer?.name}
           </div>
@@ -66,10 +66,10 @@ export default function ATWLeaderboard({ game }) {
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
               <th className="text-left p-4 font-semibold text-slate-700">#</th>
-              <th className="text-left p-4 font-semibold text-slate-700">Player</th>
-              <th className="text-center p-4 font-semibold text-slate-700">Score</th>
-              <th className="text-center p-4 font-semibold text-slate-700">Laps</th>
-              <th className="text-center p-4 font-semibold text-slate-700">Attempts</th>
+              <th className="text-left p-4 font-semibold text-slate-700">Mängija</th>
+              <th className="text-center p-4 font-semibold text-slate-700">Tulemus</th>
+              <th className="text-center p-4 font-semibold text-slate-700">Ringid</th>
+              <th className="text-center p-4 font-semibold text-slate-700">Katseid</th>
             </tr>
           </thead>
           <tbody>

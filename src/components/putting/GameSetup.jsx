@@ -28,7 +28,7 @@ export default function GameSetup({ onStartGame }) {
     const validPlayers = players.filter(p => p.trim());
     if (validPlayers.length >= 1) {
       onStartGame({
-        name: gameName || `Game ${new Date().toLocaleDateString()}`,
+        name: gameName || `Mäng ${new Date().toLocaleDateString('et-EE')}`,
         players: validPlayers
       });
     }
@@ -44,31 +44,31 @@ export default function GameSetup({ onStartGame }) {
           <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-emerald-200">
             <span className="text-4xl">🥏</span>
           </div>
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Putt Game</h1>
-          <p className="text-slate-500">Set up your disc golf putting session</p>
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Puttimäng</h1>
+          <p className="text-slate-500">Seadista oma puttamise treening</p>
         </div>
 
         {/* Game Name */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-4">
           <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Session Name (optional)
+            Treeningu nimi (valikuline)
           </label>
           <Input
             value={gameName}
             onChange={(e) => setGameName(e.target.value)}
-            placeholder="e.g., Thursday Practice"
+            placeholder="nt Neljapäevane treening"
             className="h-12 rounded-xl border-slate-200"
           />
         </div>
 
         {/* Game Rules */}
         <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-sm mb-4 text-white">
-          <h3 className="font-bold text-lg mb-3">🥏 Jyly Rules</h3>
+          <h3 className="font-bold text-lg mb-3">🥏 Jyly reeglid</h3>
           <ul className="text-sm space-y-2 opacity-95">
-            <li>• Start at 10m, throw 5 discs</li>
-            <li>• Based on makes, next distance: 0→5m, 1→6m, 2→7m, 3→8m, 4→9m, 5→10m</li>
-            <li>• Points = distance × makes (e.g., 3 makes from 8m = 24pts)</li>
-            <li>• Play 20 rounds total</li>
+            <li>• Alusta 10m pealt, viska 5 ketast</li>
+            <li>• Tabamuste põhjal järgmine distants: 0→5m, 1→6m, 2→7m, 3→8m, 4→9m, 5→10m</li>
+            <li>• Punktid = distants × tabamused (nt 3 tabamust 8m pealt = 24 p)</li>
+            <li>• Kokku 20 ringi</li>
           </ul>
         </div>
 
@@ -77,9 +77,9 @@ export default function GameSetup({ onStartGame }) {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-emerald-600" />
-              <span className="text-sm font-semibold text-slate-700">Players</span>
+              <span className="text-sm font-semibold text-slate-700">Mängijad</span>
             </div>
-            <span className="text-sm text-slate-400">{validPlayerCount} added</span>
+            <span className="text-sm text-slate-400">{validPlayerCount} lisatud</span>
           </div>
           
           <AnimatePresence>
@@ -95,7 +95,7 @@ export default function GameSetup({ onStartGame }) {
                   <Input
                     value={player}
                     onChange={(e) => updatePlayer(index, e.target.value)}
-                    placeholder={`Player ${index + 1}`}
+                    placeholder={`Mängija ${index + 1}`}
                     className="h-12 rounded-xl border-slate-200"
                   />
                   {players.length > 1 && (
@@ -117,7 +117,7 @@ export default function GameSetup({ onStartGame }) {
             className="w-full h-12 mt-4 rounded-xl border-dashed border-2"
           >
             <Plus className="w-5 h-5 mr-2" />
-            Add Player
+            Lisa mängija
           </Button>
         </div>
 
@@ -128,7 +128,7 @@ export default function GameSetup({ onStartGame }) {
           className="w-full h-16 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-xl font-bold rounded-2xl shadow-xl shadow-emerald-200 disabled:opacity-50"
         >
           <Play className="w-6 h-6 mr-3" />
-          Start Game
+          Alusta mängu
         </Button>
       </div>
     </div>

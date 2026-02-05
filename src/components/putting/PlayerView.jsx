@@ -11,6 +11,7 @@ import BackAndForthScoreInput from './BackAndForthScoreInput';
 import StreakChallengeInput from './StreakChallengeInput';
 import MobileLeaderboard from './MobileLeaderboard';
 import PerformanceAnalysis from './PerformanceAnalysis';
+import { createPageUrl } from '@/utils';
 import useRealtimeGame from '@/hooks/use-realtime-game';
 import LoadingState from '@/components/ui/loading-state';
 import { logSyncMetric } from '@/lib/metrics';
@@ -39,6 +40,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const [showLeaderboard, setShowLeaderboard] = React.useState(false);
   const [hasSubmitted, setHasSubmitted] = React.useState(false);
   const [hasAskedSoloSubmit, setHasAskedSoloSubmit] = React.useState(false);
+  const [redirectedToResults, setRedirectedToResults] = React.useState(false);
   const [streakDistanceSelected, setStreakDistanceSelected] = React.useState(false);
   const [hideScore, setHideScore] = React.useState(false);
   const [streakComplete, setStreakComplete] = React.useState(false);
@@ -65,7 +67,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     gameIdRef.current = gameId;
   }, [gameId]);
 
-  const { game, isLoading, isSoloGame } = usePlayerGameState({ gameId });
+  const { user, game, isLoading, isSoloGame } = usePlayerGameState({ gameId });
 
   React.useEffect(() => {
     setHasAskedSoloSubmit(false);
@@ -180,19 +182,28 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
   // Initialize local state (solo + multiplayer)
   React.useEffect(() => {
-    if (game && !localGameState) {
-      const initialState = {
-        player_putts: game.player_putts || {},
-        total_points: game.total_points || {},
-        player_distances: game.player_distances || {},
-        player_current_streaks: game.player_current_streaks || {},
-        player_highest_streaks: game.player_highest_streaks || {},
-        status: game.status
-      };
-      setLocalGameState(initialState);
-      localGameStateRef.current = initialState;
+    if (!game) return;
+    const nextState = {
+      player_putts: game.player_putts || {},
+      total_points: game.total_points || {},
+      player_distances: game.player_distances || {},
+      player_current_streaks: game.player_current_streaks || {},
+      player_highest_streaks: game.player_highest_streaks || {},
+      status: game.status
+    };
+
+    if (isSoloGame) {
+      if (!localGameState) {
+        setLocalGameState(nextState);
+        localGameStateRef.current = nextState;
+      }
+      return;
     }
-  }, [game, localGameState]);
+
+    if (pendingUpdateRef.current || pendingLiveRef.current || syncInFlightRef.current) return;
+    setLocalGameState(nextState);
+    localGameStateRef.current = nextState;
+  }, [game, isSoloGame, localGameState]);
 
   const updateGameMutation = useMutation({
     mutationFn: async ({ id, data }) => {
@@ -332,6 +343,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       localGameStateRef.current = nextState;
     } else {
       if (!game?.id) return;
+      if (game?.status === 'closed' || game?.join_closed === true) {
+        toast.error('Mäng on suletud');
+        return;
+      }
       // For multiplayer games, update local cache immediately and debounce DB writes
       const nextState = { ...current, ...data };
       const liveStats = buildLiveStats(nextState);
@@ -453,7 +468,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     },
     onSuccess: () => {
       setHasSubmitted(true);
-      toast.success('Result submitted to leaderboard!');
+      toast.success('Tulemus edetabelisse saadetud!');
     }
   });
 
@@ -722,6 +737,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     isGameComplete(gameType, playerPutts.length) ||
     (gameType === 'streak_challenge' && (currentState.status === 'completed' || streakComplete))
   );
+  const userRole = user?.app_role || 'user';
+  const canAdminSubmit = ['trainer', 'admin', 'super_admin'].includes(userRole);
+  const isHost = Boolean(user?.email && currentState?.host_user && user.email === currentState.host_user);
+  const canSubmitHosted = isHost || canAdminSubmit;
 
   React.useEffect(() => {
     if (!currentState || !isComplete || !isSoloGame || hasSubmitted || hasAskedSoloSubmit) return;
@@ -731,6 +750,12 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       submitToLeaderboardMutation.mutate();
     }
   }, [currentState, hasAskedSoloSubmit, hasSubmitted, isComplete, isSoloGame, submitToLeaderboardMutation]);
+
+  React.useEffect(() => {
+    if (!currentState || !isComplete || !isSoloGame || redirectedToResults || !hasAskedSoloSubmit || !game?.id) return;
+    setRedirectedToResults(true);
+    window.location.href = `${createPageUrl('GameResult')}?id=${game.id}`;
+  }, [currentState, game?.id, hasAskedSoloSubmit, isComplete, isSoloGame, redirectedToResults]);
 
   if (isLoading || !game || !currentState) {
     return <LoadingState />;
@@ -749,23 +774,23 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             <div className="w-32 h-32 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-amber-300">
               <Trophy className="w-16 h-16 text-white" />
             </div>
-            <h1 className="text-4xl font-bold text-slate-800 mb-4">🎉 Complete!</h1>
-            <p className="text-xl text-slate-600 mb-2">You finished all rounds</p>
-            <p className="text-4xl font-bold text-emerald-600">{currentState.total_points[playerName]} points</p>
+            <h1 className="text-4xl font-bold text-slate-800 mb-4">🎉 Lõpetatud!</h1>
+            <p className="text-xl text-slate-600 mb-2">Lõpetasid kõik ringid</p>
+            <p className="text-4xl font-bold text-emerald-600">{currentState.total_points[playerName]} punkti</p>
             </motion.div>
 
             {/* Performance Analysis */}
             <PerformanceAnalysis playerPutts={playerPutts} />
 
             <div className="space-y-3 mt-6">
-            {!hasSubmitted && (
+            {!hasSubmitted && (isSoloGame || canSubmitHosted) && (
               <Button
                 onClick={() => submitToLeaderboardMutation.mutate()}
                 disabled={submitToLeaderboardMutation.isPending}
                 className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 rounded-xl"
               >
                 <Upload className="w-5 h-5 mr-2" />
-                Submit to Leaderboard
+                Saada edetabelisse
               </Button>
             )}
             <Button
@@ -773,14 +798,14 @@ export default function PlayerView({ gameId, playerName, onExit }) {
               className="w-full h-14 bg-slate-600 hover:bg-slate-700 rounded-xl"
             >
               <Trophy className="w-5 h-5 mr-2" />
-              View Leaderboard
+              Vaata edetabelit
             </Button>
             <Button
               onClick={onExit}
               variant="outline"
               className="w-full h-14 rounded-xl"
             >
-              Exit Game
+              Välju mängust
             </Button>
           </div>
         </div>
@@ -811,7 +836,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           <div className="text-center">
             <h2 className="text-lg font-bold text-slate-800">{game.name}</h2>
             <p className="text-sm text-slate-500">
-              {format.name} • Round {currentRound} of {totalRounds}
+              {format.name} • Ring {currentRound}/{totalRounds}
             </p>
           </div>
           <button
@@ -824,22 +849,22 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
         {/* Your Stats */}
         {gameType !== 'streak_challenge' && (
-          <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 mb-4">
+          <div className="bg-white rounded-xl p-2 sm:p-3 shadow-sm border border-slate-100 mb-3 sm:mb-4">
             <div className="flex items-center justify-around text-center">
               <div>
-                <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Best Streak' : 'Points'}</div>
-                <div className="text-2xl font-bold text-emerald-600">
+                <div className="text-[11px] sm:text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Parim seeria' : 'Punktid'}</div>
+                <div className="text-xl sm:text-2xl font-bold text-emerald-600">
                   {hideScore ? '***' : (gameType === 'streak_challenge' ? (currentState.player_highest_streaks?.[playerName] || 0) : (currentState.total_points[playerName] || 0))}
                 </div>
               </div>
-              <div className="h-10 w-px bg-slate-200" />
+              <div className="h-8 sm:h-10 w-px bg-slate-200" />
               <div>
-                <div className="text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Putts' : 'Round'}</div>
-                <div className="text-2xl font-bold text-slate-600">
+                <div className="text-[11px] sm:text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Putid' : 'Ring'}</div>
+                <div className="text-xl sm:text-2xl font-bold text-slate-600">
                   {gameType === 'streak_challenge' ? playerPutts.length : `${currentRound}/${totalRounds}`}
                 </div>
               </div>
-              <div className="h-10 w-px bg-slate-200" />
+              <div className="h-8 sm:h-10 w-px bg-slate-200" />
               <button
                 onClick={() => setHideScore(!hideScore)}
                 className="flex flex-col items-center justify-center"
@@ -849,8 +874,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
                 ) : (
                   <Eye className="w-5 h-5 text-slate-400" />
                 )}
-                <div className="text-xs text-slate-400 mt-1">
-                  {hideScore ? 'Show' : 'Hide'}
+                <div className="text-[11px] sm:text-xs text-slate-400 mt-1">
+                  {hideScore ? 'Näita' : 'Peida'}
                 </div>
               </button>
             </div>

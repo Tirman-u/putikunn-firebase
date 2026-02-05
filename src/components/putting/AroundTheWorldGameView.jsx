@@ -155,7 +155,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
               <div className="text-4xl font-bold text-purple-600 mb-2">{attemptsCount}</div>
-              <div className="text-sm text-slate-600">Attempts</div>
+              <div className="text-sm text-slate-600">Katseid</div>
             </div>
           </div>
 
@@ -211,7 +211,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
                 disabled={submitToLeaderboardMutation.isPending || submitToLeaderboardMutation.isSuccess}
                 className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg"
               >
-                {submitToLeaderboardMutation.isSuccess ? '✓ Submitted' : 'Submit to Leaderboard'}
+                {submitToLeaderboardMutation.isSuccess ? '✓ Saadetud' : 'Saada edetabelisse'}
               </Button>
             )}
             <Button
@@ -313,7 +313,7 @@ const ActiveGameView = React.memo(({
           </div>
           <div className="bg-white rounded-xl p-3 text-center shadow-sm">
             <div className="text-xl font-bold text-purple-600">{attemptsCount}</div>
-            <div className="text-xs text-slate-600">Attempts</div>
+            <div className="text-xs text-slate-600">Katseid</div>
           </div>
         </div>
         
@@ -401,13 +401,13 @@ const ActiveGameView = React.memo(({
                     onClick={() => handleShot(false)}
                     className="h-14 rounded-xl font-bold text-base bg-red-100 text-red-700 hover:bg-red-200 active:scale-95 transition-all"
                   >
-                    Miss
+                    Mööda
                   </button>
                   <button
                     onClick={() => handleShot(true)}
                     className="h-14 rounded-xl font-bold text-base bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 transition-all"
                   >
-                    Make
+                    Sees
                   </button>
                 </div>
               </div>
@@ -417,13 +417,13 @@ const ActiveGameView = React.memo(({
                   onClick={() => handleSubmitPutts(0)}
                   className="h-16 rounded-xl font-bold text-lg bg-red-100 text-red-700 hover:bg-red-200 active:scale-95 transition-all"
                 >
-                  Missed
+                  Mööda
                 </button>
                 <button
                   onClick={() => handleSubmitPutts(1)}
                   className="h-16 rounded-xl font-bold text-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 transition-all"
                 >
-                  Made
+                  Sees
                 </button>
               </div>
             )}
@@ -494,11 +494,11 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
         <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 shadow-lg text-white">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-semibold mb-1 opacity-90">Game PIN</div>
+              <div className="text-sm font-semibold mb-1 opacity-90">Mängu PIN</div>
               <div className="text-3xl font-bold tracking-widest">{game.pin}</div>
             </div>
             <div className="text-sm opacity-90">
-              {playerNames.length} players
+              {playerNames.length} mängijat
             </div>
           </div>
         </div>
@@ -509,20 +509,20 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
           <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <Trophy className="w-5 h-5 text-amber-500" />
-              <div className="text-sm text-slate-600">Best Score</div>
+              <div className="text-sm text-slate-600">Parim tulemus</div>
             </div>
             <div className="text-3xl font-bold text-emerald-600">{bestPlayer.bestScore}</div>
             <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
-            <div className="text-sm text-slate-600 mb-2">Most Laps</div>
+            <div className="text-sm text-slate-600 mb-2">Enim ringe</div>
             <div className="text-3xl font-bold text-blue-600">{bestPlayer.bestLaps}</div>
             <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <Target className="w-5 h-5 text-purple-500" />
-              <div className="text-sm text-slate-600">Attempts</div>
+              <div className="text-sm text-slate-600">Katseid</div>
             </div>
             <div className="text-3xl font-bold text-purple-600">{mostAttempts}</div>
             <div className="text-xs text-slate-500 mt-1">{mostAttemptsPlayer?.name}</div>
@@ -536,11 +536,11 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="text-left p-4 font-semibold text-slate-700">#</th>
-                <th className="text-left p-4 font-semibold text-slate-700">Player</th>
-                <th className="text-center p-4 font-semibold text-slate-700">Best Score</th>
-                <th className="text-center p-4 font-semibold text-slate-700">Current</th>
-                <th className="text-center p-4 font-semibold text-slate-700">Laps</th>
-                <th className="text-center p-4 font-semibold text-slate-700">Attempts</th>
+                <th className="text-left p-4 font-semibold text-slate-700">Mängija</th>
+                <th className="text-center p-4 font-semibold text-slate-700">Parim tulemus</th>
+                <th className="text-center p-4 font-semibold text-slate-700">Praegu</th>
+                <th className="text-center p-4 font-semibold text-slate-700">Ringid</th>
+                <th className="text-center p-4 font-semibold text-slate-700">Katseid</th>
               </tr>
             </thead>
             <tbody>

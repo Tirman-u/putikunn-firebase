@@ -1,10 +1,11 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { GAME_FORMATS, getTotalRounds } from './gameRules';
 
 export default function ProgressBar({ putts, gameType }) {
-  const isBackAndForth = gameType === 'back_and_forth';
-  const totalRounds = 20;
-  const puttsPerRound = 5;
+  const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
+  const totalRounds = getTotalRounds(gameType);
+  const puttsPerRound = format.puttsPerRound || 5;
   
   // Group putts into rounds
   const rounds = [];

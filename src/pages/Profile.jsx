@@ -226,6 +226,7 @@ export default function Profile() {
   // Calculate best scores by game format
   const gameFormatStats = {
     classic: 0,
+    mini_league: 0,
     short: 0,
     long: 0,
     back_and_forth: 0,
@@ -648,6 +649,7 @@ export default function Profile() {
                  <SelectContent>
                    <SelectItem value="all">Kõik formaadid</SelectItem>
                    <SelectItem value="classic">Classic</SelectItem>
+                   <SelectItem value="mini_league">Mini Liiga</SelectItem>
                    <SelectItem value="short">Short</SelectItem>
                    <SelectItem value="long">Long</SelectItem>
                    <SelectItem value="back_and_forth">Back & Forth</SelectItem>

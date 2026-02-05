@@ -455,6 +455,7 @@ export default function ManageGames() {
   const getGameTypeName = (type) => {
     const names = {
       classic: 'Classic',
+      mini_league: 'Mini Liiga',
       back_and_forth: 'Back & Forth',
       short: 'Short',
       long: 'Long'

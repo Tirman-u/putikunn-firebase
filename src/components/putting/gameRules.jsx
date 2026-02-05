@@ -18,6 +18,15 @@ export const GAME_FORMATS = {
     puttsPerRound: 5,
     distanceMap: [5, 6, 7, 8, 9, 10]
   },
+  mini_league: {
+    name: 'Mini Liiga',
+    minDistance: 5,
+    maxDistance: 10,
+    startDistance: 10,
+    puttsPerRound: 5,
+    totalRounds: 10,
+    distanceMap: [5, 6, 7, 8, 9, 10]
+  },
   short: {
     name: 'Short',
     minDistance: 3,
@@ -66,6 +75,12 @@ export const MAX_ROUNDS = 20;
 
 // Streak challenge has no round limit
 export const STREAK_UNLIMITED = true;
+
+export function getTotalRounds(gameType) {
+  const format = GAME_FORMATS[gameType];
+  if (!format) return MAX_ROUNDS;
+  return format.totalRounds || MAX_ROUNDS;
+}
 
 // Calculate next distance for Classic/Short/Long formats
 export function getNextDistanceFromMade(gameType, madeCount) {
@@ -120,7 +135,8 @@ export function isGameComplete(gameType, puttCount) {
     return false;
   }
   const format = GAME_FORMATS[gameType];
-  const totalPutts = MAX_ROUNDS * format.puttsPerRound;
+  const totalRounds = getTotalRounds(gameType);
+  const totalPutts = totalRounds * format.puttsPerRound;
   return puttCount >= totalPutts;
 }
 

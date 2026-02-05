@@ -26,6 +26,7 @@ import {
   getNextDistanceFromMade, 
   getNextDistanceBackAndForth,
   calculateRoundScore,
+  getTotalRounds,
   isGameComplete 
 } from './gameRules';
 
@@ -833,7 +834,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
   // Scoring View
   const currentRound = gameType === 'streak_challenge' ? 1 : Math.floor(playerPutts.length / format.puttsPerRound) + 1;
-  const totalRounds = gameType === 'streak_challenge' ? 1 : 20;
+  const totalRounds = gameType === 'streak_challenge' ? 1 : getTotalRounds(gameType);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">

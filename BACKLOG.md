@@ -16,6 +16,7 @@ Staatus: ☐ Open, ⏳ In Progress, ✅ Done
 - ☐ Putting Records paginatsioon: Classic näitab 16 kirjet ja järgmisele lehele ei saa
 - ☐ Putting Records sünk: teistes tabelites puuduvad nimed (nt 4. veebr Back & Forth, 24 mängijat, tabelis vähem)
 - ☐ DG.ee tab tühi (peab näitama hostitud Classic rekordid)
+- ☐ Putting Records dublikaadid: sama mängu sama kasutaja mitmes reas (DG.ee/üldtabel)
 - ✅ Solo mängu tulemuste vaade: default tulemuste vaade peab olema tabel/host style (mitte “täpikesed” player view)
 - ✅ Join Game: aktiivsete mängude list näitab ka suletud mänge (peab näitama ainult aktiivseid)
 - ✅ Join Game mobiil: join-kaardi kõrgus/spacing liiga suur, nõuab scrolli (vajab kompaktsemat layouti)
@@ -24,6 +25,16 @@ Staatus: ☐ Open, ⏳ In Progress, ✅ Done
 - ✅ Hostitud mäng: “Submit to Leaderboard” peab olema ainult host/adminile (tava kasutaja ei tohi enne hosti lõppu midagi raporteerida)
 - ✅ Hostitud mängu lõppvaates tavakasutaja näeb “Submit to Leaderboard” nuppu (peita, ainult host/admin)
 - ✅ ATW reset: Attempts loendur resetib igal restartil (peab näitama kogukatsete arvu)
+- ✅ Uus mäng: "Mini Liiga" (Classic 50% mahust)
+- ☐ Mängu ajal näita skoori kõrval "potentsiaalne max skoor" (dünaamiline, muutub vastavalt tabamustele)
+- ☐ My Profile: putt % trendigraafik (nt viimased 10 mängu, näita tõusu/langust)
+- ☐ Distance Performance analüüs: defineeri "mugavus tsoon" kõige sagedamini esinevate distantside põhjal, ja "languse põhjus" (millisel distantsil tabamused kukuvad nii, et viib madalamale; nt 10m/9m mis tõmbab alla 8m/7m tsooni)
+- ☐ Puti stiilid: lisa juurde "Põlvelt putt" ja "Marksman"
+- ☐ Uus beta mäng: "Võitlus sõbraga" (2 mängijat, PIN/Join, ilma host-õigusteta)
+  - Variant A: kordamööda 1 ketas. Kui üks tabab ja teine mööda, tabaja liigub +1m. Kui mõlemad tabavad/mööda, keegi ei liigu. Võit 10m.
+  - Variant B: kordamööda 3 ketast. Kumb saab rohkem sisse, liigub +1m. Võit 10m.
+  - Variant C: sama mis B, aga 5 ketast.
+  - Vajab lahendust, et tavaline kasutaja saab luua PINi ja teine liitub, ilma host-rollita.
 
 ## 🟢 Low
 - ☐

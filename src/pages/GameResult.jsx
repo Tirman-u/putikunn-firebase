@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trash2, Share2, Calendar, Upload } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format as formatDate } from 'date-fns';
-import { GAME_FORMATS } from '@/components/putting/gameRules';
+import { GAME_FORMATS, getTotalRounds } from '@/components/putting/gameRules';
 import { toast } from 'sonner';
 import PerformanceAnalysis from '@/components/putting/PerformanceAnalysis';
 import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView';
@@ -301,6 +301,7 @@ export default function GameResult() {
 
   const gameType = game.game_type || 'classic';
   const gameFormat = GAME_FORMATS[gameType];
+  const totalRounds = getTotalRounds(gameType);
   const isHostedGame = Boolean(game.pin && game.pin !== '0000');
   const canSubmitDgForGame = canSubmitDiscgolf && isHostedClassicGame(game);
   const canAdminSubmit = ['trainer', 'admin', 'super_admin'].includes(userRole);
@@ -466,7 +467,7 @@ export default function GameResult() {
                 <thead>
                   <tr className="border-b border-slate-200">
                     <th className="text-left p-4 font-semibold text-slate-700 bg-slate-50 sticky left-0 z-10">Mängija</th>
-                    {[...Array(20)].map((_, i) => (
+                    {[...Array(totalRounds)].map((_, i) => (
                       <th key={i} className="text-center p-2 font-semibold text-slate-700 bg-slate-50 text-sm min-w-[60px]">
                         {i + 1}
                       </th>
@@ -485,7 +486,7 @@ export default function GameResult() {
                           <span>{player.name}</span>
                         </div>
                       </td>
-                      {[...Array(20)].map((_, frameIndex) => {
+                      {[...Array(totalRounds)].map((_, frameIndex) => {
                         const frame = player.frames[frameIndex];
                         return (
                           <td key={frameIndex} className="p-2 text-center">

@@ -11,6 +11,14 @@ const GAME_FORMATS = [
     color: 'emerald'
   },
   {
+    id: 'mini_league',
+    name: 'Mini Liiga',
+    distance: '5-10m',
+    description: 'Classic 10 ringi',
+    color: 'teal',
+    badge: 'BETA'
+  },
+  {
     id: 'back_and_forth',
     name: 'Back & Forth',
     distance: '5-10m',

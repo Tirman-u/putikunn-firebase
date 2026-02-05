@@ -21,6 +21,7 @@ export default function PuttingRecords() {
 
   const viewTypes = [
     { id: 'general_classic', label: 'Classic', leaderboardType: 'general', gameType: 'classic' },
+    { id: 'general_mini_league', label: 'Mini Liiga', leaderboardType: 'general', gameType: 'mini_league' },
     { id: 'general_back_and_forth', label: 'Back & Forth', leaderboardType: 'general', gameType: 'back_and_forth' },
     { id: 'general_short', label: 'Short', leaderboardType: 'general', gameType: 'short' },
     { id: 'general_streak_challenge', label: 'Streak', leaderboardType: 'general', gameType: 'streak_challenge' },

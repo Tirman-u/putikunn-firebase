@@ -9,6 +9,8 @@ import PuttingKingOverview from './pages/PuttingKingOverview';
 import PuttingKingScoring from './pages/PuttingKingScoring';
 import PuttingKingSetup from './pages/PuttingKingSetup';
 import PuttingRecordsPage from './pages/PuttingRecordsPage';
+import HostDuelPreviewPage from './pages/HostDuelPreview';
+import PlayerDuelPreviewPage from './pages/PlayerDuelPreview';
 import SoloDuelPreviewPage from './pages/SoloDuelPreview';
 import SubmitDiscgolf from './pages/SubmitDiscgolf';
 
@@ -25,6 +27,8 @@ export const PAGES = {
     "PuttingKingScoring": PuttingKingScoring,
     "PuttingKingSetup": PuttingKingSetup,
     "PuttingRecordsPage": PuttingRecordsPage,
+    "HostDuelPreview": HostDuelPreviewPage,
+    "PlayerDuelPreview": PlayerDuelPreviewPage,
     "SoloDuelPreview": SoloDuelPreviewPage,
     "SubmitDiscgolf": SubmitDiscgolf,
 }

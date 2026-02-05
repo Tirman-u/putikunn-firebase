@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import {
   buildLeaderboardIdentityFilter,
   deleteGameAndLeaderboardEntries,
+  getLeaderboardEmail,
   getLeaderboardStats,
   isHostedClassicGame,
   resolveLeaderboardPlayer
@@ -118,7 +119,7 @@ export default function ManageGames() {
         made_putts: madePutts,
         total_putts: totalPutts,
         ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
-        ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
+        player_email: getLeaderboardEmail(resolvedPlayer),
         ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
         ...(game.game_type === 'streak_challenge'
           ? { streak_distance: game.player_distances?.[rawPlayerName] || 0 }

@@ -8,6 +8,7 @@ import { getATWMovement, isATWRoundComplete, shouldATWRestart } from '@/componen
 import { logSyncMetric } from '@/lib/metrics';
 import {
   buildLeaderboardIdentityFilter,
+  getLeaderboardEmail,
   resolveLeaderboardPlayer
 } from '@/lib/leaderboard-utils';
 
@@ -362,7 +363,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       const payload = {
         game_id: game.id,
         ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
-        ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
+        player_email: getLeaderboardEmail(resolvedPlayer),
         player_name: resolvedPlayer.playerName,
         game_type: 'around_the_world',
         score: bestScore,

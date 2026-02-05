@@ -69,6 +69,10 @@ export function buildLeaderboardIdentityFilter({ playerUid, playerEmail, playerN
   return { player_name: playerName };
 }
 
+export function getLeaderboardEmail(resolvedPlayer) {
+  return resolvedPlayer?.playerEmail || 'unknown';
+}
+
 export async function resolveLeaderboardPlayer({ game, playerName, cache = {} }) {
   const mappedUid = game?.player_uids?.[playerName];
   const mappedEmail = normalizeEmail(game?.player_emails?.[playerName]);

@@ -16,6 +16,7 @@ import useRealtimeGame from '@/hooks/use-realtime-game';
 import {
   buildLeaderboardIdentityFilter,
   deleteGameAndLeaderboardEntries,
+  getLeaderboardEmail,
   getLeaderboardStats,
   isHostedClassicGame,
   resolveLeaderboardPlayer
@@ -129,7 +130,7 @@ export default function GameResult() {
         game_id: game.id,
         player_name: resolvedPlayer.playerName,
         ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
-        ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
+        player_email: getLeaderboardEmail(resolvedPlayer),
         ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
         game_type: game.game_type,
         score,
@@ -179,7 +180,7 @@ export default function GameResult() {
           game_id: game.id,
           player_name: resolvedPlayer.playerName,
           ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
-          ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
+          player_email: getLeaderboardEmail(resolvedPlayer),
           ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
           game_type: game.game_type,
           score,

@@ -18,6 +18,7 @@ import { logSyncMetric } from '@/lib/metrics';
 import usePlayerGameState from '@/hooks/use-player-game-state';
 import {
   buildLeaderboardIdentityFilter,
+  getLeaderboardEmail,
   resolveLeaderboardPlayer
 } from '@/lib/leaderboard-utils';
 import { 
@@ -446,7 +447,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       const leaderboardData = {
         game_id: game.id,
         ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
-        ...(resolvedPlayer.playerEmail ? { player_email: resolvedPlayer.playerEmail } : {}),
+        player_email: getLeaderboardEmail(resolvedPlayer),
         player_name: resolvedPlayer.playerName,
         game_type: game.game_type,
         score: game.total_points[playerName] || 0,

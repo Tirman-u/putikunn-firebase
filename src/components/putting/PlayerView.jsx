@@ -120,6 +120,15 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     if (!incoming) return localGameStateRef.current || incoming;
     const localState = localGameStateRef.current || {};
     const merged = { ...incoming };
+    if (!merged.game_type && localState.game_type) {
+      merged.game_type = localState.game_type;
+    }
+    if (!merged.putt_type && localState.putt_type) {
+      merged.putt_type = localState.putt_type;
+    }
+    if (!merged.status && localState.status) {
+      merged.status = localState.status;
+    }
     const mapKeys = [
       'player_putts',
       'total_points',

@@ -184,6 +184,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   React.useEffect(() => {
     if (!game) return;
     const nextState = {
+      game_type: game.game_type,
+      putt_type: game.putt_type,
       player_putts: game.player_putts || {},
       total_points: game.total_points || {},
       player_distances: game.player_distances || {},

@@ -172,6 +172,13 @@ export default function Profile() {
   const trendDelta = trendData.length > 1
     ? Math.round((trendData[trendData.length - 1].accuracy - trendData[0].accuracy) * 10) / 10
     : 0;
+  const trendPoints = trendData.map((item, idx) => {
+    const x = trendData.length === 1 ? 50 : (idx / (trendData.length - 1)) * 100;
+    const clamped = Math.max(0, Math.min(100, item.accuracy));
+    const y = 100 - clamped;
+    return { x, y };
+  });
+  const trendLine = trendPoints.map((point) => `${point.x},${point.y}`).join(' ');
 
   // Distance analysis
   const distanceStats = allPutts.reduce((acc, putt) => {
@@ -498,16 +505,46 @@ export default function Profile() {
            {trendData.length === 0 ? (
              <div className="text-sm text-slate-400">Pole piisavalt andmeid trendi jaoks.</div>
            ) : (
-             <div className="flex items-end gap-2 h-28">
-               {trendData.map((item, idx) => (
-                 <div key={`${item.id}-${idx}`} className="flex-1 flex flex-col items-center gap-1">
-                   <div className="w-full max-w-[18px] bg-emerald-500 rounded-t-md transition-all"
-                        style={{ height: `${Math.max(8, Math.round(item.accuracy))}%` }} />
-                   <div className="text-[10px] text-slate-400">
+             <div className="space-y-2">
+               <div className="relative h-28">
+                 <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                   <defs>
+                     <linearGradient id="trendLine" x1="0" y1="0" x2="1" y2="0">
+                       <stop offset="0%" stopColor="#10b981" />
+                       <stop offset="100%" stopColor="#059669" />
+                     </linearGradient>
+                   </defs>
+                   <line x1="0" y1="100" x2="100" y2="100" stroke="#e2e8f0" strokeWidth="0.5" />
+                   <line x1="0" y1="66" x2="100" y2="66" stroke="#f1f5f9" strokeWidth="0.5" />
+                   <line x1="0" y1="33" x2="100" y2="33" stroke="#f1f5f9" strokeWidth="0.5" />
+                   {trendPoints.length > 1 && (
+                     <polyline
+                       fill="none"
+                       stroke="url(#trendLine)"
+                       strokeWidth="2"
+                       strokeLinecap="round"
+                       strokeLinejoin="round"
+                       points={trendLine}
+                     />
+                   )}
+                   {trendPoints.map((point, idx) => (
+                     <circle
+                       key={`trend-point-${idx}`}
+                       cx={point.x}
+                       cy={point.y}
+                       r="2"
+                       fill="#10b981"
+                     />
+                   ))}
+                 </svg>
+               </div>
+               <div className="flex justify-between gap-2 text-[10px] text-slate-400">
+                 {trendData.map((item, idx) => (
+                   <span key={`${item.id}-label-${idx}`} className="flex-1 text-center">
                      {item.date ? format(new Date(item.date), 'd.M') : '-'}
-                   </div>
-                 </div>
-               ))}
+                   </span>
+                 ))}
+               </div>
              </div>
            )}
          </div>

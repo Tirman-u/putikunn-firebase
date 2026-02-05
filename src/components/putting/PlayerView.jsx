@@ -64,6 +64,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const turnsSinceSyncRef = React.useRef(0);
   const gameIdRef = React.useRef(gameId);
   const baseGameRef = React.useRef(null);
+  const lastLoadedGameIdRef = React.useRef(null);
   const queryClient = useQueryClient();
 
   React.useEffect(() => {
@@ -218,8 +219,11 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       status: game.status
     };
 
+    const isNewGame = lastLoadedGameIdRef.current !== game.id;
+    lastLoadedGameIdRef.current = game.id;
+
     if (isSoloGame) {
-      if (!localGameState) {
+      if (!localGameStateRef.current || isNewGame) {
         setLocalGameState(nextState);
         localGameStateRef.current = nextState;
       }
@@ -227,9 +231,11 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     }
 
     if (pendingUpdateRef.current || pendingLiveRef.current || syncInFlightRef.current) return;
-    setLocalGameState(nextState);
-    localGameStateRef.current = nextState;
-  }, [game, isSoloGame, localGameState]);
+    if (!localGameStateRef.current || isNewGame) {
+      setLocalGameState(nextState);
+      localGameStateRef.current = nextState;
+    }
+  }, [game, isSoloGame]);
 
   const updateGameMutation = useMutation({
     mutationFn: async ({ id, data }) => {
@@ -763,19 +769,6 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const currentScore = gameType === 'streak_challenge'
     ? (currentState?.player_highest_streaks?.[playerName] || 0)
     : (currentState?.total_points?.[playerName] || 0);
-  const isPotentialMaxEnabled = !format.singlePuttMode && gameType !== 'streak_challenge';
-  let potentialMaxScore = null;
-  if (isPotentialMaxEnabled) {
-    const totalRoundsForGame = getTotalRounds(gameType);
-    const roundsCompleted = Math.floor(playerPutts.length / format.puttsPerRound);
-    const roundsRemaining = Math.max(0, totalRoundsForGame - roundsCompleted);
-    const puttsPerRound = format.puttsPerRound || 5;
-    const maxRoundScore = format.maxDistance * puttsPerRound;
-    const firstRoundScore = currentDistance * puttsPerRound;
-    potentialMaxScore = currentScore + (roundsRemaining > 0
-      ? firstRoundScore + Math.max(0, roundsRemaining - 1) * maxRoundScore
-      : 0);
-  }
   const isComplete = Boolean(currentState) && (
     isGameComplete(gameType, playerPutts.length) ||
     (gameType === 'streak_challenge' && (currentState.status === 'completed' || streakComplete))
@@ -899,11 +892,6 @@ export default function PlayerView({ gameId, playerName, onExit }) {
                 <div className="text-xl sm:text-2xl font-bold text-emerald-600">
                   {hideScore ? '***' : currentScore}
                 </div>
-                {isPotentialMaxEnabled && (
-                  <div className="text-[10px] sm:text-xs text-slate-400">
-                    Max skoor: {hideScore ? '***' : potentialMaxScore}
-                  </div>
-                )}
               </div>
               <div className="h-8 sm:h-10 w-px bg-slate-200" />
               <div>

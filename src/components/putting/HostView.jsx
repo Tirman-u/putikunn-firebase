@@ -19,6 +19,7 @@ import {
 export default function HostView({ gameId, onExit }) {
   const [copied, setCopied] = useState(false);
   const queryClient = useQueryClient();
+  const baseGameRef = React.useRef(null);
 
   const { data: user } = useQuery({
     queryKey: ['current-user'],
@@ -34,10 +35,22 @@ export default function HostView({ gameId, onExit }) {
     refetchInterval: false
   });
 
+  useEffect(() => {
+    if (!game) return;
+    baseGameRef.current = { ...baseGameRef.current, ...game };
+  }, [game]);
+
   const mergeRealtimeGame = React.useCallback((previous, incoming) => {
     if (!previous) return incoming;
     if (!incoming) return previous;
     const merged = { ...previous, ...incoming };
+    const fallback = baseGameRef.current || previous;
+    const staticKeys = ['name', 'pin', 'host_user', 'game_type', 'putt_type', 'status', 'date'];
+    staticKeys.forEach((key) => {
+      if (merged?.[key] === undefined || merged?.[key] === null) {
+        merged[key] = fallback?.[key];
+      }
+    });
     const mapKeys = [
       'player_putts',
       'total_points',
@@ -70,11 +83,8 @@ export default function HostView({ gameId, onExit }) {
         queryClient.setQueryData(['game', gameId], undefined);
         return;
       }
+      if (!event?.data) return;
       queryClient.setQueryData(['game', gameId], (previous) => {
-        const gameType = previous?.game_type || event.data?.game_type;
-        if (gameType === 'around_the_world') {
-          return event.data;
-        }
         return mergeRealtimeGame(previous, event.data);
       });
     }

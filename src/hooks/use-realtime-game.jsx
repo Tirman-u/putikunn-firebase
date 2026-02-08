@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 
-export default function useRealtimeDuelGame({
+export default function useRealtimeGame({
   gameId,
   enabled = true,
   throttleMs = 1000,
@@ -91,7 +91,7 @@ export default function useRealtimeDuelGame({
     const subscribe = () => {
       if (cancelled) return;
       try {
-        const unsubscribe = base44.entities.DuelGame.subscribe(handleEvent);
+        const unsubscribe = base44.entities.Game.subscribe(handleEvent);
         unsubscribeRef.current = unsubscribe;
         resetRetry();
       } catch (error) {

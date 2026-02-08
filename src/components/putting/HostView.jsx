@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '@/lib/AuthContext'; // Import useAuth
+import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Copy, Check, Users, Upload, Trophy, Target, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import useRealtimeGame from '@/hooks/use-realtime-game';
 import LoadingState from '@/components/ui/loading-state';
 import {
+  buildLeaderboardIdentityFilter,
+  getLeaderboardEmail,
   getLeaderboardStats,
   isHostedClassicGame,
   resolveLeaderboardPlayer
@@ -16,24 +19,85 @@ import {
 export default function HostView({ gameId, onExit }) {
   const [copied, setCopied] = useState(false);
   const queryClient = useQueryClient();
-  const { user } = useAuth(); // Use useAuth hook
+  const baseGameRef = React.useRef(null);
+
+  const { data: user } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: () => base44.auth.me()
+  });
 
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],
     queryFn: async () => {
-      // Mock data, replace with Firestore
-      return null;
+      const games = await base44.entities.Game.filter({ id: gameId });
+      return games[0];
     },
     refetchInterval: false
   });
 
-  const canSubmitDiscgolf = false; // Placeholder
-  const canSubmitGeneralForGame = false; // Placeholder
+  useEffect(() => {
+    if (!game) return;
+    baseGameRef.current = { ...baseGameRef.current, ...game };
+  }, [game]);
+
+  const mergeRealtimeGame = React.useCallback((previous, incoming) => {
+    if (!previous) return incoming;
+    if (!incoming) return previous;
+    const merged = { ...previous, ...incoming };
+    const fallback = baseGameRef.current || previous;
+    const staticKeys = ['name', 'pin', 'host_user', 'game_type', 'putt_type', 'status', 'date'];
+    staticKeys.forEach((key) => {
+      if (merged?.[key] === undefined || merged?.[key] === null) {
+        merged[key] = fallback?.[key];
+      }
+    });
+    const mapKeys = [
+      'player_putts',
+      'total_points',
+      'player_distances',
+      'player_current_streaks',
+      'player_highest_streaks',
+      'player_uids',
+      'player_emails',
+      'atw_state',
+      'live_stats'
+    ];
+    mapKeys.forEach((key) => {
+      if (previous?.[key] || incoming?.[key]) {
+        merged[key] = {
+          ...(previous?.[key] || {}),
+          ...(incoming?.[key] || {})
+        };
+      }
+    });
+    return merged;
+  }, []);
+
+  useRealtimeGame({
+    gameId,
+    enabled: !!gameId,
+    throttleMs: 1000,
+    eventTypes: ['update', 'delete'],
+    onEvent: (event) => {
+      if (event.type === 'delete') {
+        queryClient.setQueryData(['game', gameId], undefined);
+        return;
+      }
+      if (!event?.data) return;
+      queryClient.setQueryData(['game', gameId], (previous) => {
+        return mergeRealtimeGame(previous, event.data);
+      });
+    }
+  });
+
+  const userRole = user?.app_role || 'user';
+  const canSubmitDiscgolf = ['trainer', 'admin', 'super_admin'].includes(userRole);
 
   const completeGameMutation = useMutation({
     mutationFn: async () => {
-      // Mock mutation, replace with Firestore
-      return Promise.resolve();
+      await base44.entities.Game.update(gameId, {
+        status: 'completed'
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
@@ -43,8 +107,10 @@ export default function HostView({ gameId, onExit }) {
 
   const closeGameMutation = useMutation({
     mutationFn: async () => {
-      // Mock mutation, replace with Firestore
-      return Promise.resolve();
+      await base44.entities.Game.update(gameId, {
+        join_closed: true,
+        status: 'closed'
+      });
     },
     onSuccess: () => {
       toast.success('Mäng suletud');
@@ -52,21 +118,131 @@ export default function HostView({ gameId, onExit }) {
     }
   });
 
+  const resolveGamePlayers = (gameData) => {
+    const fromPlayers = Array.isArray(gameData?.players) ? gameData.players : [];
+    const fromPutts = Object.keys(gameData?.player_putts || {});
+    const fromAtw = Object.keys(gameData?.atw_state || {});
+    return Array.from(new Set([...fromPlayers, ...fromPutts, ...fromAtw].filter(Boolean)));
+  };
+
+  const syncLeaderboardEntries = async ({ includeDiscgolf }) => {
+      const results = [];
+      const profileCache = {};
+
+      const playersToSync = resolveGamePlayers(game);
+      for (const rawPlayerName of playersToSync) {
+        const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, rawPlayerName);
+        const resolvedPlayer = await resolveLeaderboardPlayer({
+          game,
+          playerName: rawPlayerName,
+          cache: profileCache
+        });
+        const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
+        const normalizedDate = new Date(game.date || new Date().toISOString()).toISOString();
+        const basePayload = {
+          game_id: game.id,
+          player_name: resolvedPlayer.playerName,
+          ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
+          player_email: getLeaderboardEmail(resolvedPlayer),
+          ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
+          game_type: game.game_type,
+          score,
+          accuracy: Math.round(accuracy * 10) / 10,
+          made_putts: madePutts,
+          total_putts: totalPutts,
+          ...(game.game_type === 'streak_challenge'
+            ? { streak_distance: game.player_distances?.[rawPlayerName] || 0 }
+            : {}),
+          date: normalizedDate
+        };
+
+        if (includeDiscgolf && isHostedClassicGame(game)) {
+          const [existingDiscgolf] = await base44.entities.LeaderboardEntry.filter({
+            ...identityFilter,
+            game_type: game.game_type,
+            leaderboard_type: 'discgolf_ee'
+          });
+
+          if (existingDiscgolf) {
+            if (score > existingDiscgolf.score) {
+              await base44.entities.LeaderboardEntry.update(existingDiscgolf.id, {
+                ...basePayload,
+                leaderboard_type: 'discgolf_ee',
+                submitted_by: user?.email
+              });
+              results.push({ player: resolvedPlayer.playerName, action: 'updated' });
+            } else {
+              results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
+            }
+          } else {
+            await base44.entities.LeaderboardEntry.create({
+              ...basePayload,
+              leaderboard_type: 'discgolf_ee',
+              submitted_by: user?.email
+            });
+            results.push({ player: resolvedPlayer.playerName, action: 'created' });
+          }
+        }
+
+        const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
+          ...identityFilter,
+          game_type: game.game_type,
+          leaderboard_type: 'general'
+        });
+
+        if (existingGeneral) {
+          if (score > existingGeneral.score) {
+            await base44.entities.LeaderboardEntry.update(existingGeneral.id, {
+              ...basePayload,
+              leaderboard_type: 'general'
+            });
+            if (!includeDiscgolf) {
+              results.push({ player: resolvedPlayer.playerName, action: 'updated' });
+            }
+          } else if (!includeDiscgolf) {
+            results.push({ player: resolvedPlayer.playerName, action: 'skipped' });
+          }
+        } else {
+          await base44.entities.LeaderboardEntry.create({
+            ...basePayload,
+            leaderboard_type: 'general'
+          });
+          if (!includeDiscgolf) {
+            results.push({ player: resolvedPlayer.playerName, action: 'created' });
+          }
+        }
+      }
+
+      return results;
+  };
+
   const submitToLeaderboardMutation = useMutation({
-    mutationFn: async () => {
-        Promise.resolve()
-    },
+    mutationFn: async () => syncLeaderboardEntries({ includeDiscgolf: false }),
     onSuccess: (results) => {
-      toast.success("Placeholder");
+      const updated = results.filter(r => r.action === 'updated').length;
+      const created = results.filter(r => r.action === 'created').length;
+      const skipped = results.filter(r => r.action === 'skipped').length;
+      
+      let message = 'Edetabelisse saadetud';
+      if (updated > 0 || skipped > 0) {
+        message += ` (${created} uusi, ${updated} uuendatud, ${skipped} vahele jäetud)`;
+      }
+      toast.success(message);
     }
   });
 
   const submitToDiscgolfMutation = useMutation({
-    mutationFn: async () => {
-        Promise.resolve()
-    },
+    mutationFn: async () => syncLeaderboardEntries({ includeDiscgolf: true }),
     onSuccess: (results) => {
-        toast.success("Placeholder");
+      const updated = results.filter(r => r.action === 'updated').length;
+      const created = results.filter(r => r.action === 'created').length;
+      const skipped = results.filter(r => r.action === 'skipped').length;
+      
+      let message = 'Discgolf.ee-sse saadetud';
+      if (updated > 0 || skipped > 0) {
+        message += ` (${created} uusi, ${updated} uuendatud, ${skipped} vahele jäetud)`;
+      }
+      toast.success(message);
     }
   });
 
@@ -78,17 +254,66 @@ export default function HostView({ gameId, onExit }) {
     }
   };
 
+  const gameType = game?.game_type;
+  const isATWGame = gameType === 'around_the_world';
+  const isCompleted = game?.status === 'completed';
+  const canSubmitDiscgolfForGame = canSubmitDiscgolf && isHostedClassicGame(game);
+  const canSubmitGeneralForGame =
+    Boolean(user?.email && game?.host_user && user.email === game.host_user) || canSubmitDiscgolf;
+  const scoreLabel = gameType === 'streak_challenge' ? 'Parim seeria' : 'Tulemus';
+
+  useEffect(() => {
+    if (!gameId || !gameType || isATWGame) return undefined;
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [gameId, gameType, isATWGame, queryClient]);
+
   if (isLoading || !game) {
     return <LoadingState />;
   }
 
-  const gameType = game?.game_type;
-  const isATWGame = gameType === 'around_the_world';
-  const isCompleted = game?.status === 'completed';
-  const scoreLabel = gameType === 'streak_challenge' ? 'Parim seeria' : 'Tulemus';
+  // Calculate player stats for ATW
+  const playerStats = (game.players || []).map(playerName => {
+    const playerState = game.atw_state?.[playerName] || {};
+    const currentScore = game.total_points?.[playerName] || 0;
+    const bestScore = playerState.best_score || 0;
+    const currentLaps = playerState.laps_completed || 0;
+    const bestLaps = playerState.best_laps || 0;
+    const attemptsCount = playerState.attempts_count || 0;
 
-  const playerStats = (game.players || []).map(playerName => ({ name: playerName, bestScore: 0, currentScore: 0, bestLaps: 0, currentLaps: 0, attemptsCount: 0 })).sort((a, b) => b.bestScore - a.bestScore);
-  const nonAtwPlayerStats = !isATWGame ? (game.players || []).map(playerName => ({ name: playerName, totalPoints: 0, totalPutts: 0, madePutts: 0, puttingPercentage: 0 })).sort((a, b) => b.totalPoints - a.totalPoints) : [];
+    return {
+      name: playerName,
+      currentScore,
+      bestScore,
+      currentLaps,
+      bestLaps,
+      attemptsCount
+    };
+  }).sort((a, b) => b.bestScore - a.bestScore);
+
+  const nonAtwPlayerStats = !isATWGame
+    ? (game.players || []).map((playerName) => {
+        const putts = game.player_putts?.[playerName] || [];
+        const liveStats = game.live_stats?.[playerName];
+        const totalPutts = liveStats?.total_putts ?? putts.length;
+        const madePutts = liveStats?.made_putts ?? putts.filter(p => p.result === 'made').length;
+        const totalPoints = liveStats?.total_points ?? game.total_points?.[playerName] ?? 0;
+        const puttingPercentage = totalPutts > 0
+          ? Math.round((madePutts / totalPutts) * 1000) / 10
+          : 0;
+
+        return {
+          name: playerName,
+          totalPoints,
+          totalPutts,
+          madePutts,
+          puttingPercentage
+        };
+      }).sort((a, b) => b.totalPoints - a.totalPoints)
+    : [];
+
   const bestPlayer = playerStats[0];
   const mostAttempts = Math.max(...playerStats.map(p => p.attemptsCount || 0), 0);
   const mostAttemptsPlayer = playerStats.find(p => p.attemptsCount === mostAttempts);

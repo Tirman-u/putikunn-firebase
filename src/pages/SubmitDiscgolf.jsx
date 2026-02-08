@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from '@/lib/AuthContext'; // Import useAuth
+import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,17 +19,36 @@ export default function SubmitDiscgolf() {
   const [totalPutts, setTotalPutts] = useState('');
   const [gender, setGender] = useState('M');
 
-  const { user } = useAuth(); // Use useAuth hook
+  const { data: user } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: () => base44.auth.me()
+  });
 
   const { data: allUsers = [] } = useQuery({
     queryKey: ['all-users'],
-    queryFn: () => Promise.resolve([]) // base44.entities.User.list()
+    queryFn: () => base44.entities.User.list()
   });
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      // This will be replaced with a Firestore call
-      return Promise.resolve();
+      const selectedUser = allUsers.find(u => u.email === playerEmail);
+      const accuracy = parseInt(totalPutts) > 0 ? (parseInt(madePutts) / parseInt(totalPutts)) * 100 : 0;
+
+      return await base44.entities.LeaderboardEntry.create({
+        game_id: 'discgolf-submission',
+        player_uid: selectedUser?.id,
+        player_email: playerEmail,
+        player_name: selectedUser?.full_name || playerEmail,
+        game_type: gameType,
+        score: parseInt(score),
+        accuracy: Math.round(accuracy * 10) / 10,
+        made_putts: parseInt(madePutts),
+        total_putts: parseInt(totalPutts),
+        leaderboard_type: 'discgolf_ee',
+        submitted_by: user?.email,
+        player_gender: gender,
+        date: new Date().toISOString()
+      });
     },
     onSuccess: () => {
       toast.success('Tulemus saadetud Discgolf.ee edetabelisse!');
@@ -52,8 +71,7 @@ export default function SubmitDiscgolf() {
     submitMutation.mutate();
   };
 
-  // Assuming user object has a similar role property
-  const userRole = user?.app_role || 'user'; 
+  const userRole = user?.app_role || 'user';
   const canSubmit = ['trainer', 'admin', 'super_admin'].includes(userRole);
 
   if (!canSubmit) {

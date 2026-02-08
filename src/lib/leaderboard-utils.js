@@ -1,9 +1,7 @@
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, writeBatch, doc, deleteDoc, getDoc } from 'firebase/firestore';
+import { base44 } from '@/api/base44Client';
 
 function normalizeEmail(value) {
-  if (typeof value !== 'string') return '';
-  return value.trim().toLowerCase();
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
 function getCacheMap(cache, key) {
@@ -14,37 +12,50 @@ function getCacheMap(cache, key) {
 }
 
 async function getUserByUid(uid, cache) {
-  const cacheMap = getCacheMap(cache, 'user_by_uid');
-  if (cacheMap.has(uid)) {
-    return cacheMap.get(uid);
+  if (!uid) return null;
+  const byUid = getCacheMap(cache, 'byUid');
+  if (byUid.has(uid)) return byUid.get(uid);
+
+  let user = null;
+  try {
+    user = await base44.entities.User.get(uid);
+  } catch {
+    const users = await base44.entities.User.filter({ id: uid });
+    user = users?.[0] || null;
   }
-  const userRef = doc(db, 'users', uid);
-  const userSnap = await getDoc(userRef);
-  const user = userSnap.exists() ? { id: userSnap.id, ...userSnap.data() } : null;
-  cacheMap.set(uid, user);
+  byUid.set(uid, user);
+
+  if (user?.email) {
+    const byEmail = getCacheMap(cache, 'byEmail');
+    byEmail.set(normalizeEmail(user.email), user);
+  }
+
   return user;
 }
 
 async function getUserByEmail(email, cache) {
-  const normalizedEmail = normalizeEmail(email);
-  const cacheMap = getCacheMap(cache, 'user_by_email');
-  if (cacheMap.has(normalizedEmail)) {
-    return cacheMap.get(normalizedEmail);
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+  const byEmail = getCacheMap(cache, 'byEmail');
+  if (byEmail.has(normalized)) return byEmail.get(normalized);
+
+  const users = await base44.entities.User.filter({ email: normalized });
+  const user = users?.[0] || null;
+  byEmail.set(normalized, user);
+
+  if (user?.id) {
+    const byUid = getCacheMap(cache, 'byUid');
+    byUid.set(user.id, user);
   }
-  const usersRef = collection(db, 'users');
-  const q = query(usersRef, where('email', '==', normalizedEmail));
-  const querySnapshot = await getDocs(q);
-  if (querySnapshot.empty) {
-    cacheMap.set(normalizedEmail, null);
-    return null;
-  }
-  const user = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
-  cacheMap.set(normalizedEmail, user);
+
   return user;
 }
 
 export function normalizeLeaderboardGender(gender) {
-  return gender === 'N' ? 'N' : undefined;
+  if (!gender) return undefined;
+  const normalized = typeof gender === 'string' ? gender.trim().toUpperCase() : gender;
+  if (normalized === 'N' || normalized === 'M') return normalized;
+  return undefined;
 }
 
 export function isHostedGame(game) {
@@ -57,7 +68,7 @@ export function isHostedClassicGame(game) {
 
 export function buildLeaderboardIdentityFilter({ playerUid, playerEmail, playerName }) {
   if (playerUid) return { player_uid: playerUid };
-  if (playerEmail) return { player_email: playerEmail.trim().toLowerCase() };
+  if (playerEmail) return { player_email: normalizeEmail(playerEmail) };
   return { player_name: playerName };
 }
 
@@ -66,78 +77,68 @@ export function getLeaderboardEmail(resolvedPlayer) {
 }
 
 export async function resolveLeaderboardPlayer({ game, playerName, cache = {} }) {
-  const playerUids = game?.player_uids || {};
-  const playerEmails = game?.player_emails || {};
-  const uid = playerUids[playerName];
-  const email = playerEmails[playerName];
+  const mappedUid = game?.player_uids?.[playerName];
+  const mappedEmail = normalizeEmail(game?.player_emails?.[playerName]);
 
-  if (uid) {
-    const user = await getUserByUid(uid, cache);
-    if (user) {
-      return {
-        playerName: user.displayName || user.fullName || playerName,
-        playerUid: uid,
-        playerEmail: user.email,
-        playerGender: normalizeLeaderboardGender(user.gender)
-      };
-    }
+  let user = await getUserByUid(mappedUid, cache);
+  if (!user && mappedEmail) {
+    user = await getUserByEmail(mappedEmail, cache);
   }
 
-  if (email) {
-    const user = await getUserByEmail(email, cache);
-    if (user) {
-      return {
-        playerName: user.displayName || user.fullName || playerName,
-        playerUid: user.id,
-        playerEmail: email,
-        playerGender: normalizeLeaderboardGender(user.gender)
-      };
-    }
-  }
+  const resolvedName = user?.full_name?.trim() || playerName;
+  const resolvedUid = user?.id || mappedUid;
+  const resolvedEmail = normalizeEmail(user?.email || mappedEmail);
 
   return {
-    playerName,
-    playerUid: undefined,
-    playerEmail: undefined,
-    playerGender: undefined
+    playerName: resolvedName,
+    playerUid: resolvedUid || undefined,
+    playerEmail: resolvedEmail || undefined,
+    playerGender: normalizeLeaderboardGender(user?.gender)
   };
 }
 
 export function getLeaderboardStats(game, playerName) {
-    if (game?.game_type === 'around_the_world') {
-        const state = game?.atw_state?.[playerName] || {};
-        const currentScore = game?.total_points?.[playerName] || 0;
-        const score = Math.max(state?.best_score || 0, currentScore);
-        const madePutts = state?.total_makes || 0;
-        const totalPutts = state?.total_putts || 0;
-        const currentAccuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
-        const accuracy = Math.max(state?.best_accuracy || 0, currentAccuracy);
-        return { score, madePutts, totalPutts, accuracy };
-    }
-
-    const putts = game?.player_putts?.[playerName] || [];
-    const madePutts = putts.filter((putt) => putt.result === 'made').length;
-    const totalPutts = putts.length;
-    const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
-    const score = game?.total_points?.[playerName] || 0;
+  if (game?.game_type === 'around_the_world') {
+    const state = game?.atw_state?.[playerName] || {};
+    const currentScore = game?.total_points?.[playerName] || 0;
+    const score = Math.max(state?.best_score || 0, currentScore);
+    const madePutts = state?.total_makes || 0;
+    const totalPutts = state?.total_putts || 0;
+    const currentAccuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+    const accuracy = Math.max(state?.best_accuracy || 0, currentAccuracy);
     return { score, madePutts, totalPutts, accuracy };
+  }
+
+  const putts = game?.player_putts?.[playerName] || [];
+  const liveStats = game?.live_stats?.[playerName] || {};
+  const hasPutts = putts.length > 0;
+  const madePutts = hasPutts
+    ? putts.filter((putt) => putt.result === 'made').length
+    : (liveStats.made_putts || 0);
+  const totalPutts = hasPutts ? putts.length : (liveStats.total_putts || 0);
+  const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
+  const score = game?.total_points?.[playerName] || liveStats.total_points || 0;
+  return { score, madePutts, totalPutts, accuracy };
 }
 
 export async function deleteGameAndLeaderboardEntries(gameId) {
   if (!gameId) return;
 
-  const entriesRef = collection(db, 'leaderboard_entries');
-  const q = query(entriesRef, where('game_id', '==', gameId));
-  const querySnapshot = await getDocs(q);
+  const pageSize = 100;
+  let skip = 0;
+  const entryIds = [];
 
-  if (!querySnapshot.empty) {
-    const batch = writeBatch(db);
-    querySnapshot.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-    await batch.commit();
+  while (true) {
+    const chunk = await base44.entities.LeaderboardEntry.filter({ game_id: gameId }, '-created_date', pageSize, skip);
+    if (!chunk?.length) break;
+    entryIds.push(...chunk.map((entry) => entry.id).filter(Boolean));
+    if (chunk.length < pageSize) break;
+    skip += chunk.length;
   }
 
-  const gameDocRef = doc(db, 'games', gameId);
-  await deleteDoc(gameDocRef);
+  for (const id of entryIds) {
+    await base44.entities.LeaderboardEntry.delete(id);
+  }
+
+  await base44.entities.Game.delete(gameId);
 }

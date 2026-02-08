@@ -1,9 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/AuthContext';
-import { db, storage } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { updateProfile } from "firebase/auth";
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,75 +17,60 @@ import LoadingState from '@/components/ui/loading-state';
 export default function Profile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, isLoadingAuth } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
   const [uploading, setUploading] = useState(false);
-  const [sortBy, setSortBy] = useState('date');
+  const [sortBy, setSortBy] = useState('date'); // date, score, format
   const [filterFormat, setFilterFormat] = useState('all');
   const [filterPuttType, setFilterPuttType] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const GAMES_PER_PAGE = 10;
 
-  const { data: userData, isLoading: userLoading } = useQuery({
-    queryKey: ['userProfile', user?.uid],
-    queryFn: async () => {
-      const userDocRef = doc(db, "users", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-      return userDocSnap.exists() ? userDocSnap.data() : null;
-    },
-    enabled: !!user,
+  const { data: user, isLoading: userLoading } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => base44.auth.me()
   });
 
   const { data: games = [], isLoading: gamesLoading } = useQuery({
-    queryKey: ['user-games', user?.uid],
+    queryKey: ['user-games'],
     queryFn: async () => {
-      const gamesRef = collection(db, "games");
-      const q = query(gamesRef, where("playerUids", "array-contains", user.uid));
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const allGames = await base44.entities.Game.list();
+      return allGames.filter(g => 
+        g.players?.includes(user?.full_name) || g.host_user === user?.email
+      );
     },
     enabled: !!user
   });
-  
-    // NOTE: Tournament functionality is temporarily disabled for migration.
-    const tournamentsLoading = false;
-    const tournamentPlayers = [];
-    const tournaments = [];
+
+  const { data: tournamentPlayers = [], isLoading: tournamentsLoading } = useQuery({
+    queryKey: ['user-tournaments'],
+    queryFn: async () => {
+      const allPlayers = await base44.entities.PuttingKingPlayer.list();
+      return allPlayers.filter(p => p.user_email === user?.email);
+    },
+    enabled: !!user
+  });
+
+  const { data: tournaments = [] } = useQuery({
+    queryKey: ['putting-king-tournaments'],
+    queryFn: () => base44.entities.PuttingKingTournament.list()
+  });
 
   const updateUserMutation = useMutation({
-    mutationFn: async (newData) => {
-      if (!user) return;
-
-      // Update Firebase Auth profile
-      await updateProfile(user, {
-        displayName: newData.displayName,
-        photoURL: newData.photoURL,
-      });
-
-      // Update Firestore user document
-      const userDocRef = doc(db, "users", user.uid);
-      await updateDoc(userDocRef, {
-        displayName: newData.displayName,
-        bio: newData.bio,
-        gender: newData.gender,
-        photoURL: newData.photoURL,
-      });
-
-      return newData;
-    },
-    onSuccess: (updatedData) => {
-      queryClient.invalidateQueries({ queryKey: ['userProfile', user?.uid] });
+    mutationFn: (data) => base44.auth.updateMe(data),
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(['user'], updatedUser);
+      queryClient.invalidateQueries({ queryKey: ['user'] });
       setIsEditing(false);
     }
   });
 
   const handleEdit = () => {
     setEditData({
-      displayName: userData?.displayName || user?.displayName || '',
-      bio: userData?.bio || '',
-      photoURL: userData?.photoURL || user?.photoURL || '',
-      gender: userData?.gender || ''
+      display_name: user.display_name || '',
+      bio: user.bio || '',
+      profile_picture: user.profile_picture || '',
+      gender: user.gender || ''
     });
     setIsEditing(true);
   };
@@ -100,54 +81,64 @@ export default function Profile() {
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
-    if (!file || !user) return;
+    if (!file) return;
 
     setUploading(true);
     try {
-      const storageRef = ref(storage, `profile_pictures/${user.uid}/${file.name}`);
-      const uploadResult = await uploadBytes(storageRef, file);
-      const file_url = await getDownloadURL(uploadResult.ref);
-      setEditData({ ...editData, photoURL: file_url });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setEditData({ ...editData, profile_picture: file_url });
     } catch (error) {
-      console.error("Error uploading file:", error);
       alert('Pildi üleslaadimine ebaõnnestus');
     } finally {
       setUploading(false);
     }
   };
-  
-  const toDate = (date) => {
-    if (date instanceof Timestamp) {
-      return date.toDate();
-    }
-    if(typeof date === 'string' || typeof date === 'number') {
-        return new Date(date);
-    }
-    return new Date(); // Fallback
-  }
 
-  if (userLoading || isLoadingAuth || gamesLoading || tournamentsLoading) {
+  if (userLoading || gamesLoading || tournamentsLoading) {
     return <LoadingState />;
   }
+
+  const myDisplayName = user?.display_name || user?.full_name || user?.email;
+  const myGames = games.filter(g => 
+    g.players?.includes(myDisplayName) || 
+    g.players?.includes(user?.full_name) ||
+    g.players?.includes(user?.email) ||
+    g.host_user === user?.email
+  );
   
-  const myDisplayName = userData?.displayName || user?.displayName || 'Nimetu Kasutaja';
-  const myGames = games; // Already filtered by query
-  
-  // Calculate ATW stats
+  // Calculate ATW stats by difficulty
   const atwGames = myGames.filter(g => g.game_type === 'around_the_world');
-  const atwStatsByDifficulty = { easy: 0, medium: 0, hard: 0, ultra_hard: 0, impossible: 0 };
+  const atwStatsByDifficulty = {
+    easy: 0,
+    medium: 0,
+    hard: 0,
+    ultra_hard: 0,
+    impossible: 0
+  };
+
   atwGames.forEach(game => {
-    if (game.atw_state && user?.uid && game.atw_state[user.uid]) {
-      const playerState = game.atw_state[user.uid];
+    const playerState = game.atw_state?.[myDisplayName] || game.atw_state?.[user?.full_name] || game.atw_state?.[user?.email];
+    if (playerState) {
       const difficulty = game.atw_config?.difficulty || 'medium';
-      const score = game.total_points?.[user.uid] || 0;
+      const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
       atwStatsByDifficulty[difficulty] = Math.max(atwStatsByDifficulty[difficulty], score);
     }
   });
 
+  const atwStats = atwGames.reduce((acc, game) => {
+    const playerState = game.atw_state?.[myDisplayName] || game.atw_state?.[user?.full_name] || game.atw_state?.[user?.email];
+    if (playerState) {
+      acc.totalLaps += playerState.laps_completed || 0;
+      acc.totalTurns += playerState.turns_played || 0;
+      const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+      acc.bestScore = Math.max(acc.bestScore, score);
+    }
+    return acc;
+  }, { totalLaps: 0, totalTurns: 0, bestScore: 0 });
+
   // Calculate statistics
   const totalGames = myGames.length;
-  const allPutts = myGames.flatMap(g => g.player_putts?.[user.uid] || []);
+  const allPutts = myGames.flatMap(g => g.player_putts?.[myDisplayName] || g.player_putts?.[user?.full_name] || g.player_putts?.[user?.email] || []);
   const totalPutts = allPutts.length;
   const madePutts = allPutts.filter(p => p.result === 'made').length;
   const puttingPercentage = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
@@ -155,13 +146,112 @@ export default function Profile() {
   let totalPoints = 0;
   let bestScore = 0;
   myGames.forEach(game => {
-    const points = game.total_points?.[user.uid] || 0;
+    const points = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
     totalPoints += points;
     if (points > bestScore) bestScore = points;
   });
   const avgScore = myGames.length > 0 ? Math.round(totalPoints / myGames.length) : 0;
-  
-  const isSuperAdmin = userData?.app_role === 'super_admin';
+
+  const trendGames = myGames
+    .map((game) => {
+      const putts = game.player_putts?.[myDisplayName] || game.player_putts?.[user?.full_name] || game.player_putts?.[user?.email] || [];
+      const total = putts.length;
+      if (total === 0) return null;
+      const made = putts.filter(p => p.result === 'made').length;
+      const accuracy = Math.round((made / total) * 1000) / 10;
+      return {
+        id: game.id,
+        date: game.date || game.created_date || null,
+        accuracy
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+
+  const trendData = trendGames.slice(-10);
+  const trendDelta = trendData.length > 1
+    ? Math.round((trendData[trendData.length - 1].accuracy - trendData[0].accuracy) * 10) / 10
+    : 0;
+  const trendPoints = trendData.map((item, idx) => {
+    const x = trendData.length === 1 ? 50 : (idx / (trendData.length - 1)) * 100;
+    const clamped = Math.max(0, Math.min(100, item.accuracy));
+    const y = 100 - clamped;
+    return { x, y };
+  });
+  const trendLine = trendPoints.map((point) => `${point.x},${point.y}`).join(' ');
+
+  // Distance analysis
+  const distanceStats = allPutts.reduce((acc, putt) => {
+    const dist = putt.distance;
+    if (!acc[dist]) acc[dist] = { made: 0, attempts: 0 };
+    if (putt.result === 'made') acc[dist].made += 1;
+    acc[dist].attempts += 1;
+    return acc;
+  }, {});
+
+  const distanceBuckets = Object.entries(distanceStats).map(([dist, stats]) => {
+    const attempts = stats.attempts || 0;
+    const made = stats.made || 0;
+    const misses = Math.max(0, attempts - made);
+    const accuracy = attempts > 0 ? Math.round((made / attempts) * 1000) / 10 : 0;
+    return {
+      distance: parseInt(dist, 10),
+      attempts,
+      made,
+      misses,
+      accuracy
+    };
+  }).sort((a, b) => a.distance - b.distance);
+
+  const totalDistanceAttempts = distanceBuckets.reduce((sum, item) => sum + item.attempts, 0);
+
+  const comfortZone = distanceBuckets.length > 0
+    ? distanceBuckets.reduce((best, curr) => {
+        if (curr.attempts > best.attempts) return curr;
+        if (curr.attempts === best.attempts && curr.accuracy > best.accuracy) return curr;
+        if (curr.attempts === best.attempts && curr.accuracy === best.accuracy && curr.distance > best.distance) return curr;
+        return best;
+      })
+    : null;
+
+  const comfortShare = comfortZone && totalDistanceAttempts > 0
+    ? Math.round((comfortZone.attempts / totalDistanceAttempts) * 1000) / 10
+    : 0;
+
+  const dropCandidates = comfortZone
+    ? distanceBuckets.filter((entry) => entry.distance > comfortZone.distance && entry.attempts > 0)
+    : [];
+
+  const dropCause = dropCandidates.length > 0
+    ? dropCandidates.reduce((worst, curr) => {
+        if (curr.misses > worst.misses) return curr;
+        if (curr.misses === worst.misses && curr.accuracy < worst.accuracy) return curr;
+        if (curr.misses === worst.misses && curr.accuracy === worst.accuracy && curr.distance > worst.distance) return curr;
+        return worst;
+      })
+    : (distanceBuckets.length > 0
+        ? distanceBuckets.reduce((worst, curr) =>
+            curr.accuracy < worst.accuracy ? curr : worst
+          )
+        : null);
+
+  const distancePercentages = distanceBuckets.map((stat) => ({
+    distance: stat.distance,
+    percentage: stat.accuracy,
+    attempts: stat.attempts
+  }));
+
+  // Group game stats
+  const groupGames = games.filter(g => g.group_id);
+  const groupScores = groupGames
+    .filter(g => g.players?.includes(myDisplayName) || g.players?.includes(user?.full_name))
+    .map(g => g.total_points?.[myDisplayName] || g.total_points?.[user?.full_name] || 0);
+  const avgGroupScore = groupScores.length > 0
+    ? (groupScores.reduce((sum, s) => sum + s, 0) / groupScores.length).toFixed(1)
+    : 0;
+
+  // Achievements
+  const isSuperAdmin = user?.app_role === 'super_admin';
   const achievements = getAchievements({
     totalGames,
     puttingPercentage,
@@ -174,6 +264,44 @@ export default function Profile() {
 
   const unlockedAchievements = achievements.filter(a => a.unlocked);
 
+  // Calculate stats by putt type
+  const puttTypeStats = {
+    regular: { made: 0, total: 0, score: 0, count: 0 },
+    straddle: { made: 0, total: 0, score: 0, count: 0 },
+    turbo: { made: 0, total: 0, score: 0, count: 0 },
+    kneeling: { made: 0, total: 0, score: 0, count: 0 },
+    marksman: { made: 0, total: 0, score: 0, count: 0 }
+  };
+  
+  myGames.forEach(game => {
+    const puttType = game.putt_type || 'regular';
+    const putts = game.player_putts?.[myDisplayName] || game.player_putts?.[user?.full_name] || game.player_putts?.[user?.email] || [];
+    const made = putts.filter(p => p.result === 'made').length;
+    const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+    
+    puttTypeStats[puttType].made += made;
+    puttTypeStats[puttType].total += putts.length;
+    puttTypeStats[puttType].score = Math.max(puttTypeStats[puttType].score, score);
+    if (score > 0) puttTypeStats[puttType].count += 1;
+  });
+
+  // Calculate best scores by game format
+  const gameFormatStats = {
+    classic: 0,
+    mini_league: 0,
+    short: 0,
+    long: 0,
+    back_and_forth: 0,
+    streak_challenge: 0,
+    random_distance: 0,
+    around_the_world: 0
+  };
+
+  myGames.forEach(game => {
+    const gameType = game.game_type || 'classic';
+    const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+    gameFormatStats[gameType] = Math.max(gameFormatStats[gameType], score);
+  });
 
   // Filter and sort games
   let filteredGames = myGames.filter(game => {
@@ -188,23 +316,16 @@ export default function Profile() {
 
   filteredGames = filteredGames.sort((a, b) => {
     if (sortBy === 'date') {
-      return toDate(b.date).getTime() - toDate(a.date).getTime();
+      return new Date(b.date || 0) - new Date(a.date || 0);
     } else if (sortBy === 'score') {
-      const scoreA = a.total_points?.[user.uid] || 0;
-      const scoreB = b.total_points?.[user.uid] || 0;
+      const scoreA = a.total_points?.[myDisplayName] || a.total_points?.[user?.full_name] || 0;
+      const scoreB = b.total_points?.[myDisplayName] || b.total_points?.[user?.full_name] || 0;
       return scoreB - scoreA;
     } else if (sortBy === 'format') {
       return (a.game_type || 'classic').localeCompare(b.game_type || 'classic');
     }
     return 0;
   });
-  
-  const profilePicture = userData?.photoURL || user?.photoURL;
-  const fullName = user?.displayName; // From Auth
-  const email = user?.email;
-  const gender = userData?.gender;
-  const bio = userData?.bio;
-
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -227,30 +348,30 @@ export default function Profile() {
           {!isEditing ? (
             <div className="flex items-start gap-4">
               <div className="relative">
-                {profilePicture ? (
+                {user.profile_picture ? (
                   <img 
-                    src={profilePicture} 
-                    alt={fullName}
+                    src={user.profile_picture} 
+                    alt={user.full_name}
                     className="w-20 h-20 rounded-full object-cover border-2 border-emerald-100"
                   />
                 ) : (
                   <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-3xl font-bold text-emerald-600">
-                    {fullName?.charAt(0) || 'U'}
+                    {user.full_name?.charAt(0) || 'U'}
                   </div>
                 )}
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-slate-800">{myDisplayName}</h2>
-                {myDisplayName !== fullName && (
-                  <p className="text-sm text-slate-500">{fullName}</p>
+                <h2 className="text-2xl font-bold text-slate-800">{user.display_name || user.full_name}</h2>
+                {user.display_name && (
+                  <p className="text-sm text-slate-500">{user.full_name}</p>
                 )}
-                <p className="text-slate-500">{email}</p>
-                {gender && (
+                <p className="text-slate-500">{user.email}</p>
+                {user.gender && (
                   <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-semibold mt-1">
-                    {gender === 'M' ? 'Mees' : 'Naine'}
+                    {user.gender === 'M' ? 'Mees' : 'Naine'}
                   </span>
                 )}
-                {bio && <p className="text-slate-600 mt-2">{bio}</p>}
+                {user.bio && <p className="text-slate-600 mt-2">{user.bio}</p>}
               </div>
               <Button onClick={handleEdit} variant="outline" size="sm">
                 <Edit2 className="w-4 h-4 mr-2" />
@@ -261,15 +382,15 @@ export default function Profile() {
             <div className="space-y-4">
               <div className="flex items-start gap-4">
                 <div className="relative">
-                  {editData.photoURL ? (
+                  {editData.profile_picture ? (
                     <img 
-                      src={editData.photoURL} 
+                      src={editData.profile_picture} 
                       alt="Profiil"
                       className="w-20 h-20 rounded-full object-cover border-2 border-emerald-100"
                     />
                   ) : (
                    <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-3xl font-bold text-emerald-600">
-                     {editData.displayName?.charAt(0) || fullName?.charAt(0) || 'U'}
+                     {editData.display_name?.charAt(0) || user?.full_name?.charAt(0) || 'U'}
                    </div>
                   )}
                   <label className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-emerald-700">
@@ -281,9 +402,9 @@ export default function Profile() {
                   <div>
                    <label className="text-sm text-slate-600 mb-1 block">Kuvatav nimi</label>
                    <Input 
-                     value={editData.displayName}
-                     onChange={(e) => setEditData({ ...editData, displayName: e.target.value })}
-                     placeholder={fullName}
+                     value={editData.display_name}
+                     onChange={(e) => setEditData({ ...editData, display_name: e.target.value })}
+                     placeholder={user?.full_name}
                    />
                   </div>
                   <div>
@@ -315,7 +436,8 @@ export default function Profile() {
               </div>
               <div className="flex gap-3">
                 <Button onClick={handleSave} disabled={uploading || updateUserMutation.isPending}>
-                  {updateUserMutation.isPending ? 'Salvestan...' : <><Save className="w-4 h-4 mr-2" /> Salvesta</>}
+                  <Save className="w-4 h-4 mr-2" />
+                  Salvesta
                 </Button>
                 <Button onClick={() => setIsEditing(false)} variant="outline">
                   <X className="w-4 h-4 mr-2" />
@@ -325,32 +447,367 @@ export default function Profile() {
             </div>
           )}
         </div>
-        
-        {/* Stats Grid - simplified for now */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+
+        {/* Stats */}
+         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-             <div className="flex items-center gap-2 mb-2"><Trophy className="w-5 h-5 text-emerald-600" /><span className="text-sm text-slate-500">Mängud</span></div>
+             <div className="flex items-center gap-2 mb-2">
+               <Trophy className="w-5 h-5 text-emerald-600" />
+               <span className="text-sm text-slate-500">Mängud</span>
+             </div>
              <div className="text-2xl font-bold text-slate-800">{totalGames}</div>
            </div>
+           {atwStats.totalLaps > 0 && (
+             <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+               <div className="flex items-center gap-2 mb-2">
+                 <Trophy className="w-5 h-5 text-emerald-600" />
+                 <span className="text-sm text-slate-500">ATW ringe</span>
+               </div>
+               <div className="text-2xl font-bold text-emerald-600">{atwStats.totalLaps}</div>
+             </div>
+           )}
            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-             <div className="flex items-center gap-2 mb-2"><Target className="w-5 h-5 text-emerald-600" /><span className="text-sm text-slate-500">Täpsus</span></div>
+             <div className="flex items-center gap-2 mb-2">
+               <Target className="w-5 h-5 text-emerald-600" />
+               <span className="text-sm text-slate-500">Täpsus</span>
+             </div>
              <div className="text-2xl font-bold text-slate-800">{puttingPercentage}%</div>
            </div>
            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-             <div className="flex items-center gap-2 mb-2"><TrendingUp className="w-5 h-5 text-emerald-600" /><span className="text-sm text-slate-500">Keskmine skoor</span></div>
+             <div className="flex items-center gap-2 mb-2">
+               <TrendingUp className="w-5 h-5 text-emerald-600" />
+               <span className="text-sm text-slate-500">Keskmine skoor</span>
+             </div>
              <div className="text-2xl font-bold text-slate-800">{avgScore}</div>
            </div>
            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-             <div className="flex items-center gap-2 mb-2"><Trophy className="w-5 h-5 text-amber-500" /><span className="text-sm text-slate-500">Parim skoor</span></div>
+             <div className="flex items-center gap-2 mb-2">
+               <Trophy className="w-5 h-5 text-amber-500" />
+               <span className="text-sm text-slate-500">Parim skoor</span>
+             </div>
              <div className="text-2xl font-bold text-slate-800">{bestScore}</div>
            </div>
+         </div>
+
+         {/* Putt % Trend */}
+         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+           <div className="flex items-center justify-between mb-4">
+             <div className="flex items-center gap-2 text-slate-800 font-semibold">
+               <TrendingUp className="w-5 h-5 text-emerald-600" />
+               Puti % trend (viimased 10 mängu)
+             </div>
+             {trendData.length > 1 && (
+               <div className={`text-sm font-semibold ${trendDelta >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                 {trendDelta >= 0 ? '+' : ''}{trendDelta}%
+               </div>
+             )}
+           </div>
+           {trendData.length === 0 ? (
+             <div className="text-sm text-slate-400">Pole piisavalt andmeid trendi jaoks.</div>
+           ) : (
+             <div className="space-y-2">
+               <div className="relative h-28">
+                 <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                   <defs>
+                     <linearGradient id="trendLine" x1="0" y1="0" x2="1" y2="0">
+                       <stop offset="0%" stopColor="#10b981" />
+                       <stop offset="100%" stopColor="#059669" />
+                     </linearGradient>
+                   </defs>
+                   <line x1="0" y1="100" x2="100" y2="100" stroke="#e2e8f0" strokeWidth="0.5" />
+                   <line x1="0" y1="66" x2="100" y2="66" stroke="#f1f5f9" strokeWidth="0.5" />
+                   <line x1="0" y1="33" x2="100" y2="33" stroke="#f1f5f9" strokeWidth="0.5" />
+                   {trendPoints.length > 1 && (
+                     <polyline
+                       fill="none"
+                       stroke="url(#trendLine)"
+                       strokeWidth="2"
+                       strokeLinecap="round"
+                       strokeLinejoin="round"
+                       points={trendLine}
+                     />
+                   )}
+                   {trendPoints.map((point, idx) => (
+                     <circle
+                       key={`trend-point-${idx}`}
+                       cx={point.x}
+                       cy={point.y}
+                       r="2"
+                       fill="#10b981"
+                     />
+                   ))}
+                 </svg>
+               </div>
+               <div className="flex justify-between gap-2 text-[10px] text-slate-400">
+                 {trendData.map((item, idx) => (
+                   <span key={`${item.id}-label-${idx}`} className="flex-1 text-center">
+                     {item.date ? format(new Date(item.date), 'd.M') : '-'}
+                   </span>
+                 ))}
+               </div>
+             </div>
+           )}
+         </div>
+
+         {/* Game Format Best Scores */}
+         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500" />
+              Parimad skoorid formaadi järgi
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {[
+                { key: 'classic', label: 'Classic', unit: 'p' },
+                { key: 'short', label: 'Short', unit: 'p' },
+                { key: 'long', label: 'Long', unit: 'p' },
+                { key: 'back_and_forth', label: 'Back & Forth', unit: 'p' },
+                { key: 'streak_challenge', label: 'Streak', unit: 'putti' },
+                { key: 'random_distance', label: 'Random', unit: 'p' }
+              ].map((format) => (
+                <div key={format.key} className="p-3 bg-gradient-to-br from-amber-50 to-emerald-50 rounded-xl border border-amber-100">
+                  <div className="text-xs font-semibold text-slate-600 mb-1">{format.label}</div>
+                  <div className="text-2xl font-bold text-emerald-600">
+                    {gameFormatStats[format.key]}
+                    <span className="text-xs ml-1 text-slate-500">{format.unit}</span>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Around The World with all difficulties */}
+              <div className="p-3 bg-gradient-to-br from-amber-50 to-emerald-50 rounded-xl border border-amber-100">
+                <div className="text-xs font-semibold text-slate-600 mb-1">ATW</div>
+                <div className="space-y-1">
+                  {Object.entries(atwStatsByDifficulty).map(([difficulty, score]) => {
+                    const labels = {
+                      easy: 'Lihtne',
+                      medium: 'Kesk',
+                      hard: 'Raske',
+                      ultra_hard: 'Ultra',
+                      impossible: 'Võimatu'
+                    };
+                    if (score === 0) return null;
+                    return (
+                      <div key={difficulty} className="flex justify-between items-center">
+                        <span className="text-xs text-slate-500">{labels[difficulty]}:</span>
+                        <span className="text-sm font-bold text-emerald-600">{score}</span>
+                      </div>
+                    );
+                  })}
+                  {Object.values(atwStatsByDifficulty).every(s => s === 0) && (
+                    <div className="text-2xl font-bold text-emerald-600">
+                      0<span className="text-xs ml-1 text-slate-500">p</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+         {/* Putt Style Performance */}
+         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <Target className="w-5 h-5" />
+              Puti stiili statistika
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {['regular', 'straddle', 'turbo', 'kneeling', 'marksman'].map((style) => {
+                const stats = puttTypeStats[style];
+                const accuracy = stats.total > 0 ? ((stats.made / stats.total) * 100).toFixed(1) : 0;
+                const styleName = style === 'regular'
+                  ? 'Tavaline'
+                  : style === 'straddle'
+                  ? 'Straddle'
+                  : style === 'turbo'
+                  ? 'Turbo'
+                  : style === 'kneeling'
+                  ? 'Põlvelt'
+                  : 'Marksman';
+                return (
+                  <div key={style} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="text-sm font-semibold text-slate-700 mb-2">{styleName}</div>
+                    <div className="text-2xl font-bold text-emerald-600 mb-1">{stats.score}</div>
+                    <div className="text-xs text-slate-500 mb-2">Parim: {stats.count} mängu</div>
+                    <div className="text-xs text-slate-600">
+                      {stats.total > 0 ? `${accuracy}% (${stats.made}/${stats.total})` : 'Mänge pole'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+        {/* Performance Analysis */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+          <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <Target className="w-5 h-5" />
+            Soorituse analüüs
+          </h2>
+          
+          {comfortZone && (
+            <div className="mb-4 p-4 bg-emerald-50 rounded-xl">
+              <div className="text-sm text-emerald-700 font-semibold mb-1">Mugavus tsoon</div>
+              <div className="text-2xl font-bold text-emerald-600">
+                {comfortZone.distance}m • {comfortZone.accuracy}%
+              </div>
+              <div className="text-xs text-emerald-600">
+                {comfortZone.attempts} katset • {comfortShare}% sinu katsetest
+              </div>
+            </div>
+          )}
+
+          {dropCause && (
+            <div className="mb-4 p-4 bg-amber-50 rounded-xl">
+              <div className="text-sm text-amber-700 font-semibold mb-1">Languse põhjus</div>
+              <div className="text-2xl font-bold text-amber-600">
+                {dropCause.distance}m • {dropCause.accuracy}%
+              </div>
+              <div className="text-xs text-amber-600">
+                Mööda {dropCause.misses}/{dropCause.attempts}
+              </div>
+            </div>
+          )}
+
+          {/* Distance Breakdown */}
+          <div>
+            <div className="text-sm font-semibold text-slate-700 mb-2">Distantstulemused</div>
+            <div className="space-y-2">
+              {distancePercentages.map((stat) => (
+                <div key={stat.distance} className="flex items-center gap-3">
+                  <div className="w-12 text-sm font-medium text-slate-600">{stat.distance}m</div>
+                  <div className="flex-1 h-6 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500"
+                    style={{ width: `${stat.percentage}%` }}
+                  />
+                  </div>
+                  <div className="w-16 text-sm font-medium text-slate-700 text-right">
+                    {stat.percentage}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        
-        {/* Game History */}
+
+        {/* Group Game Stats */}
+        {groupGames.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <Award className="w-5 h-5" />
+              Grupimängude statistika
+            </h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 rounded-xl">
+                <div className="text-sm text-slate-500 mb-1">Keskmine skoor</div>
+                <div className="text-3xl font-bold text-slate-700">{avgGroupScore}</div>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-xl">
+                <div className="text-sm text-slate-500 mb-1">Parim skoor</div>
+                <div className="text-3xl font-bold text-emerald-600">{bestScore}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tournament Results */}
+        {tournamentPlayers.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-purple-600" />
+              Turniiri tulemused
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left py-3 px-2 text-slate-600 font-semibold">Turniir</th>
+                    <th className="text-center py-3 px-2 text-slate-600 font-semibold">Võidud</th>
+                    <th className="text-center py-3 px-2 text-slate-600 font-semibold">Kaotused</th>
+                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Punktid</th>
+                    <th className="text-right py-3 px-2 text-slate-600 font-semibold">Täpsus</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tournamentPlayers.map((player) => {
+                    const tournament = tournaments.find(t => t.id === player.tournament_id);
+                    const accuracy = player.total_attempts > 0 
+                      ? ((player.total_made_putts / player.total_attempts) * 100).toFixed(1)
+                      : 0;
+
+                    return (
+                      <tr key={player.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="py-3 px-2 font-medium text-slate-700">
+                          {tournament?.name || 'Teadmata'}
+                        </td>
+                        <td className="py-3 px-2 text-center text-slate-700 font-semibold">
+                          {player.wins}
+                        </td>
+                        <td className="py-3 px-2 text-center text-slate-700 font-semibold">
+                          {player.losses}
+                        </td>
+                        <td className="py-3 px-2 text-right font-bold text-purple-600">
+                          {player.tournament_points}
+                        </td>
+                        <td className="py-3 px-2 text-right text-slate-700">
+                          {accuracy}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* AI Insights */}
+        <AIInsights games={myGames} userName={myDisplayName} />
+
+        {/* Game History with Filters */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-4">
              <h3 className="text-lg font-bold text-slate-800">Mängude ajalugu</h3>
-             {/* Filter UI */}
+             <div className="flex flex-wrap gap-2">
+               <Select value={filterFormat} onValueChange={() => { setFilterFormat(arguments[0]); setCurrentPage(1); }}>
+                 <SelectTrigger className="w-32">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="all">Kõik formaadid</SelectItem>
+                   <SelectItem value="classic">Classic</SelectItem>
+                   <SelectItem value="mini_league">Mini Liiga</SelectItem>
+                   <SelectItem value="short">Short</SelectItem>
+                   <SelectItem value="long">Long</SelectItem>
+                   <SelectItem value="back_and_forth">Back & Forth</SelectItem>
+                   <SelectItem value="streak_challenge">Streak</SelectItem>
+                   <SelectItem value="random_distance">Random</SelectItem>
+                   <SelectItem value="around_the_world">Around The World</SelectItem>
+                   </SelectContent>
+                   </Select>
+               <Select value={filterPuttType} onValueChange={() => { setFilterPuttType(arguments[0]); setCurrentPage(1); }}>
+                 <SelectTrigger className="w-32">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="all">Kõik stiilid</SelectItem>
+                   <SelectItem value="regular">Tavaline</SelectItem>
+                   <SelectItem value="straddle">Straddle</SelectItem>
+                   <SelectItem value="turbo">Turbo</SelectItem>
+                   <SelectItem value="kneeling">Põlvelt</SelectItem>
+                   <SelectItem value="marksman">Marksman</SelectItem>
+                 </SelectContent>
+               </Select>
+               <Select value={sortBy} onValueChange={setSortBy}>
+                 <SelectTrigger className="w-32">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="date">Kuupäev</SelectItem>
+                   <SelectItem value="score">Skoor</SelectItem>
+                   <SelectItem value="format">Formaat</SelectItem>
+                 </SelectContent>
+               </Select>
+             </div>
            </div>
 
           {filteredGames.length === 0 ? (
@@ -364,39 +821,80 @@ export default function Profile() {
                        <th className="text-left py-3 px-2 text-slate-600 font-semibold">Mäng</th>
                        <th className="text-left py-3 px-2 text-slate-600 font-semibold">Kuupäev</th>
                        <th className="text-left py-3 px-2 text-slate-600 font-semibold">Formaat</th>
+                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">Stiil</th>
                        <th className="text-right py-3 px-2 text-slate-600 font-semibold">Skoor</th>
                        <th className="text-right py-3 px-2 text-slate-600 font-semibold">%</th>
+                       <th className="text-center py-3 px-2 text-slate-600 font-semibold">Staatus</th>
                        <th className="text-center py-3 px-2 text-slate-600 font-semibold"></th>
                      </tr>
                    </thead>
                   <tbody>
                     {filteredGames.slice((currentPage - 1) * GAMES_PER_PAGE, currentPage * GAMES_PER_PAGE).map((game) => {
-                      const putts = game.player_putts?.[user.uid] || [];
+                      const putts = game.player_putts?.[myDisplayName] || game.player_putts?.[user?.full_name] || game.player_putts?.[user?.email] || [];
                       const made = putts.filter(p => p.result === 'made').length;
                       const percentage = putts.length > 0 ? ((made / putts.length) * 100).toFixed(0) : 0;
-                      const score = game.total_points?.[user.uid] || 0;
+                      const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
                       const gameFormat = GAME_FORMATS[game.game_type || 'classic'];
 
                       return (
                         <tr key={game.id} className="border-b border-slate-100 hover:bg-slate-50">
                            <td className="py-3 px-2 font-medium text-slate-700">{game.name}</td>
                            <td className="py-3 px-2 text-slate-700">
-                             {game.date ? format(toDate(game.date), 'MMM d, yyyy') : '-'}
+                             {game.date ? format(new Date(game.date), 'MMM d, yyyy') : '-'}
                            </td>
                            <td className="py-3 px-2">
                              <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">
-                               {gameFormat?.name || 'Tundmatu'}
+                               {gameFormat.name}
                              </span>
                            </td>
-                           <td className="py-3 px-2 text-right font-bold text-emerald-600">{score}</td>
-                           <td className="py-3 px-2 text-right text-slate-700">{percentage}%</td>
+                           <td className="py-3 px-2">
+                             <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                               {game.putt_type === 'regular'
+                                 ? 'Tavaline'
+                                 : game.putt_type === 'straddle'
+                                 ? 'Straddle'
+                                 : game.putt_type === 'turbo'
+                                 ? 'Turbo'
+                                 : game.putt_type === 'kneeling'
+                                 ? 'Põlvelt'
+                                 : game.putt_type === 'marksman'
+                                 ? 'Marksman'
+                                 : 'Tavaline'}
+                             </span>
+                           </td>
+                           <td className="py-3 px-2 text-right font-bold text-emerald-600">
+                             {score}
+                           </td>
+                           <td className="py-3 px-2 text-right text-slate-700">
+                             {percentage}%
+                           </td>
                            <td className="py-3 px-2 text-center">
+                             <span className={`text-xs px-2 py-1 rounded ${
+                               game.status === 'active' 
+                                 ? 'bg-amber-100 text-amber-700' 
+                                 : 'bg-slate-100 text-slate-600'
+                             }`}>
+                               {game.status === 'active' ? 'Käimas' : 'Lõpetatud'}
+                             </span>
+                           </td>
+                           <td className="py-3 px-2 text-center">
+                             {game.status === 'active' ? (
+                               <Link
+                                 to={game.game_type === 'around_the_world' 
+                                   ? createPageUrl('Home') + '?mode=atw-game&gameId=' + game.id
+                                   : createPageUrl('Home') + '?mode=player&gameId=' + game.id}
+                                 className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
+                               >
+                                 <ExternalLink className="w-4 h-4" />
+                               </Link>
+                             ) : (
                                <Link
                                  to={`${createPageUrl('GameResult')}?id=${game.id}`}
                                  className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
                                >
                                  <ExternalLink className="w-4 h-4" />
                                </Link>
+                             )}
                            </td>
                          </tr>
                       );
@@ -404,12 +902,50 @@ export default function Profile() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
+                <div className="text-sm text-slate-500">
+                  Kuvatakse {Math.min((currentPage - 1) * GAMES_PER_PAGE + 1, filteredGames.length)}–{Math.min(currentPage * GAMES_PER_PAGE, filteredGames.length)} / {filteredGames.length} mängu
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Eelmine
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.ceil(filteredGames.length / GAMES_PER_PAGE) }).map((_, i) => (
+                      <Button
+                        key={i + 1}
+                        onClick={() => setCurrentPage(i + 1)}
+                        variant={currentPage === i + 1 ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                      >
+                        {i + 1}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    onClick={() => setCurrentPage(Math.min(Math.ceil(filteredGames.length / GAMES_PER_PAGE), currentPage + 1))}
+                    disabled={currentPage === Math.ceil(filteredGames.length / GAMES_PER_PAGE)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Järgmine
+                  </Button>
+                </div>
+              </div>
             </>
           )}
         </div>
-        
+
         {/* Achievements */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mt-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-slate-800">
               Saavutused ({unlockedAchievements.length}/{achievements.length})

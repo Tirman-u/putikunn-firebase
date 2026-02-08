@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
 import { Users, UserPlus, Settings, User, Target, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { db, auth } from '@/lib/firebase';
-import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
 
 import HostSetup from '@/components/putting/HostSetup';
 import JoinGame from '@/components/putting/JoinGame';
@@ -16,27 +14,16 @@ import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView'
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 
 export default function Home() {
-  const [mode, setMode] = useState(null);
+  const [mode, setMode] = useState(null); // null, 'host', 'player', 'atw-setup', 'atw-game', 'atw-host'
   const [gameId, setGameId] = useState(null);
   const [playerName, setPlayerName] = useState(null);
   const [isSoloATW, setIsSoloATW] = useState(false);
   const [atwPin, setAtwPin] = useState(null);
   const [atwName, setAtwName] = useState(null);
   const [atwPuttType, setAtwPuttType] = useState(null);
-  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        queryClient.setQueryData(['user'], user);
-      } else {
-        queryClient.setQueryData(['user'], null);
-      }
-    });
-    return () => unsubscribe();
-  }, [queryClient]);
-
-  useEffect(() => {
+  // Check URL params for ATW mode and continuing games
+  React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlMode = params.get('mode');
     const isSolo = params.get('solo') === '1';
@@ -45,12 +32,20 @@ export default function Home() {
     if (urlMode === 'atw-setup') {
       setIsSoloATW(isSolo);
       setMode('atw-setup');
+      // Store pin, name, and puttType if available
       const urlPin = params.get('pin');
       const urlName = params.get('name');
       const urlPuttType = params.get('puttType');
-      if (urlPin) setAtwPin(urlPin);
-      if (urlName) setAtwName(decodeURIComponent(urlName));
-      if (urlPuttType) setAtwPuttType(urlPuttType);
+      if (urlPin) {
+        setAtwPin(urlPin);
+      }
+      if (urlName) {
+        setAtwName(decodeURIComponent(urlName));
+      }
+      if (urlPuttType) {
+        setAtwPuttType(urlPuttType);
+      }
+      // Keep URL for shareable setup state
     } else if (urlMode === 'atw-host' && urlGameId) {
       setGameId(urlGameId);
       setMode('atw-host');
@@ -58,42 +53,51 @@ export default function Home() {
       setGameId(urlGameId);
       setMode('host');
     } else if (urlMode === 'atw-game' && urlGameId) {
-      const gameRef = doc(db, 'games', urlGameId);
-      getDoc(gameRef).then(docSnap => {
-        if (docSnap.exists()) {
-          const game = docSnap.data();
-          setIsSoloATW(game.pin === '0000');
-          const currentUser = auth.currentUser;
-          if (currentUser) {
-            setPlayerName(currentUser.displayName || currentUser.email || 'Mängija');
-            setGameId(urlGameId);
-            setMode('atw-game');
-          }
-        }
+      // Continue ATW game from profile
+      setGameId(urlGameId);
+      base44.entities.Game.filter({ id: urlGameId }).then(games => {
+        const game = games?.[0];
+        if (!game) return;
+        setIsSoloATW(game.pin === '0000');
+        base44.auth.me().then(user => {
+          const playerName = user?.display_name || user?.full_name || user?.email || 'Mängija';
+          setPlayerName(playerName);
+          setMode('atw-game');
+        });
       });
     } else if (urlMode === 'player' && urlGameId) {
-        const currentUser = auth.currentUser;
-        if (currentUser) {
-          setPlayerName(currentUser.displayName || currentUser.email || 'Mängija');
-          setGameId(urlGameId);
-          setMode('player');
-        }
+      // Continue regular game from profile
+      setGameId(urlGameId);
+      base44.auth.me().then(user => {
+        const playerName = user?.display_name || user?.full_name || user?.email || 'Mängija';
+        setPlayerName(playerName);
+        setMode('player');
+      });
     }
   }, []);
 
-  const { data: user } = useQuery({ queryKey: ['user'] });
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => base44.auth.me()
+  });
+
+  const userRole = user?.app_role || 'user';
+  const canHostGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
+  const canManageGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
+
+
 
   const handleHostGame = async (gameData) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
+    const user = await base44.auth.me();
     const gameType = gameData.gameType || 'classic';
-    const newGame = {
+    const format = GAME_FORMATS[gameType];
+
+    const game = await base44.entities.Game.create({
       name: gameData.name,
       pin: gameData.pin,
       game_type: gameType,
       putt_type: gameData.puttType || 'regular',
-      host_user: currentUser.email,
+      host_user: user.email,
       players: [],
       player_distances: {},
       player_putts: {},
@@ -102,19 +106,19 @@ export default function Home() {
       player_emails: {},
       join_closed: false,
       status: 'active',
-      date: new Date().toISOString(),
-    };
+      date: new Date().toISOString()
+    });
 
-    const docRef = await addDoc(collection(db, 'games'), newGame);
-    setGameId(docRef.id);
+    setGameId(game.id);
     setMode('host');
-    window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=host&gameId=${docRef.id}`);
+    window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=host&gameId=${game.id}`);
   };
 
   const handleJoinGame = ({ game, playerName }) => {
     setGameId(game.id);
     setPlayerName(playerName);
     
+    // Check if this is an ATW game
     if (game.game_type === 'around_the_world') {
       setMode('atw-game');
       setIsSoloATW(game.pin === '0000');
@@ -125,17 +129,20 @@ export default function Home() {
     }
   };
 
+  // Initial selection screen
   if (!mode) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
         <div className="max-w-lg mx-auto pt-16">
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-slate-800 mb-2">
-              Tere tulemast, {user?.displayName || 'Külaline'}!
+              Tere tulemast, {user?.display_name || user?.full_name || 'Külaline'}!
             </h1>
             <p className="text-slate-600 text-xl mb-8">Valmis puttama?</p>
           </div>
+
           <div className="space-y-4">
+            {canHostGames && (
               <button
                 onClick={() => setMode('host-setup')}
                 className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
@@ -150,6 +157,7 @@ export default function Home() {
                   </div>
                 </div>
               </button>
+            )}
 
             <button
               onClick={() => setMode('join')}
@@ -196,7 +204,41 @@ export default function Home() {
               </div>
             </button>
 
+            <button
+              onClick={() => window.location.href = createPageUrl('PuttingKing')}
+              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                  <Trophy className="w-7 h-7 text-purple-600" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-lg font-bold text-slate-800">Puttingu Kuningas</h3>
+                  <p className="text-sm text-slate-500">Liitu turniiridega ja võistle</p>
+                </div>
+              </div>
+            </button>
+
+
+
             <div className="pt-8 border-t-2 border-slate-200 mt-8 space-y-3">
+            {canManageGames && (
+              <Link
+                to={createPageUrl('ManageGames')}
+                className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200 transition-colors">
+                    <Settings className="w-6 h-6 text-slate-600" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="text-base font-bold text-slate-800">Halda mänge</h3>
+                    <p className="text-xs text-slate-500">Vaata ja halda oma mänge</p>
+                  </div>
+                </div>
+              </Link>
+            )}
+
             <Link
               to={createPageUrl('Profile')}
               className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block"
@@ -211,6 +253,23 @@ export default function Home() {
                 </div>
               </div>
             </Link>
+
+            {userRole === 'super_admin' && (
+              <Link
+                to={createPageUrl('AdminUsers')}
+                className="w-full bg-white rounded-2xl p-5 shadow-sm border border-red-200 hover:border-red-300 hover:shadow-md transition-all group block"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center group-hover:bg-red-200 transition-colors">
+                    <User className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="text-base font-bold text-slate-800">Kasutajate haldus</h3>
+                    <p className="text-xs text-slate-500">Halda rolle ja õigusi</p>
+                  </div>
+                </div>
+              </Link>
+            )}
             </div>
           </div>
         </div>
@@ -218,50 +277,53 @@ export default function Home() {
     );
   }
 
+  // Host setup
   if (mode === 'host-setup') {
     return <HostSetup onStartGame={handleHostGame} onBack={() => setMode(null)} />;
   }
 
+  // Solo mode
   if (mode === 'solo') {
     return <HostSetup onStartGame={async (gameData) => {
-      const currentUser = auth.currentUser;
-      if(!currentUser) return;
-      const gameType = gameData.gameType || 'classic';
-      const newGame = {
+      const user = await base44.auth.me();
+      const game = await base44.entities.Game.create({
         name: gameData.name || 'Soolotreening',
         pin: '0000',
-        game_type: gameType,
+        game_type: gameData.gameType || 'classic',
         putt_type: gameData.puttType || 'regular',
-        host_user: currentUser.email,
-        players: [currentUser.displayName],
-        player_distances: { [currentUser.displayName]: GAME_FORMATS[gameType].startDistance },
-        player_putts: { [currentUser.displayName]: [] },
-        total_points: { [currentUser.displayName]: 0 },
-        player_uids: { [currentUser.displayName]: currentUser.uid },
-        player_emails: { [currentUser.displayName]: currentUser.email },
+        host_user: user.email,
+        players: [user.full_name],
+        player_distances: { [user.full_name]: GAME_FORMATS[gameData.gameType || 'classic'].startDistance },
+        player_putts: { [user.full_name]: [] },
+        total_points: { [user.full_name]: 0 },
+        player_uids: { [user.full_name]: user.id },
+        player_emails: { [user.full_name]: user.email },
         join_closed: false,
         status: 'active',
         date: new Date().toISOString()
-      };
-      const docRef = await addDoc(collection(db, 'games'), newGame);
-      setGameId(docRef.id);
-      setPlayerName(currentUser.displayName);
+      });
+      setGameId(game.id);
+      setPlayerName(user.full_name);
       setMode('player');
     }} onBack={() => setMode(null)} isSolo={true} />;
   }
 
+  // Join game
   if (mode === 'join') {
     return <JoinGame onJoin={handleJoinGame} onBack={() => setMode(null)} />;
   }
 
+  // Host view
   if (mode === 'host') {
     return <HostView gameId={gameId} onExit={() => setMode(null)} />;
   }
 
+  // Player view
   if (mode === 'player') {
     return <PlayerView gameId={gameId} playerName={playerName} onExit={() => setMode(null)} />;
   }
 
+  // Around the World setup
   if (mode === 'atw-setup') {
     return (
       <AroundTheWorldSetup
@@ -276,22 +338,21 @@ export default function Home() {
           setAtwPuttType(null);
         }}
         onStart={async (setupData) => {
-          const currentUser = auth.currentUser;
-          if (!currentUser) return;
-          const playerName = currentUser.displayName || currentUser.email || 'Player';
+          const user = await base44.auth.me();
+          const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
 
-          const newGame = {
+          const game = await base44.entities.Game.create({
             name: setupData.name,
             pin: isSoloATW ? '0000' : setupData.pin,
             game_type: setupData.gameType,
             putt_type: setupData.puttType || 'regular',
-            host_user: currentUser.email,
+            host_user: user.email,
             players: isSoloATW ? [playerName] : [],
             player_distances: {},
             player_putts: {},
             total_points: {},
-            player_uids: isSoloATW ? { [playerName]: currentUser.uid } : {},
-            player_emails: isSoloATW ? { [playerName]: currentUser.email } : {},
+            player_uids: isSoloATW ? { [playerName]: user.id } : {},
+            player_emails: isSoloATW ? { [playerName]: user.email } : {},
             join_closed: false,
             status: 'active',
             date: new Date().toISOString(),
@@ -313,27 +374,28 @@ export default function Home() {
                 attempts_count: 0
               }
             } : {}
-          };
-
-          const docRef = await addDoc(collection(db, 'games'), newGame);
-          setGameId(docRef.id);
+          });
+          
+          setGameId(game.id);
           if (isSoloATW) {
             setPlayerName(playerName);
             setMode('atw-game');
-            window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=atw-game&gameId=${docRef.id}`);
+            window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=atw-game&gameId=${game.id}`);
           } else {
             setMode('atw-host');
-            window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=atw-host&gameId=${docRef.id}`);
+            window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=atw-host&gameId=${game.id}`);
           }
         }}
       />
     );
   }
 
+  // Around the World host view
   if (mode === 'atw-host') {
     return <HostView gameId={gameId} onExit={() => setMode(null)} />;
   }
 
+  // Around the World game view
   if (mode === 'atw-game') {
     return (
       <AroundTheWorldGameView

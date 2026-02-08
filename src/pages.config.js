@@ -2,6 +2,7 @@ import AdminUsers from './pages/AdminUsers';
 import GameResult from './pages/GameResult';
 import GroupResult from './pages/GroupResult';
 import Home from './pages/Home';
+import Login from './pages/Login';
 import ManageGames from './pages/ManageGames';
 import Profile from './pages/Profile';
 import DuelHost from './pages/DuelHost';
@@ -19,6 +20,7 @@ import SubmitDiscgolf from './pages/SubmitDiscgolf';
 
 
 export const PAGES = {
+    "Login": Login,
     "AdminUsers": AdminUsers,
     "GameResult": GameResult,
     "GroupResult": GroupResult,

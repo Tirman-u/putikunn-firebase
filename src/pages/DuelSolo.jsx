@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth } from '@/lib/AuthContext';
+import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -12,7 +12,6 @@ import { createPageUrl } from '@/utils';
 
 export default function DuelSolo() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [gameId, setGameId] = React.useState(null);
   const [creating, setCreating] = React.useState(false);
   const [gameName, setGameName] = React.useState('');
@@ -23,19 +22,17 @@ export default function DuelSolo() {
   const handleCreate = async () => {
     try {
       setCreating(true);
-      const playerName = displayName || user?.displayName || user?.email || 'Mängija';
+      const user = await base44.auth.me();
+      const playerName = displayName || user?.display_name || user?.full_name || user?.email || 'Mängija';
       const state = createEmptyDuelState(1);
       addPlayerToState(state, {
-        id: user?.uid || user?.email,
+        id: user?.id || user?.email,
         name: playerName,
         email: user?.email,
         joined_at: new Date().toISOString(),
         desired_station: 1
       });
-      
-      // Mock game creation
-      const game = {
-        id: `mock_${Date.now()}`,
+      const game = await base44.entities.DuelGame.create({
         name: gameName || `Sõbraduell ${new Date().toLocaleDateString()}`,
         pin,
         disc_count: Number(discCount),
@@ -45,14 +42,8 @@ export default function DuelSolo() {
         host_user: user?.email,
         created_at: new Date().toISOString(),
         state
-      };
-      
-      // Replace with firestore call
-      // const game = await base44.entities.DuelGame.create({ ... });
-      
+      });
       setGameId(game.id);
-      toast.success("Mock game created!");
-
     } catch (error) {
       toast.error('Mängu loomine ebaõnnestus');
     } finally {

@@ -1,6 +1,15 @@
 #env
 .env
+
+# Firebase service account keys (keep local only)
+firebase-service-account.json
+firebase-adminsdk-*.json
+*firebase-adminsdk-*.json
+putikunn-migration-firebase-adminsdk-*.json
 .env.*
+
+# Data exports
+exports/
 
 # Logs
 logs

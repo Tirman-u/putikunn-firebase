@@ -1,23 +1,24 @@
-import { useAuth } from '@/lib/AuthContext';
-import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 
 export default function usePlayerGameState({ gameId }) {
-  const { user, isLoading: isLoadingUser } = useAuth();
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => base44.auth.me()
+  });
 
-  const { data: game, isLoading: isLoadingGame } = useQuery({
+  const { data: game, isLoading } = useQuery({
     queryKey: ['game', gameId],
     queryFn: async () => {
-      if (!gameId) return null;
-      const gameDocRef = doc(db, "games", gameId);
-      const gameDocSnap = await getDoc(gameDocRef);
-      return gameDocSnap.exists() ? { id: gameDocSnap.id, ...gameDocSnap.data() } : null;
+      const games = await base44.entities.Game.filter({ id: gameId });
+      return games[0];
     },
-    enabled: !!gameId,
+    refetchInterval: false,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true
   });
 
   const isSoloGame = game?.pin === '0000';
 
-  return { user, game, isLoading: isLoadingUser || isLoadingGame, isSoloGame };
+  return { user, game, isLoading, isSoloGame };
 }

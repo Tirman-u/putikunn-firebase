@@ -1,5 +1,6 @@
 import React from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
@@ -10,13 +11,20 @@ import {
   startDuelGame
 } from '@/lib/duel-utils';
 import { cn } from '@/lib/utils';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 export default function DuelHostView({ gameId }) {
   const queryClient = useQueryClient();
 
-  const { data: game, isLoading } = useRealtimeDuelGame({
+  const { data: game, isLoading } = useQuery({
+    queryKey: ['duel-game', gameId],
+    queryFn: async () => {
+      const games = await base44.entities.DuelGame.filter({ id: gameId });
+      return games?.[0] || null;
+    },
+    enabled: !!gameId
+  });
+
+  useRealtimeDuelGame({
     gameId,
     enabled: !!gameId,
     onEvent: (event) => {
@@ -26,12 +34,11 @@ export default function DuelHostView({ gameId }) {
   });
 
   const updateGame = async (updater) => {
-    const gameRef = doc(db, 'duel_games', gameId);
-    const currentDoc = await getDoc(gameRef);
-    if (!currentDoc.exists()) throw new Error('Mängu ei leitud');
-    const current = { id: currentDoc.id, ...currentDoc.data() };
+    const games = await base44.entities.DuelGame.filter({ id: gameId });
+    const current = games?.[0];
+    if (!current) throw new Error('Mängu ei leitud');
     const next = updater(current);
-    await updateDoc(gameRef, next);
+    await base44.entities.DuelGame.update(gameId, next);
     queryClient.setQueryData(['duel-game', gameId], next);
   };
 

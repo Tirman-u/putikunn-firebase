@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from '@/lib/AuthContext'; // Import useAuth
+import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,11 +16,6 @@ import {
   resolveLeaderboardPlayer
 } from '@/lib/leaderboard-utils';
 
-// Placeholder for Firestore interactions
-const db = {
-  collection: () => ({ /* placeholder */ }),
-};
-
 export default function ManageGames() {
   const [selectedGames, setSelectedGames] = useState([]);
   const [newGroupName, setNewGroupName] = useState('');
@@ -29,39 +24,36 @@ export default function ManageGames() {
   const [selectedSyncGameIds, setSelectedSyncGameIds] = useState([]);
   const queryClient = useQueryClient();
 
-  const { user } = useAuth(); // Use the useAuth hook
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => base44.auth.me()
+  });
 
-  // TODO: Replace with Firestore queries
   const { data: games = [] } = useQuery({
-    queryKey: ['my-games', user?.email],
+    queryKey: ['my-games'],
     queryFn: async () => {
-      // const allGames = await base44.entities.Game.list();
-      // return allGames.filter(g => g.host_user === user?.email);
-      return [];
+      const allGames = await base44.entities.Game.list();
+      return allGames.filter(g => g.host_user === user?.email);
     },
     enabled: !!user
   });
 
   const { data: groups = [] } = useQuery({
-    queryKey: ['game-groups', user?.email],
+    queryKey: ['game-groups'],
     queryFn: async () => {
-      // const allGroups = await base44.entities.GameGroup.list();
-      // return allGroups.filter(g => g.created_by === user?.email);
-      return [];
+      const allGroups = await base44.entities.GameGroup.list();
+      return allGroups.filter(g => g.created_by === user?.email);
     },
     enabled: !!user
   });
 
   const { data: leaderboardEntries = [] } = useQuery({
     queryKey: ['leaderboard-entries'],
-    queryFn: async () => {
-        // base44.entities.LeaderboardEntry.list()
-        return []
-    }
+    queryFn: () => base44.entities.LeaderboardEntry.list()
   });
 
   const completeGameMutation = useMutation({
-    mutationFn: (gameId) => Promise.resolve(), // base44.entities.Game.update(gameId, { status: 'completed' }),
+    mutationFn: (gameId) => base44.entities.Game.update(gameId, { status: 'completed' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-games'] });
       toast.success('Mäng märgitud lõpetatuks');
@@ -69,7 +61,7 @@ export default function ManageGames() {
   });
 
   const deleteGameMutation = useMutation({
-    mutationFn: (gameId) => Promise.resolve(), // deleteGameAndLeaderboardEntries(gameId),
+    mutationFn: (gameId) => deleteGameAndLeaderboardEntries(gameId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-games'] });
       queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
@@ -77,14 +69,14 @@ export default function ManageGames() {
   });
 
   const deleteGroupMutation = useMutation({
-    mutationFn: (groupId) => Promise.resolve(), // base44.entities.GameGroup.delete(groupId),
+    mutationFn: (groupId) => base44.entities.GameGroup.delete(groupId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['game-groups'] });
     }
   });
 
   const createGroupMutation = useMutation({
-    mutationFn: (groupData) => Promise.resolve(), // base44.entities.GameGroup.create(groupData),
+    mutationFn: (groupData) => base44.entities.GameGroup.create(groupData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['game-groups'] });
       setShowGroupDialog(false);
@@ -93,18 +85,296 @@ export default function ManageGames() {
     }
   });
 
-  const syncGameToLeaderboards = async (game, profileCache = {}) => {
-    // ... (logic depends on base44, will be refactored)
-    return { results: [], players: [], eligiblePlayers: 0 };
+  const REQUEST_INTERVAL_MS = 150;
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const normalizeEmail = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+  const normalizeIdentityEmail = (value) => {
+    const normalized = normalizeEmail(value);
+    if (!normalized || normalized === 'unknown') return '';
+    return normalized;
+  };
+  const isRateLimitError = (error) => {
+    const status = error?.status || error?.response?.status;
+    const message = String(error?.message || '');
+    return status === 429 || message.includes('429') || message.toLowerCase().includes('too many');
+  };
+  const withRateLimitRetry = async (fn, { retries = 3, delayMs = 300 } = {}) => {
+    let attempt = 0;
+    let waitMs = delayMs;
+    while (true) {
+      try {
+        return await fn();
+      } catch (error) {
+        if (!isRateLimitError(error) || attempt >= retries) {
+          throw error;
+        }
+        await sleep(waitMs);
+        waitMs *= 2;
+        attempt += 1;
+      }
+    }
+  };
+  const requestQueueRef = React.useRef(Promise.resolve());
+  const lastRequestAtRef = React.useRef(0);
+  const enqueueRequest = React.useCallback(async (fn) => {
+    const run = async () => {
+      const elapsed = Date.now() - lastRequestAtRef.current;
+      const waitMs = Math.max(0, REQUEST_INTERVAL_MS - elapsed);
+      if (waitMs > 0) {
+        await sleep(waitMs);
+      }
+      const result = await fn();
+      lastRequestAtRef.current = Date.now();
+      return result;
+    };
+
+    const chained = requestQueueRef.current.then(run, run);
+    requestQueueRef.current = chained.catch(() => {});
+    return chained;
+  }, []);
+  const queuedRequest = React.useCallback(
+    (fn, options) => withRateLimitRetry(() => enqueueRequest(fn), options),
+    [enqueueRequest]
+  );
+
+  const resolveGamePlayers = (game) => {
+    const fromPlayers = Array.isArray(game.players) ? game.players : [];
+    const fromPutts = Object.keys(game.player_putts || {});
+    const fromAtw = Object.keys(game.atw_state || {});
+    return Array.from(new Set([...fromPlayers, ...fromPutts, ...fromAtw].filter(Boolean)));
   };
 
-    const submitToDiscgolfMutation = useMutation({
+  const getEntryIdentityKey = (entry) => {
+    if (entry?.player_uid) return `uid:${entry.player_uid}`;
+    const email = normalizeIdentityEmail(entry?.player_email);
+    if (email) return `email:${email}`;
+    if (entry?.player_name) return `name:${entry.player_name.trim().toLowerCase()}`;
+    return `id:${entry?.id}`;
+  };
+
+  const getResolvedIdentityKey = (resolvedPlayer) => {
+    if (resolvedPlayer?.playerUid) return `uid:${resolvedPlayer.playerUid}`;
+    const email = normalizeIdentityEmail(resolvedPlayer?.playerEmail);
+    if (email) return `email:${email}`;
+    if (resolvedPlayer?.playerName) return `name:${resolvedPlayer.playerName.trim().toLowerCase()}`;
+    return '';
+  };
+
+  const fetchLeaderboardEntries = async (filter) => {
+    const entries = [];
+    let skip = 0;
+    const limit = 200;
+    while (entries.length < 2000) {
+      const chunk = await queuedRequest(
+        () => base44.entities.LeaderboardEntry.filter(filter, '-score', limit, skip),
+        { retries: 4, delayMs: 350 }
+      );
+      if (!chunk?.length) break;
+      entries.push(...chunk);
+      if (chunk.length < limit) break;
+      skip += chunk.length;
+    }
+    return entries;
+  };
+
+  const syncGameToLeaderboards = async (game, profileCache = {}) => {
+    const results = [];
+    const players = resolveGamePlayers(game);
+    let eligiblePlayers = 0;
+    const generalByKey = new Map();
+    const discgolfByKey = new Map();
+
+    try {
+      const existingGeneralEntries = await fetchLeaderboardEntries({
+        game_id: game.id,
+        game_type: game.game_type,
+        leaderboard_type: 'general'
+      });
+      existingGeneralEntries.forEach((entry) => {
+        const key = getEntryIdentityKey(entry);
+        if (!key) return;
+        const current = generalByKey.get(key);
+        if (!current || entry.score > current.score) {
+          generalByKey.set(key, entry);
+        }
+      });
+
+      if (isHostedClassicGame(game)) {
+        const existingDgEntries = await fetchLeaderboardEntries({
+          game_id: game.id,
+          game_type: game.game_type,
+          leaderboard_type: 'discgolf_ee'
+        });
+        existingDgEntries.forEach((entry) => {
+          const key = getEntryIdentityKey(entry);
+          if (!key) return;
+          const current = discgolfByKey.get(key);
+          if (!current || entry.score > current.score) {
+            discgolfByKey.set(key, entry);
+          }
+        });
+      }
+    } catch (error) {
+      console.warn(`[Sync] "${game?.name}" olemasolevate kirjete laadimine ebaõnnestus:`, error);
+    }
+
+    for (const rawPlayerName of players) {
+      if (!rawPlayerName) continue;
+
+      const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, rawPlayerName);
+      const hasStats = totalPutts > 0 || score > 0;
+      const resolvedPlayer = await resolveLeaderboardPlayer({
+        game,
+        playerName: rawPlayerName,
+        cache: profileCache
+      });
+      const normalizedDate = new Date(game.date || new Date().toISOString()).toISOString();
+      const basePayload = {
+        game_id: game.id,
+        game_type: game.game_type,
+        player_name: resolvedPlayer.playerName,
+        score,
+        accuracy: Math.round(accuracy * 10) / 10,
+        made_putts: madePutts,
+        total_putts: totalPutts,
+        ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
+        player_email: getLeaderboardEmail(resolvedPlayer),
+        ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
+        ...(game.game_type === 'streak_challenge'
+          ? { streak_distance: game.player_distances?.[rawPlayerName] || 0 }
+          : {}),
+        date: normalizedDate
+      };
+
+      if (!hasStats) {
+        results.push({ player: resolvedPlayer.playerName, action: 'skipped', reason: 'no_stats' });
+        continue;
+      }
+      eligiblePlayers += 1;
+
+      try {
+        const identityKey = getResolvedIdentityKey(resolvedPlayer);
+        const existingGeneral = identityKey ? generalByKey.get(identityKey) : null;
+        let didWrite = false;
+
+        if (existingGeneral) {
+          if (score > existingGeneral.score) {
+            await queuedRequest(
+              () => base44.entities.LeaderboardEntry.update(existingGeneral.id, {
+                ...basePayload,
+                leaderboard_type: 'general'
+              }),
+              { retries: 4, delayMs: 350 }
+            );
+            results.push({ player: resolvedPlayer.playerName, action: 'updated' });
+            didWrite = true;
+            if (identityKey) {
+              generalByKey.set(identityKey, { ...existingGeneral, ...basePayload, leaderboard_type: 'general' });
+            }
+          } else {
+            results.push({ player: resolvedPlayer.playerName, action: 'skipped', reason: 'lower_score' });
+          }
+        } else {
+          const created = await queuedRequest(
+            () => base44.entities.LeaderboardEntry.create({
+              ...basePayload,
+              leaderboard_type: 'general',
+            }),
+            { retries: 4, delayMs: 350 }
+          );
+          results.push({ player: resolvedPlayer.playerName, action: 'created' });
+          didWrite = true;
+          if (identityKey) {
+            generalByKey.set(identityKey, created || { ...basePayload, leaderboard_type: 'general' });
+          }
+        }
+
+        if (isHostedClassicGame(game)) {
+          const existingDg = identityKey ? discgolfByKey.get(identityKey) : null;
+
+          if (existingDg) {
+            if (score > existingDg.score) {
+              await queuedRequest(
+                () => base44.entities.LeaderboardEntry.update(existingDg.id, {
+                  ...basePayload,
+                  leaderboard_type: 'discgolf_ee',
+                  submitted_by: user?.email
+                }),
+                { retries: 4, delayMs: 350 }
+              );
+              didWrite = true;
+              if (identityKey) {
+                discgolfByKey.set(identityKey, { ...existingDg, ...basePayload, leaderboard_type: 'discgolf_ee' });
+              }
+            }
+          } else {
+            const createdDg = await queuedRequest(
+              () => base44.entities.LeaderboardEntry.create({
+                ...basePayload,
+                leaderboard_type: 'discgolf_ee',
+                submitted_by: user?.email
+              }),
+              { retries: 4, delayMs: 350 }
+            );
+            didWrite = true;
+            if (identityKey) {
+              discgolfByKey.set(identityKey, createdDg || { ...basePayload, leaderboard_type: 'discgolf_ee' });
+            }
+          }
+        }
+
+        if (didWrite) {
+          await sleep(REQUEST_INTERVAL_MS);
+        }
+      } catch (error) {
+        results.push({ player: resolvedPlayer.playerName, action: 'error', error });
+      }
+    }
+
+    return { results, players, eligiblePlayers };
+  };
+
+  const submitToDiscgolfMutation = useMutation({
     mutationFn: async (game) => {
       const payload = await syncGameToLeaderboards(game, {});
       return { ...payload, game };
     },
     onSuccess: ({ results, eligiblePlayers, players, game }) => {
-        toast.success("Placehelder");
+      const updated = results.filter(r => r.action === 'updated').length;
+      const created = results.filter(r => r.action === 'created').length;
+      const errors = results.filter(r => r.action === 'error').length;
+      const skippedNoStats = results.filter(r => r.action === 'skipped' && r.reason === 'no_stats').map(r => r.player);
+      const skippedLowerScore = results.filter(r => r.action === 'skipped' && r.reason === 'lower_score').length;
+      const totalPlayers = players?.length || 0;
+      
+      let message = 'Edetabelitesse saadetud';
+      const detailParts = [];
+      if (created > 0) detailParts.push(`${created} uusi`);
+      if (updated > 0) detailParts.push(`${updated} uuendatud`);
+      if (skippedLowerScore > 0) detailParts.push(`${skippedLowerScore} rekord parem olemas`);
+      if (skippedNoStats.length > 0) detailParts.push(`${skippedNoStats.length} stats puudub`);
+      if (errors > 0) detailParts.push(`${errors} viga`);
+      if (detailParts.length > 0) {
+        message += ` (${detailParts.join(', ')})`;
+      }
+      if (totalPlayers > 0) {
+        message += ` • Mängijaid: ${totalPlayers}, statsiga: ${eligiblePlayers}`;
+      }
+
+      if (skippedNoStats.length > 0) {
+        console.warn(`[Sync] "${game?.name}" - puuduvad stats:`, skippedNoStats);
+      }
+      const errorPlayers = results.filter(r => r.action === 'error');
+      if (errorPlayers.length > 0) {
+        console.error(`[Sync] "${game?.name}" - vead:`, errorPlayers);
+      }
+
+      if (errors > 0) {
+        toast.error(message);
+      } else {
+        toast.success(message);
+      }
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
     },
     onError: (error) => {
       const message = error?.message || 'Saatmine ebaõnnestus';
@@ -114,16 +384,63 @@ export default function ManageGames() {
 
   const bulkSyncMutation = useMutation({
     mutationFn: async (gamesToSync) => {
-        toast.success("Placehelder");
+      const profileCache = {};
+      const summary = {
+        games: gamesToSync.length,
+        players: 0,
+        eligiblePlayers: 0,
+        created: 0,
+        updated: 0,
+        skippedNoStats: 0,
+        skippedLowerScore: 0,
+        errors: 0
+      };
+
+      for (const game of gamesToSync) {
+        const payload = await syncGameToLeaderboards(game, profileCache);
+        const { results, eligiblePlayers, players } = payload;
+        summary.created += results.filter(r => r.action === 'created').length;
+        summary.updated += results.filter(r => r.action === 'updated').length;
+        summary.errors += results.filter(r => r.action === 'error').length;
+        summary.players += players?.length || 0;
+        summary.eligiblePlayers += eligiblePlayers || 0;
+
+        const skippedNoStats = results.filter(r => r.action === 'skipped' && r.reason === 'no_stats').map(r => r.player);
+        summary.skippedNoStats += skippedNoStats.length;
+        summary.skippedLowerScore += results.filter(r => r.action === 'skipped' && r.reason === 'lower_score').length;
+        if (skippedNoStats.length > 0) {
+          console.warn(`[Bulk Sync] "${game?.name}" - puuduvad stats:`, skippedNoStats);
+        }
+        const errorPlayers = results.filter(r => r.action === 'error');
+        if (errorPlayers.length > 0) {
+          console.error(`[Bulk Sync] "${game?.name}" - vead:`, errorPlayers);
+        }
+      }
+
+      return summary;
     },
     onSuccess: (summary) => {
-        toast.success("Placehelder");
+      const detailParts = [`${summary.games} mängu`];
+      if (summary.created > 0) detailParts.push(`${summary.created} uusi`);
+      if (summary.updated > 0) detailParts.push(`${summary.updated} uuendatud`);
+      if (summary.skippedLowerScore > 0) detailParts.push(`${summary.skippedLowerScore} rekord parem olemas`);
+      if (summary.skippedNoStats > 0) detailParts.push(`${summary.skippedNoStats} stats puudub`);
+      if (summary.errors > 0) detailParts.push(`${summary.errors} viga`);
+      let message = `Mass-sünk valmis (${detailParts.join(', ')})`;
+      if (summary.players > 0) {
+        message += ` • Mängijaid: ${summary.players}, statsiga: ${summary.eligiblePlayers}`;
+      }
+      if (summary.errors > 0) {
+        toast.error(message);
+      } else {
+        toast.success(message);
+      }
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
     },
     onError: (error) => {
       toast.error(error?.message || 'Mass-sünk ebaõnnestus');
     }
   });
-
 
   const handleCreateGroup = () => {
     if (!newGroupName.trim() || selectedGames.length === 0) return;

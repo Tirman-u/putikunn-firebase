@@ -95,6 +95,52 @@ const normalizeSort = (sort) => {
   return null;
 };
 
+const matchesFilter = (row, filter) => {
+  if (!filter) return true;
+  return Object.entries(filter).every(([field, value]) => {
+    if (value === undefined) return true;
+    const rowValue = field === 'id' ? row?.id : row?.[field];
+
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      if (Object.prototype.hasOwnProperty.call(value, '$in')) {
+        return value.$in?.includes(rowValue);
+      }
+      if (Object.prototype.hasOwnProperty.call(value, '$ne')) {
+        return rowValue !== value.$ne;
+      }
+      if (Object.prototype.hasOwnProperty.call(value, '$gte')) {
+        return rowValue >= value.$gte;
+      }
+      if (Object.prototype.hasOwnProperty.call(value, '$gt')) {
+        return rowValue > value.$gt;
+      }
+      if (Object.prototype.hasOwnProperty.call(value, '$lte')) {
+        return rowValue <= value.$lte;
+      }
+      if (Object.prototype.hasOwnProperty.call(value, '$lt')) {
+        return rowValue < value.$lt;
+      }
+    }
+
+    return rowValue === value;
+  });
+};
+
+const sortRows = (rows, sortConfig) => {
+  if (!sortConfig) return rows;
+  const { field, direction } = sortConfig;
+  return rows.sort((a, b) => {
+    const aVal = a?.[field];
+    const bVal = b?.[field];
+    if (aVal === bVal) return 0;
+    if (aVal === undefined || aVal === null) return 1;
+    if (bVal === undefined || bVal === null) return -1;
+    if (aVal < bVal) return direction === 'desc' ? 1 : -1;
+    if (aVal > bVal) return direction === 'desc' ? -1 : 1;
+    return 0;
+  });
+};
+
 const applyFilterToQuery = (collectionRef, filter) => {
   const constraints = [];
   if (!filter) return { queryRef: collectionRef, constraints, idFilter: null };
@@ -250,7 +296,21 @@ const createEntityApi = (entityName) => {
       }
 
       const queryRef = constraints.length ? query(collectionRef, ...constraints) : collectionRef;
-      return readDocs(queryRef, skip, limit);
+      try {
+        return await readDocs(queryRef, skip, limit);
+      } catch (error) {
+        // Fallback when Firestore index is missing: client-side filter & sort.
+        const snapshot = await getDocs(collectionRef);
+        let rows = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+        rows = rows.filter((row) => matchesFilter(row, filter));
+        rows = sortRows(rows, sortConfig);
+        if (typeof skip === 'number' && skip > 0) {
+          rows = rows.slice(skip, limit ? skip + limit : undefined);
+        } else if (typeof limit === 'number') {
+          rows = rows.slice(0, limit);
+        }
+        return rows;
+      }
     },
     subscribe(handler) {
       if (typeof handler !== 'function') return () => {};

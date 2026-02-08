@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,16 +9,13 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
 
-  const { data: user } = useQuery({
-    queryKey: ['user'],
-    queryFn: () => base44.auth.me()
-  });
+  const { user } = useAuth(); // Use auth hook
 
   const { data: tournaments = [] } = useQuery({
     queryKey: ['active-tournaments'],
     queryFn: async () => {
-      const all = await base44.entities.PuttingKingTournament.list();
-      return all.filter(t => t.status === 'active' || t.status === 'setup');
+      // Mock data, replace with Firestore
+      return [];
     },
     refetchInterval: 3000
   });
@@ -51,8 +48,8 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
         return;
       }
 
-      // Check if tournament has completed all rounds
-      const allMatches = await base44.entities.PuttingKingMatch.list();
+      // Mock checks, replace with Firestore
+      const allMatches = [];
       const tournamentMatches = allMatches.filter(m => m.tournament_id === tournament.id && m.round_number === tournament.current_round);
       const allMatchesFinished = tournamentMatches.length > 0 && tournamentMatches.every(m => m.status === 'finished');
       const isTournamentComplete = tournament.current_round === tournament.total_rounds && allMatchesFinished;
@@ -62,26 +59,14 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
         return;
       }
 
-      // Check if user is already a player
-      const allPlayers = await base44.entities.PuttingKingPlayer.list();
+      const allPlayers = [];
       const existingPlayer = allPlayers.find(
         p => p.tournament_id === tournament.id && p.user_email === user.email
       );
 
       if (!existingPlayer) {
-        // Add user as a player with display_name (nickname) or fallback to full_name
-        await base44.entities.PuttingKingPlayer.create({
-          tournament_id: tournament.id,
-          user_email: user.email,
-          user_name: user.display_name || user.full_name || user.email.split('@')[0],
-          active: true,
-          tournament_points: 0,
-          wins: 0,
-          losses: 0,
-          total_made_putts: 0,
-          total_attempts: 0,
-          stats_by_distance: {}
-        });
+        // Mock player creation, replace with Firestore
+        Promise.resolve();
       }
 
       onJoin(tournament);

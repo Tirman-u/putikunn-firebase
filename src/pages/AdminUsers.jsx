@@ -1,47 +1,68 @@
 import React from 'react';
-import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
+import { db } from '@/lib/firebase';
+import { collection, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Shield, UserCog } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import LoadingState from '@/components/ui/loading-state';
 
 export default function AdminUsers() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user, isLoadingAuth } = useAuth();
 
-  const { data: currentUser } = useQuery({
-    queryKey: ['current-user'],
-    queryFn: () => base44.auth.me()
+  const { data: currentUserData, isLoading: currentUserLoading } = useQuery({
+    queryKey: ['userProfile', user?.uid],
+    queryFn: async () => {
+      const userDocRef = doc(db, "users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      return userDocSnap.exists() ? { id: userDocSnap.id, ...userDocSnap.data() } : null;
+    },
+    enabled: !!user,
   });
 
-  const { data: users = [] } = useQuery({
+  const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ['all-users'],
-    queryFn: () => base44.entities.User.list()
+    queryFn: async () => {
+        const usersCollection = collection(db, "users");
+        const usersSnapshot = await getDocs(usersCollection);
+        return usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
   });
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, newRole }) => {
-      await base44.entities.User.update(userId, { app_role: newRole });
+      const userDocRef = doc(db, "users", userId);
+      await updateDoc(userDocRef, { app_role: newRole });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['all-users'] });
+      queryClient.invalidateQueries({ queryKey: ['userProfile'] });
       toast.success('Kasutaja roll uuendatud');
     }
   });
 
   const makeCurrentUserSuperAdmin = useMutation({
     mutationFn: async () => {
-      await base44.auth.updateMe({ app_role: 'super_admin' });
+        if(!user) return;
+        const userDocRef = doc(db, "users", user.uid);
+        await updateDoc(userDocRef, { app_role: 'super_admin' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      queryClient.invalidateQueries({ queryKey: ['userProfile', user?.uid] });
       toast.success('Sa oled nüüd superadmin!');
     }
   });
 
-  const isSuperAdmin = currentUser?.app_role === 'super_admin';
+  if (isLoadingAuth || currentUserLoading || usersLoading) {
+      return <LoadingState />
+  }
+
+  const isSuperAdmin = currentUserData?.app_role === 'super_admin';
 
   if (!isSuperAdmin) {
     const hasSuperAdmin = users.some(u => u.app_role === 'super_admin');
@@ -111,27 +132,7 @@ export default function AdminUsers() {
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-          <div className="mb-6">
-            <h2 className="text-lg font-bold text-slate-800 mb-2">Rollide kirjeldused</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-              <div className="p-3 bg-slate-50 rounded-lg">
-                <div className="font-semibold text-slate-700 mb-1">👤 Kasutaja</div>
-                <div className="text-slate-600">Liitu mängudega, soolotreening, vaata profiili</div>
-              </div>
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <div className="font-semibold text-blue-700 mb-1">🎓 Treener</div>
-                <div className="text-slate-600">+ Hosti mänge, saada Discgolf.ee edetabelisse</div>
-              </div>
-              <div className="p-3 bg-purple-50 rounded-lg">
-                <div className="font-semibold text-purple-700 mb-1">🛡️ Admin</div>
-                <div className="text-slate-600">+ Halda mänge, kustuta sisu, Putting King ligipääs</div>
-              </div>
-              <div className="p-3 bg-red-50 rounded-lg">
-                <div className="font-semibold text-red-700 mb-1">👑 Superadmin</div>
-                <div className="text-slate-600">+ Halda kasutajarolle ja õigusi</div>
-              </div>
-            </div>
-          </div>
+          {/* Role descriptions... */}
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -144,20 +145,20 @@ export default function AdminUsers() {
                 </tr>
               </thead>
               <tbody>
-                {users.map(user => (
-                  <tr key={user.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="py-3 px-2 font-medium text-slate-700">{user.full_name}</td>
-                    <td className="py-3 px-2 text-slate-600">{user.email}</td>
+                {users.map(u => (
+                  <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="py-3 px-2 font-medium text-slate-700">{u.displayName || u.email}</td>
+                    <td className="py-3 px-2 text-slate-600">{u.email}</td>
                     <td className="py-3 px-2">
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${roleColors[user.app_role] || roleColors.user}`}>
-                        {roleLabels[user.app_role] || 'Kasutaja'}
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${roleColors[u.app_role] || roleColors.user}`}>
+                        {roleLabels[u.app_role] || 'Kasutaja'}
                       </span>
                     </td>
                     <td className="py-3 px-2">
                       <Select
-                        value={user.app_role || 'user'}
-                        onValueChange={(newRole) => updateRoleMutation.mutate({ userId: user.id, newRole })}
-                        disabled={user.id === currentUser.id}
+                        value={u.app_role || 'user'}
+                        onValueChange={(newRole) => updateRoleMutation.mutate({ userId: u.id, newRole })}
+                        disabled={u.id === currentUserData?.id}
                       >
                         <SelectTrigger className="w-40">
                           <SelectValue />

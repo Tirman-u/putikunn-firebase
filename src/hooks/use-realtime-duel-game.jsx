@@ -1,38 +1,28 @@
 import { useEffect, useRef } from 'react';
-import { base44 } from '@/api/base44Client';
+import { db } from '@/lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 export default function useRealtimeDuelGame({
   gameId,
   enabled = true,
   throttleMs = 1000,
-  eventTypes = ['update', 'delete'],
   onEvent,
-  filterEvent,
   onError,
-  retryMs = 2000,
-  maxRetryMs = 30000
 }) {
   const onEventRef = useRef(onEvent);
-  const filterRef = useRef(filterEvent);
   const onErrorRef = useRef(onError);
   const throttleRef = useRef({ timer: null, latest: null });
-  const retryRef = useRef({ timer: null, delay: retryMs });
-  const unsubscribeRef = useRef(null);
 
   useEffect(() => {
     onEventRef.current = onEvent;
   }, [onEvent]);
 
   useEffect(() => {
-    filterRef.current = filterEvent;
-  }, [filterEvent]);
-
-  useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
 
   useEffect(() => {
-    if (!enabled || !onEventRef.current) return undefined;
+    if (!enabled || !gameId) return undefined;
 
     let cancelled = false;
 
@@ -43,21 +33,8 @@ export default function useRealtimeDuelGame({
       throttle.latest = null;
     };
 
-    const resetRetry = () => {
-      if (retryRef.current.timer) clearTimeout(retryRef.current.timer);
-      retryRef.current.timer = null;
-      retryRef.current.delay = retryMs;
-    };
-
-    const shouldHandleEvent = (event) => {
-      const filterFn = filterRef.current;
-      if (filterFn) return filterFn(event);
-      if (eventTypes && !eventTypes.includes(event.type)) return false;
-      if (gameId && event.id !== gameId) return false;
-      return true;
-    };
-
     const deliverEvent = (event) => {
+      if (cancelled) return;
       try {
         onEventRef.current?.(event);
       } catch (error) {
@@ -66,7 +43,6 @@ export default function useRealtimeDuelGame({
     };
 
     const handleEvent = (event) => {
-      if (!shouldHandleEvent(event)) return;
       if (!throttleMs || throttleMs <= 0) {
         deliverEvent(event);
         return;
@@ -88,34 +64,38 @@ export default function useRealtimeDuelGame({
       }
     };
 
-    const subscribe = () => {
-      if (cancelled) return;
-      try {
-        const unsubscribe = base44.entities.DuelGame.subscribe(handleEvent);
-        unsubscribeRef.current = unsubscribe;
-        resetRetry();
-      } catch (error) {
-        onErrorRef.current?.(error);
-        if (!retryRef.current.timer) {
-          retryRef.current.timer = setTimeout(() => {
-            retryRef.current.timer = null;
-            retryRef.current.delay = Math.min(retryRef.current.delay * 1.5, maxRetryMs);
-            subscribe();
-          }, retryRef.current.delay);
-        }
-      }
-    };
+    const unsubscribe = onSnapshot(
+      doc(db, 'duel_games', gameId),
+      (snapshot) => {
+        if (cancelled) return;
+        resetThrottle(); 
 
-    subscribe();
+        let event;
+        if (snapshot.exists()) {
+          event = {
+            type: 'update',
+            id: snapshot.id,
+            data: snapshot.data(),
+          };
+        } else {
+          event = {
+            type: 'delete',
+            id: gameId,
+            data: null,
+          };
+        }
+        handleEvent(event);
+      },
+      (error) => {
+        if (cancelled) return;
+        onErrorRef.current?.(error);
+      }
+    );
 
     return () => {
       cancelled = true;
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
+      unsubscribe();
       resetThrottle();
-      resetRetry();
     };
-  }, [enabled, eventTypes, gameId, maxRetryMs, retryMs, throttleMs]);
+  }, [enabled, gameId, throttleMs]);
 }

@@ -10,6 +10,7 @@ putikunn-migration-firebase-adminsdk-*.json
 
 # Data exports
 exports/
+/.firebase/
 
 # Logs
 logs

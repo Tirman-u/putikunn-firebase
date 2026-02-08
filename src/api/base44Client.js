@@ -37,6 +37,21 @@ const ENTITY_COLLECTIONS = {
   ErrorLog: 'error_logs'
 };
 
+const buildFallbackProfile = (firebaseUser) => {
+  const displayName = firebaseUser?.displayName || firebaseUser?.email || 'Külaline';
+  return {
+    id: firebaseUser?.uid,
+    email: firebaseUser?.email || '',
+    display_name: displayName,
+    displayName,
+    full_name: displayName,
+    fullName: displayName,
+    app_role: 'user',
+    created_date: new Date().toISOString(),
+    _auth_only: true
+  };
+};
+
 const ensureUserProfile = async (firebaseUser) => {
   if (!firebaseUser) {
     const error = new Error('Authentication required');
@@ -47,21 +62,26 @@ const ensureUserProfile = async (firebaseUser) => {
   const userRef = doc(db, ENTITY_COLLECTIONS.User, firebaseUser.uid);
   const snapshot = await getDoc(userRef);
   if (snapshot.exists()) {
-    return { id: firebaseUser.uid, ...snapshot.data() };
+    const data = snapshot.data();
+    const displayName = data.display_name || data.full_name || data.displayName || data.fullName;
+    if (!displayName) {
+      const fallback = buildFallbackProfile(firebaseUser);
+      const patch = {
+        email: fallback.email,
+        display_name: fallback.display_name,
+        displayName: fallback.displayName,
+        full_name: fallback.full_name,
+        fullName: fallback.fullName
+      };
+      await setDoc(userRef, patch, { merge: true });
+      return { id: firebaseUser.uid, ...data, ...patch };
+    }
+    return { id: firebaseUser.uid, ...data };
   }
 
-  const displayName = firebaseUser.displayName || firebaseUser.email || 'Külaline';
-  const profile = {
-    email: firebaseUser.email || '',
-    display_name: displayName,
-    displayName,
-    full_name: displayName,
-    fullName: displayName,
-    app_role: 'user',
-    created_date: new Date().toISOString()
-  };
+  const profile = buildFallbackProfile(firebaseUser);
   await setDoc(userRef, profile, { merge: true });
-  return { id: firebaseUser.uid, ...profile };
+  return { ...profile, id: firebaseUser.uid };
 };
 
 const normalizeSort = (sort) => {
@@ -265,7 +285,11 @@ const authApi = {
       error.status = 401;
       throw error;
     }
-    return ensureUserProfile(auth.currentUser);
+    try {
+      return await ensureUserProfile(auth.currentUser);
+    } catch (error) {
+      return buildFallbackProfile(auth.currentUser);
+    }
   },
   async updateMe(data = {}) {
     if (!auth.currentUser) {

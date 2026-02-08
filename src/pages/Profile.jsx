@@ -66,6 +66,7 @@ export default function Profile() {
   });
 
   const handleEdit = () => {
+    if (!user) return;
     setEditData({
       display_name: user.display_name || '',
       bio: user.bio || '',
@@ -97,8 +98,18 @@ export default function Profile() {
   if (userLoading || gamesLoading || tournamentsLoading) {
     return <LoadingState />;
   }
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 text-center">
+          <p className="text-slate-700 mb-4">Kasutaja profiili ei õnnestu laadida.</p>
+          <Button onClick={() => navigate(createPageUrl('Login'))}>Logi uuesti sisse</Button>
+        </div>
+      </div>
+    );
+  }
 
-  const myDisplayName = user?.display_name || user?.full_name || user?.email;
+  const myDisplayName = user?.display_name || user?.full_name || user?.email || 'Mängija';
   const myGames = games.filter(g => 
     g.players?.includes(myDisplayName) || 
     g.players?.includes(user?.full_name) ||
@@ -348,24 +359,24 @@ export default function Profile() {
           {!isEditing ? (
             <div className="flex items-start gap-4">
               <div className="relative">
-                {user.profile_picture ? (
+                {user?.profile_picture ? (
                   <img 
                     src={user.profile_picture} 
-                    alt={user.full_name}
+                    alt={user.full_name || user.display_name || user.email}
                     className="w-20 h-20 rounded-full object-cover border-2 border-emerald-100"
                   />
                 ) : (
                   <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-3xl font-bold text-emerald-600">
-                    {user.full_name?.charAt(0) || 'U'}
+                    {user?.full_name?.charAt(0) || user?.display_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
                   </div>
                 )}
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-slate-800">{user.display_name || user.full_name}</h2>
-                {user.display_name && (
+                <h2 className="text-2xl font-bold text-slate-800">{user.display_name || user.full_name || user.email}</h2>
+                {user.display_name && user.full_name && (
                   <p className="text-sm text-slate-500">{user.full_name}</p>
                 )}
-                <p className="text-slate-500">{user.email}</p>
+                <p className="text-slate-500">{user.email || '-'}</p>
                 {user.gender && (
                   <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-semibold mt-1">
                     {user.gender === 'M' ? 'Mees' : 'Naine'}

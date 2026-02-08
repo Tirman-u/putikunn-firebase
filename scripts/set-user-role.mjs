@@ -45,19 +45,37 @@ const resolveUserDoc = async () => {
   if (uid) {
     return { ref: db.collection('users').doc(uid), uid };
   }
+
   const snapshot = await db.collection('users').where('email', '==', email).limit(1).get();
-  if (snapshot.empty) {
+  if (!snapshot.empty) {
+    const doc = snapshot.docs[0];
+    return { ref: doc.ref, uid: doc.id };
+  }
+
+  try {
+    const authUser = await admin.auth().getUserByEmail(email);
+    return { ref: db.collection('users').doc(authUser.uid), uid: authUser.uid, authUser };
+  } catch (error) {
     return null;
   }
-  const doc = snapshot.docs[0];
-  return { ref: doc.ref, uid: doc.id };
 };
 
 const run = async () => {
   const userDoc = await resolveUserDoc();
   if (!userDoc) {
-    console.error('User not found. Check email/uid in Firestore users collection.');
+    console.error('User not found. Check email/uid in Firebase Auth or Firestore users collection.');
     process.exit(1);
+  }
+
+  if (userDoc.authUser) {
+    const displayName = userDoc.authUser.displayName || userDoc.authUser.email || 'Külaline';
+    await userDoc.ref.set({
+      email: userDoc.authUser.email || '',
+      display_name: displayName,
+      displayName,
+      full_name: displayName,
+      fullName: displayName
+    }, { merge: true });
   }
 
   await userDoc.ref.set({ app_role: role }, { merge: true });

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DuelPlayerView from '@/components/putting/DuelPlayerView';
-import { addPlayerToState, createEmptyDuelState, startDuelGame } from '@/lib/duel-utils';
+import { addPlayerToState, createEmptyDuelState } from '@/lib/duel-utils';
 import { toast } from 'sonner';
 
 export default function DuelJoin() {
@@ -54,18 +54,6 @@ export default function DuelJoin() {
         ...game,
         state: nextState
       };
-
-      if (game.mode === 'solo' && game.status === 'lobby') {
-        const playerCount = Object.keys(nextState.players || {}).length;
-        if (playerCount >= 2) {
-          nextGame = {
-            ...nextGame,
-            status: 'active',
-            started_at: new Date().toISOString(),
-            state: startDuelGame(nextGame)
-          };
-        }
-      }
 
       await base44.entities.DuelGame.update(game.id, nextGame);
       setGameId(game.id);

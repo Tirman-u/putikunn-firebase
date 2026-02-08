@@ -33,6 +33,11 @@ export default function ManageGames() {
     queryKey: ['my-games'],
     queryFn: async () => {
       const allGames = await base44.entities.Game.list();
+      const userRole = user?.app_role || 'user';
+      const canSeeAllHosted = ['admin', 'super_admin'].includes(userRole);
+      if (canSeeAllHosted) {
+        return allGames.filter((g) => g?.pin && g.pin !== '0000');
+      }
       return allGames.filter(g => g.host_user === user?.email);
     },
     enabled: !!user

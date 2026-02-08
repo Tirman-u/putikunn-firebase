@@ -14,6 +14,7 @@ import {
   hasPendingSubmission,
   isStationReady,
   markPlayerReady,
+  startDuelGame,
   submitDuelScore,
   undoSubmission
 } from '@/lib/duel-utils';
@@ -107,6 +108,9 @@ export default function DuelPlayerView({ gameId }) {
   const state = game.state || createEmptyDuelState(stationCount);
   const playerId = user?.id || user?.email;
   const player = playerId ? state.players?.[playerId] : null;
+  const isSoloLobby = game.mode === 'solo' && game.status === 'lobby';
+  const normalizeEmail = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+  const isHost = normalizeEmail(game.host_user) && normalizeEmail(game.host_user) === normalizeEmail(user?.email);
 
   if (!player) {
     return (
@@ -166,6 +170,54 @@ export default function DuelPlayerView({ gameId }) {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (isSoloLobby) {
+    const playersList = Object.values(state.players || {});
+    const opponentName = playersList.find((p) => p.id !== playerId)?.name || 'Ootab';
+    const canStart = isHost && playersList.length >= 2;
+
+    const handleStart = async () => {
+      if (!canStart) return;
+      try {
+        await updateGame((current) => ({
+          ...current,
+          status: 'active',
+          started_at: new Date().toISOString(),
+          state: startDuelGame(current)
+        }));
+      } catch (error) {
+        toast.error('Mängu käivitamine ebaõnnestus');
+      }
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+          <div className="text-sm text-slate-500">Sõbraduell ooterežiim</div>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+              <div className="text-xs text-slate-500">Sina</div>
+              <div className="text-base font-semibold text-slate-800">{player.name}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+              <div className="text-xs text-slate-500">Sõber</div>
+              <div className="text-base font-semibold text-slate-800">{opponentName}</div>
+            </div>
+          </div>
+        </div>
+
+        {canStart ? (
+          <Button className="w-full rounded-xl" onClick={handleStart}>
+            Alusta mängu
+          </Button>
+        ) : (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-slate-700">
+            {playersList.length < 2 ? 'Ootan sõpra liituma…' : 'Ootan hosti käivitust…'}
           </div>
         )}
       </div>

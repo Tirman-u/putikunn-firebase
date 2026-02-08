@@ -17,6 +17,7 @@ export default function DuelSolo() {
   const [gameName, setGameName] = React.useState('');
   const [discCount, setDiscCount] = React.useState('3');
   const [displayName, setDisplayName] = React.useState('');
+  const [joinPin, setJoinPin] = React.useState('');
   const [pin] = React.useState(() => Math.floor(1000 + Math.random() * 9000).toString());
 
   const handleCreate = async () => {
@@ -163,6 +164,30 @@ export default function DuelSolo() {
             disabled={creating}
           >
             {creating ? 'Loon...' : 'Loo SOLO duel'}
+          </Button>
+        </div>
+
+        <div className="mt-4 bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
+          <div className="text-sm font-semibold text-slate-700">Või liitu sõbra duelliga</div>
+          <Input
+            value={joinPin}
+            onChange={(e) => setJoinPin(e.target.value)}
+            placeholder="Sisesta PIN"
+            className="h-12 rounded-xl border-slate-200 text-center text-lg tracking-widest"
+          />
+          <Button
+            variant="outline"
+            className="w-full h-12 rounded-2xl"
+            onClick={() => {
+              const trimmed = joinPin.trim();
+              if (!trimmed) {
+                toast.error('Sisesta PIN');
+                return;
+              }
+              navigate(`${createPageUrl('DuelJoin')}?pin=${trimmed}`);
+            }}
+          >
+            Liitu duelliga
           </Button>
         </div>
       </div>

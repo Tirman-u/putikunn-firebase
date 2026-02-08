@@ -13,6 +13,8 @@ import { GAME_FORMATS } from '@/components/putting/gameRules';
 import AIInsights from '@/components/profile/AIInsights';
 import AchievementsList, { getAchievements } from '@/components/profile/AchievementsList';
 import LoadingState from '@/components/ui/loading-state';
+import { deleteGameAndLeaderboardEntries } from '@/lib/leaderboard-utils';
+import { toast } from 'sonner';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -24,6 +26,7 @@ export default function Profile() {
   const [filterFormat, setFilterFormat] = useState('all');
   const [filterPuttType, setFilterPuttType] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedGameIds, setSelectedGameIds] = useState([]);
   const GAMES_PER_PAGE = 10;
 
   const { data: user, isLoading: userLoading } = useQuery({
@@ -62,6 +65,27 @@ export default function Profile() {
       queryClient.setQueryData(['user'], updatedUser);
       queryClient.invalidateQueries({ queryKey: ['user'] });
       setIsEditing(false);
+    }
+  });
+
+  const deleteGamesMutation = useMutation({
+    mutationFn: async (gameIds) => {
+      let deleted = 0;
+      for (const id of gameIds) {
+        if (!id) continue;
+        await deleteGameAndLeaderboardEntries(id);
+        deleted += 1;
+      }
+      return deleted;
+    },
+    onSuccess: (count) => {
+      toast.success(`Kustutatud ${count} mängu`);
+      setSelectedGameIds([]);
+      queryClient.invalidateQueries({ queryKey: ['user-games'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
+    },
+    onError: (error) => {
+      toast.error(error?.message || 'Kustutamine ebaõnnestus');
     }
   });
 
@@ -110,12 +134,20 @@ export default function Profile() {
   }
 
   const myDisplayName = user?.display_name || user?.full_name || user?.email || 'Mängija';
+  const userRole = user?.app_role || 'user';
+  const isAdmin = ['admin', 'super_admin'].includes(userRole);
   const myGames = games.filter(g => 
     g.players?.includes(myDisplayName) || 
     g.players?.includes(user?.full_name) ||
     g.players?.includes(user?.email) ||
     g.host_user === user?.email
   );
+  const canDeleteGame = (game) => {
+    if (!game) return false;
+    if (isAdmin) return true;
+    if (game.pin === '0000') return true;
+    return game.host_user === user?.email;
+  };
   
   // Calculate ATW stats by difficulty
   const atwGames = myGames.filter(g => g.game_type === 'around_the_world');
@@ -337,6 +369,41 @@ export default function Profile() {
     }
     return 0;
   });
+
+  React.useEffect(() => {
+    setSelectedGameIds([]);
+  }, [filterFormat, filterPuttType, sortBy, currentPage]);
+
+  const pageGames = filteredGames.slice((currentPage - 1) * GAMES_PER_PAGE, currentPage * GAMES_PER_PAGE);
+  const selectablePageIds = pageGames.filter(canDeleteGame).map((game) => game.id);
+  const allPageSelected = selectablePageIds.length > 0 && selectablePageIds.every((id) => selectedGameIds.includes(id));
+
+  const toggleSelectAllPage = () => {
+    if (allPageSelected) {
+      setSelectedGameIds((prev) => prev.filter((id) => !selectablePageIds.includes(id)));
+    } else {
+      setSelectedGameIds((prev) => Array.from(new Set([...prev, ...selectablePageIds])));
+    }
+  };
+
+  const toggleGameSelection = (gameId) => {
+    setSelectedGameIds((prev) => (
+      prev.includes(gameId) ? prev.filter((id) => id !== gameId) : [...prev, gameId]
+    ));
+  };
+
+  const handleBulkDelete = () => {
+    const deletableIds = selectedGameIds.filter((id) => {
+      const game = filteredGames.find((g) => g.id === id);
+      return canDeleteGame(game);
+    });
+    if (deletableIds.length === 0) {
+      toast.error('Pole midagi kustutada');
+      return;
+    }
+    if (!window.confirm(`Kustutada ${deletableIds.length} mängu?`)) return;
+    deleteGamesMutation.mutate(deletableIds);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -779,6 +846,16 @@ export default function Profile() {
           <div className="flex items-center justify-between mb-4">
              <h3 className="text-lg font-bold text-slate-800">Mängude ajalugu</h3>
              <div className="flex flex-wrap gap-2">
+               {selectedGameIds.length > 0 && (
+                 <Button
+                   variant="outline"
+                   className="border-rose-200 text-rose-600 hover:text-rose-700"
+                   onClick={handleBulkDelete}
+                   disabled={deleteGamesMutation.isPending}
+                 >
+                   Kustuta valitud ({selectedGameIds.length})
+                 </Button>
+               )}
                <Select value={filterFormat} onValueChange={() => { setFilterFormat(arguments[0]); setCurrentPage(1); }}>
                  <SelectTrigger className="w-32">
                    <SelectValue />
@@ -829,6 +906,15 @@ export default function Profile() {
                 <table className="w-full text-sm">
                   <thead>
                      <tr className="border-b border-slate-200">
+                       <th className="text-left py-3 px-2 text-slate-600 font-semibold">
+                         <input
+                           type="checkbox"
+                           className="h-4 w-4 accent-emerald-500"
+                           checked={allPageSelected}
+                           onChange={toggleSelectAllPage}
+                           disabled={selectablePageIds.length === 0}
+                         />
+                       </th>
                        <th className="text-left py-3 px-2 text-slate-600 font-semibold">Mäng</th>
                        <th className="text-left py-3 px-2 text-slate-600 font-semibold">Kuupäev</th>
                        <th className="text-left py-3 px-2 text-slate-600 font-semibold">Formaat</th>
@@ -840,15 +926,27 @@ export default function Profile() {
                      </tr>
                    </thead>
                   <tbody>
-                    {filteredGames.slice((currentPage - 1) * GAMES_PER_PAGE, currentPage * GAMES_PER_PAGE).map((game) => {
+                    {pageGames.map((game) => {
                       const putts = game.player_putts?.[myDisplayName] || game.player_putts?.[user?.full_name] || game.player_putts?.[user?.email] || [];
                       const made = putts.filter(p => p.result === 'made').length;
                       const percentage = putts.length > 0 ? ((made / putts.length) * 100).toFixed(0) : 0;
                       const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
                       const gameFormat = GAME_FORMATS[game.game_type || 'classic'];
+                      const canDeleteThis = canDeleteGame(game);
+                      const isSelected = selectedGameIds.includes(game.id);
 
                       return (
                         <tr key={game.id} className="border-b border-slate-100 hover:bg-slate-50">
+                           <td className="py-3 px-2">
+                             {canDeleteThis ? (
+                               <input
+                                 type="checkbox"
+                                 className="h-4 w-4 accent-emerald-500"
+                                 checked={isSelected}
+                                 onChange={() => toggleGameSelection(game.id)}
+                               />
+                             ) : null}
+                           </td>
                            <td className="py-3 px-2 font-medium text-slate-700">{game.name}</td>
                            <td className="py-3 px-2 text-slate-700">
                              {game.date ? format(new Date(game.date), 'MMM d, yyyy') : '-'}

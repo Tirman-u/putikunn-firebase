@@ -338,21 +338,17 @@ export default function DuelPlayerView({ gameId }) {
           {discCount === 1 ? (
             <div className="grid grid-cols-2 gap-3">
               <button
-                disabled={hasSubmitted}
                 onClick={() => handleSubmit(1)}
                 className={cn(
-                  'rounded-2xl border-2 border-emerald-200 bg-emerald-50 py-4 text-base font-semibold text-emerald-700 shadow-sm',
-                  hasSubmitted && 'opacity-50 cursor-not-allowed'
+                  'rounded-2xl border-2 border-emerald-200 bg-emerald-50 py-4 text-base font-semibold text-emerald-700 shadow-sm'
                 )}
               >
                 Sees
               </button>
               <button
-                disabled={hasSubmitted}
                 onClick={() => handleSubmit(0)}
                 className={cn(
-                  'rounded-2xl border-2 border-rose-200 bg-rose-50 py-4 text-base font-semibold text-rose-700 shadow-sm',
-                  hasSubmitted && 'opacity-50 cursor-not-allowed'
+                  'rounded-2xl border-2 border-rose-200 bg-rose-50 py-4 text-base font-semibold text-rose-700 shadow-sm'
                 )}
               >
                 Mööda
@@ -363,11 +359,9 @@ export default function DuelPlayerView({ gameId }) {
               {numberButtons.map((num) => (
                 <button
                   key={`made-${num}`}
-                  disabled={hasSubmitted}
                   onClick={() => handleSubmit(num)}
                   className={cn(
-                    'rounded-2xl border-2 border-slate-200 bg-slate-50 py-3 text-base font-semibold text-slate-800 shadow-sm',
-                    hasSubmitted && 'opacity-50 cursor-not-allowed'
+                    'rounded-2xl border-2 border-slate-200 bg-slate-50 py-3 text-base font-semibold text-slate-800 shadow-sm'
                   )}
                 >
                   {num}
@@ -378,7 +372,7 @@ export default function DuelPlayerView({ gameId }) {
 
           {hasSubmitted && (
             <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              Ootab vastase sisestust…
+              Vastane pole veel sisestanud – saad vajadusel oma tulemust muuta.
             </div>
           )}
 

@@ -756,11 +756,35 @@ export default function TrainerGroupDashboard() {
   };
 
   const handleRemoveClaimedMember = async (slotId, targetUid) => {
-    await updateAttendance(slotId, (slotData) => {
-      const claimed = (slotData.claimed_uids || []).filter((uid) => uid !== targetUid);
+    await updateAttendanceMulti((weekData, groupData) => {
+      const slotsList = Array.isArray(groupData.slots) ? groupData.slots : [];
+      const rosterSlotIds = slotsList
+        .filter((slot) => Array.isArray(slot.roster_uids) && slot.roster_uids.includes(targetUid))
+        .map((slot) => slot.id);
+      const nextWeek = { ...weekData };
+
+      const slotData = normalizeSlotData(nextWeek[slotId]);
+      const claimed = slotData.claimed_uids.filter((uid) => uid !== targetUid);
       const claimedMeta = { ...(slotData.claimed_meta || {}) };
       delete claimedMeta[targetUid];
-      return { ...slotData, claimed_uids: claimed, claimed_meta: claimedMeta };
+      nextWeek[slotId] = {
+        ...slotData,
+        claimed_uids: claimed,
+        claimed_meta: claimedMeta
+      };
+
+      rosterSlotIds.forEach((rosterSlotId) => {
+        const rosterData = normalizeSlotData(nextWeek[rosterSlotId]);
+        const released = rosterData.released_uids.filter((uid) => uid !== targetUid);
+        if (released.length !== rosterData.released_uids.length) {
+          nextWeek[rosterSlotId] = {
+            ...rosterData,
+            released_uids: released
+          };
+        }
+      });
+
+      return nextWeek;
     });
   };
 

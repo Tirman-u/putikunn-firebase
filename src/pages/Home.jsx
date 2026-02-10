@@ -124,13 +124,13 @@ export default function Home() {
   const trainingSub = trainingGroups.length ? 'Trenn' : 'Sisesta PIN';
 
   const tileThemes = {
-    emerald: { bg: 'bg-emerald-100', icon: 'text-emerald-600', ring: 'ring-emerald-200', glow: 'shadow-emerald-100/60' },
-    sky: { bg: 'bg-sky-100', icon: 'text-sky-600', ring: 'ring-sky-200', glow: 'shadow-sky-100/60' },
-    amber: { bg: 'bg-amber-100', icon: 'text-amber-600', ring: 'ring-amber-200', glow: 'shadow-amber-100/60' },
-    purple: { bg: 'bg-purple-100', icon: 'text-purple-600', ring: 'ring-purple-200', glow: 'shadow-purple-100/60' },
-    blue: { bg: 'bg-blue-100', icon: 'text-blue-600', ring: 'ring-blue-200', glow: 'shadow-blue-100/60' },
-    slate: { bg: 'bg-slate-100', icon: 'text-slate-600', ring: 'ring-slate-200', glow: 'shadow-slate-100/60' },
-    red: { bg: 'bg-red-100', icon: 'text-red-600', ring: 'ring-red-200', glow: 'shadow-red-100/60' }
+    emerald: { bg: 'bg-emerald-100 dark:bg-black', icon: 'text-emerald-600', ring: 'ring-emerald-200 dark:ring-emerald-500/40', glow: 'shadow-emerald-100/60 dark:shadow-emerald-500/10' },
+    sky: { bg: 'bg-sky-100 dark:bg-black', icon: 'text-sky-600', ring: 'ring-sky-200 dark:ring-sky-500/40', glow: 'shadow-sky-100/60 dark:shadow-sky-500/10' },
+    amber: { bg: 'bg-amber-100 dark:bg-black', icon: 'text-amber-600', ring: 'ring-amber-200 dark:ring-amber-500/40', glow: 'shadow-amber-100/60 dark:shadow-amber-500/10' },
+    purple: { bg: 'bg-purple-100 dark:bg-black', icon: 'text-purple-600', ring: 'ring-purple-200 dark:ring-purple-500/40', glow: 'shadow-purple-100/60 dark:shadow-purple-500/10' },
+    blue: { bg: 'bg-blue-100 dark:bg-black', icon: 'text-blue-600', ring: 'ring-blue-200 dark:ring-blue-500/40', glow: 'shadow-blue-100/60 dark:shadow-blue-500/10' },
+    slate: { bg: 'bg-slate-100 dark:bg-black', icon: 'text-slate-600', ring: 'ring-slate-200 dark:ring-white/20', glow: 'shadow-slate-100/60 dark:shadow-white/5' },
+    red: { bg: 'bg-red-100 dark:bg-black', icon: 'text-red-600', ring: 'ring-red-200 dark:ring-red-500/40', glow: 'shadow-red-100/60 dark:shadow-red-500/10' }
   };
 
   const homeTiles = [
@@ -235,14 +235,14 @@ export default function Home() {
           <Icon className={`h-7 w-7 ${theme.icon}`} />
         </div>
         <div className="text-center">
-          <div className="text-[12px] font-semibold text-slate-800 leading-tight">{tile.label}</div>
-          <div className="text-[10px] text-slate-500 leading-tight">{tile.sub}</div>
+          <div className="text-[12px] font-semibold text-slate-800 leading-tight dark:text-slate-100">{tile.label}</div>
+          <div className="text-[10px] text-slate-500 leading-tight dark:text-slate-400">{tile.sub}</div>
         </div>
       </div>
     );
 
     const className =
-      "w-full rounded-[28px] border border-white/70 bg-white/70 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur-sm transition hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300";
+      "w-full rounded-[28px] border border-white/70 bg-white/70 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur-sm transition hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 dark:bg-black dark:border-white/10";
 
     if (tile.to) {
       return (

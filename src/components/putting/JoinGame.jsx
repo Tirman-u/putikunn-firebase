@@ -183,34 +183,34 @@ export default function JoinGame({ onJoin, onBack }) {
           <BackButton onClick={onBack} />
         </div>
 
-        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 space-y-3 sm:space-y-4">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 space-y-3 sm:space-y-4 dark:bg-black dark:border-white/10">
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-2 dark:text-slate-200">
               Sinu nimi
             </label>
             <Input
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
               placeholder="Sisesta nimi"
-              className="h-12 sm:h-14 rounded-xl border-slate-200 text-base sm:text-lg"
+              className="h-12 sm:h-14 rounded-xl border-slate-200 text-base sm:text-lg dark:border-white/10 dark:bg-black dark:text-slate-100"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-2 dark:text-slate-200">
               Mängu PIN
             </label>
             <Input
               value={pin}
               onChange={(e) => setPin(e.target.value.toUpperCase())}
               placeholder="Sisesta 4-kohaline PIN"
-              className="h-12 sm:h-14 rounded-xl border-slate-200 text-center text-xl sm:text-2xl tracking-widest font-bold"
+              className="h-12 sm:h-14 rounded-xl border-slate-200 text-center text-xl sm:text-2xl tracking-widest font-bold dark:border-white/10 dark:bg-black dark:text-slate-100"
               maxLength={4}
             />
           </div>
 
           {error && (
-            <div className="p-3 rounded-xl bg-red-50 text-red-600 text-sm text-center">
+            <div className="p-3 rounded-xl bg-red-50 text-red-600 text-sm text-center dark:bg-red-500/10 dark:text-red-300">
               {error}
             </div>
           )}
@@ -218,7 +218,7 @@ export default function JoinGame({ onJoin, onBack }) {
           <Button
             onClick={handleJoin}
             disabled={loading || !pin.trim() || !playerName.trim()}
-            className="w-full h-12 sm:h-16 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-base sm:text-xl font-bold rounded-2xl shadow-lg sm:shadow-xl shadow-emerald-200"
+            className="w-full h-12 sm:h-16 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-base sm:text-xl font-bold rounded-2xl shadow-lg sm:shadow-xl shadow-emerald-200 dark:from-emerald-400 dark:to-emerald-500 dark:shadow-emerald-500/30"
           >
             <LogIn className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
             Liitu mänguga
@@ -228,7 +228,7 @@ export default function JoinGame({ onJoin, onBack }) {
         {/* Recent Games */}
         {recentGames.length > 0 && (
           <div className="mt-8">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2 dark:text-slate-200">
               <Clock className="w-4 h-4" />
               Aktiivsed mängud
             </h3>
@@ -242,19 +242,19 @@ export default function JoinGame({ onJoin, onBack }) {
                       setPin(game.pin);
                       setPlayerName(user?.full_name || '');
                     }}
-                    className="w-full bg-white rounded-xl p-3 border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all text-left"
+                    className="w-full bg-white rounded-xl p-3 border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all text-left dark:bg-black dark:border-white/10 dark:hover:border-emerald-500/40 dark:hover:bg-black"
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="font-semibold text-slate-800 text-sm">{game.name}</div>
+                        <div className="font-semibold text-slate-800 text-sm dark:text-slate-100">{game.name}</div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded">
+                          <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded dark:bg-emerald-500/10 dark:text-emerald-300">
                             {getGameTypeName(game.game_type)}
                           </span>
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
                             {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'Kuupäev puudub'}
                           </span>
-                          <span className="flex items-center gap-1 text-xs text-slate-500">
+                          <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                             <Users className="w-3 h-3" />
                             {playerCount} {playerCount === 1 ? 'mängija' : 'mängijat'}
                           </span>

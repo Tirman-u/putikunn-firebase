@@ -6,7 +6,6 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { base44 } from '@/api/base44Client';
 import { db } from '@/lib/firebase';
 import { createPageUrl } from '@/utils';
-import { isTestEnv } from '@/lib/env';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import BackButton from '@/components/ui/back-button';
 
@@ -62,7 +61,6 @@ const buildInitialSlots = () => {
 
 export default function TrainerProjector() {
   const navigate = useNavigate();
-  const isTest = isTestEnv();
   const [slots, setSlots] = React.useState(buildInitialSlots);
 
   const { data: user } = useQuery({
@@ -74,14 +72,10 @@ export default function TrainerProjector() {
   const canManageTraining = ['trainer', 'admin', 'super_admin'].includes(userRole);
 
   React.useEffect(() => {
-    if (!isTest) {
-      navigate(createPageUrl('Home'));
-      return;
-    }
     if (user && !canManageTraining) {
       navigate(createPageUrl('Home'));
     }
-  }, [isTest, user, canManageTraining, navigate]);
+  }, [user, canManageTraining, navigate]);
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -158,7 +152,7 @@ export default function TrainerProjector() {
     return () => unsubscribers.forEach((unsub) => unsub && unsub());
   }, [slots.map((slot) => slot.gameId).join('|'), updateSlot]);
 
-  if (!isTest || (user && !canManageTraining)) {
+  if (user && !canManageTraining) {
     return null;
   }
 

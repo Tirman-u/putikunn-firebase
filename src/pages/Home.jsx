@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Users, UserPlus, Settings, User, Target, Trophy, Crown, Shield, LogOut, GraduationCap, Users2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { isTestEnv } from '@/lib/env';
 import { FEATURE_FLAGS } from '@/lib/feature-flags';
 
 import HostSetup from '@/components/putting/HostSetup';
@@ -112,7 +111,7 @@ export default function Home() {
   const canHostGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
   const canManageGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
   const canManageTraining = ['trainer', 'admin', 'super_admin'].includes(userRole);
-  const showTrainingFeatures = isTestEnv();
+  const showTrainingFeatures = true;
 
   const trainingGroups = React.useMemo(() => {
     const groups = user?.training_groups;

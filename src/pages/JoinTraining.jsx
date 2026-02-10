@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { db } from '@/lib/firebase';
 import { createPageUrl } from '@/utils';
-import { isTestEnv } from '@/lib/env';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import BackButton from '@/components/ui/back-button';
 import { getDayFullLabel, getSlotAvailability, getWeekKey } from '@/lib/training-utils';
@@ -38,14 +37,7 @@ export default function JoinTraining() {
   const [pendingSlots, setPendingSlots] = React.useState([]);
   const [selectedSlotId, setSelectedSlotId] = React.useState('');
   const [publicAction, setPublicAction] = React.useState({});
-  const isTest = isTestEnv();
   const weekKey = React.useMemo(() => getWeekKey(), []);
-
-  React.useEffect(() => {
-    if (!isTest) {
-      navigate(createPageUrl('Home'));
-    }
-  }, [isTest, navigate]);
 
   React.useEffect(() => {
     if (!pendingGroup || pendingSlots.length !== 1) return;
@@ -57,9 +49,6 @@ export default function JoinTraining() {
     }
   }, [pendingGroup, pendingSlots]);
 
-  if (!isTest) {
-    return null;
-  }
 
   const { data: user } = useQuery({
     queryKey: ['user'],

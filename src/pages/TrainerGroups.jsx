@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { db } from '@/lib/firebase';
 import { createPageUrl } from '@/utils';
-import { isTestEnv } from '@/lib/env';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import BackButton from '@/components/ui/back-button';
 import {
@@ -37,7 +36,6 @@ export default function TrainerGroups() {
   const [editingGroupName, setEditingGroupName] = React.useState('');
   const [isSavingGroup, setIsSavingGroup] = React.useState({});
   const [isDeletingGroup, setIsDeletingGroup] = React.useState({});
-  const isTest = isTestEnv();
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -49,16 +47,12 @@ export default function TrainerGroups() {
   const isAdmin = ['admin', 'super_admin'].includes(userRole);
 
   React.useEffect(() => {
-    if (!isTest) {
-      navigate(createPageUrl('Home'));
-      return;
-    }
     if (user && !canManageTraining) {
       navigate(createPageUrl('Home'));
     }
-  }, [isTest, user, canManageTraining, navigate]);
+  }, [user, canManageTraining, navigate]);
 
-  if (!isTest || (user && !canManageTraining)) {
+  if (user && !canManageTraining) {
     return null;
   }
 

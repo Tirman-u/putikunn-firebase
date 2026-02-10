@@ -6,7 +6,6 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import LoadingState from '@/components/ui/loading-state';
 import { createPageUrl } from '@/utils';
-import { isTestEnv } from '@/lib/env';
 import BackButton from '@/components/ui/back-button';
 
 const TOP_N = 10;
@@ -36,17 +35,6 @@ export default function GroupProjector() {
   const [group, setGroup] = React.useState(null);
   const [gamesById, setGamesById] = React.useState({});
   const [lastUpdate, setLastUpdate] = React.useState(null);
-  const isTest = isTestEnv();
-
-  React.useEffect(() => {
-    if (!isTest) {
-      navigate(createPageUrl('Home'));
-    }
-  }, [isTest, navigate]);
-
-  if (!isTest) {
-    return null;
-  }
 
   React.useEffect(() => {
     if (!groupId) return undefined;

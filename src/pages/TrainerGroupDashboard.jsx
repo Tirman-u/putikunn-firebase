@@ -7,7 +7,6 @@ import { base44 } from '@/api/base44Client';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, runTransaction, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { createPageUrl } from '@/utils';
-import { isTestEnv } from '@/lib/env';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import BackButton from '@/components/ui/back-button';
 import { toast } from 'sonner';
@@ -48,7 +47,6 @@ export default function TrainerGroupDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const groupId = searchParams.get('id');
-  const isTest = isTestEnv();
   const weekKey = React.useMemo(() => getWeekKey(), []);
   const [announcementDraft, setAnnouncementDraft] = React.useState('');
   const [isSavingAnnouncement, setIsSavingAnnouncement] = React.useState(false);
@@ -77,14 +75,10 @@ export default function TrainerGroupDashboard() {
   const canViewGroup = canManageTraining || isGroupMember;
 
   React.useEffect(() => {
-    if (!isTest) {
-      navigate(createPageUrl('Home'));
-      return;
-    }
     if (user && !canViewGroup) {
       navigate(createPageUrl('Home'));
     }
-  }, [isTest, user, canViewGroup, navigate]);
+  }, [user, canViewGroup, navigate]);
 
   const { data: group } = useQuery({
     queryKey: ['training-group', groupId],
@@ -146,7 +140,7 @@ export default function TrainerGroupDashboard() {
 
   const topPlayers = React.useMemo(() => buildTopPlayers(games), [games]);
 
-  if (!isTest || (user && !canViewGroup)) {
+  if (user && !canViewGroup) {
     return null;
   }
 

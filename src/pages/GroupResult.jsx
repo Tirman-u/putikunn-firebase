@@ -2,7 +2,6 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Trophy, Calendar, MonitorPlay } from 'lucide-react';
-import { isTestEnv } from '@/lib/env';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
@@ -113,17 +112,13 @@ export default function GroupResult() {
         <div className="flex items-center justify-between mb-6 pt-4">
           <BackButton />
           <h1 className="text-2xl font-bold text-slate-800">{group.name}</h1>
-          {isTestEnv() ? (
-            <Link
-              to={`${createPageUrl('GroupProjector')}?id=${group.id}`}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:border-emerald-200 hover:text-emerald-700"
-            >
-              <MonitorPlay className="w-4 h-4" />
-              Projektor
-            </Link>
-          ) : (
-            <div className="w-16" />
-          )}
+          <Link
+            to={`${createPageUrl('GroupProjector')}?id=${group.id}`}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:border-emerald-200 hover:text-emerald-700"
+          >
+            <MonitorPlay className="w-4 h-4" />
+            Projektor
+          </Link>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">

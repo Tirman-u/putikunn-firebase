@@ -5,20 +5,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Camera, Trophy, Target, TrendingUp, Edit2, Save, X, Award, ExternalLink } from 'lucide-react';
+import { Camera, Trophy, Target, TrendingUp, Edit2, Save, X, Award, ExternalLink } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
+import BackButton from '@/components/ui/back-button';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import AIInsights from '@/components/profile/AIInsights';
 import AchievementsList, { getAchievements } from '@/components/profile/AchievementsList';
 import LoadingState from '@/components/ui/loading-state';
 import { deleteGameAndLeaderboardEntries } from '@/lib/leaderboard-utils';
 import { toast } from 'sonner';
+import { FEATURE_FLAGS } from '@/lib/feature-flags';
 
 export default function Profile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const isPuttingKingEnabled = FEATURE_FLAGS.puttingKing;
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
   const [uploading, setUploading] = useState(false);
@@ -35,29 +38,50 @@ export default function Profile() {
   });
 
   const { data: games = [], isLoading: gamesLoading } = useQuery({
-    queryKey: ['user-games'],
+    queryKey: ['user-games', user?.email, user?.full_name, user?.display_name],
     queryFn: async () => {
-      const allGames = await base44.entities.Game.list();
-      return allGames.filter(g => 
-        g.players?.includes(user?.full_name) || g.host_user === user?.email
-      );
+      if (!user) return [];
+      const results = [];
+      if (user.email) {
+        results.push(...await base44.entities.Game.filter({ host_user: user.email }));
+      }
+      if (user.full_name) {
+        results.push(...await base44.entities.Game.filter({ players: { $arrayContains: user.full_name } }));
+      }
+      if (user.display_name && user.display_name !== user.full_name) {
+        results.push(...await base44.entities.Game.filter({ players: { $arrayContains: user.display_name } }));
+      }
+      const byId = new Map();
+      results.forEach((game) => {
+        if (game?.id && !byId.has(game.id)) byId.set(game.id, game);
+      });
+      return Array.from(byId.values());
     },
     enabled: !!user
   });
 
-  const { data: tournamentPlayers = [], isLoading: tournamentsLoading } = useQuery({
-    queryKey: ['user-tournaments'],
-    queryFn: async () => {
-      const allPlayers = await base44.entities.PuttingKingPlayer.list();
-      return allPlayers.filter(p => p.user_email === user?.email);
-    },
-    enabled: !!user
+  const { data: tournamentPlayers = [], isLoading: tournamentPlayersLoading } = useQuery({
+    queryKey: ['user-tournaments', user?.email],
+    queryFn: () => base44.entities.PuttingKingPlayer.filter({ user_email: user.email }),
+    enabled: isPuttingKingEnabled && !!user?.email
   });
 
-  const { data: tournaments = [] } = useQuery({
-    queryKey: ['putting-king-tournaments'],
-    queryFn: () => base44.entities.PuttingKingTournament.list()
+  const tournamentIds = React.useMemo(() => {
+    return Array.from(new Set(tournamentPlayers.map(p => p.tournament_id).filter(Boolean)));
+  }, [tournamentPlayers]);
+
+  const { data: tournaments = [], isLoading: tournamentsLoading } = useQuery({
+    queryKey: ['putting-king-tournaments', tournamentIds.join('|')],
+    queryFn: () => {
+      if (!tournamentIds.length) return [];
+      return base44.entities.PuttingKingTournament.filter({ id: { $in: tournamentIds } });
+    },
+    enabled: isPuttingKingEnabled && tournamentIds.length > 0
   });
+
+  React.useEffect(() => {
+    setSelectedGameIds([]);
+  }, [filterFormat, filterPuttType, sortBy, currentPage]);
 
   const updateUserMutation = useMutation({
     mutationFn: (data) => base44.auth.updateMe(data),
@@ -119,7 +143,7 @@ export default function Profile() {
     }
   };
 
-  if (userLoading || gamesLoading || tournamentsLoading) {
+  if (userLoading || gamesLoading || (isPuttingKingEnabled && (tournamentPlayersLoading || tournamentsLoading))) {
     return <LoadingState />;
   }
   if (!user) {
@@ -136,12 +160,32 @@ export default function Profile() {
   const myDisplayName = user?.display_name || user?.full_name || user?.email || 'Mängija';
   const userRole = user?.app_role || 'user';
   const isAdmin = ['admin', 'super_admin'].includes(userRole);
-  const myGames = games.filter(g => 
-    g.players?.includes(myDisplayName) || 
-    g.players?.includes(user?.full_name) ||
-    g.players?.includes(user?.email) ||
-    g.host_user === user?.email
-  );
+  const normalize = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+  const normalizedDisplayName = normalize(myDisplayName);
+  const normalizedFullName = normalize(user?.full_name);
+  const normalizedEmail = normalize(user?.email);
+
+  const isPlayerInGame = (game) => {
+    if (!game) return false;
+    const players = (game.players || []).map(normalize);
+    if (
+      (normalizedDisplayName && players.includes(normalizedDisplayName)) ||
+      (normalizedFullName && players.includes(normalizedFullName)) ||
+      (normalizedEmail && players.includes(normalizedEmail))
+    ) {
+      return true;
+    }
+
+    const playerEmails = Object.values(game.player_emails || {}).map(normalize);
+    if (normalizedEmail && playerEmails.includes(normalizedEmail)) return true;
+
+    const playerUids = Object.values(game.player_uids || {});
+    if (user?.id && playerUids.includes(user.id)) return true;
+
+    return false;
+  };
+
+  const myGames = games.filter((game) => isPlayerInGame(game));
   const canDeleteGame = (game) => {
     if (!game) return false;
     if (isAdmin) return true;
@@ -370,10 +414,6 @@ export default function Profile() {
     return 0;
   });
 
-  React.useEffect(() => {
-    setSelectedGameIds([]);
-  }, [filterFormat, filterPuttType, sortBy, currentPage]);
-
   const pageGames = filteredGames.slice((currentPage - 1) * GAMES_PER_PAGE, currentPage * GAMES_PER_PAGE);
   const selectablePageIds = pageGames.filter(canDeleteGame).map((game) => game.id);
   const allPageSelected = selectablePageIds.length > 0 && selectablePageIds.every((id) => selectedGameIds.includes(id));
@@ -405,24 +445,22 @@ export default function Profile() {
     deleteGamesMutation.mutate(deletableIds);
   };
 
+  const cardClass = "bg-white/80 rounded-[28px] p-5 shadow-[0_12px_28px_rgba(15,23,42,0.08)] border border-white/80 backdrop-blur";
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)]">
       <div className="max-w-4xl mx-auto p-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 pt-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Tagasi</span>
-          </button>
-          <h1 className="text-2xl font-bold text-slate-800">Minu profiil</h1>
-          <div className="w-16" />
+        <div className="mb-5 pt-2">
+          <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3">
+            <BackButton onClick={() => navigate(-1)} showLabel={false} className="h-9 w-9 justify-center px-0" />
+            <div className="text-center text-sm font-semibold text-slate-800">Minu profiil</div>
+            <div className="h-9 w-9" />
+          </div>
         </div>
 
         {/* Profile Card */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+        <div className={`${cardClass} mb-6`}>
           {!isEditing ? (
             <div className="flex items-start gap-4">
               <div className="relative">
@@ -430,28 +468,28 @@ export default function Profile() {
                   <img 
                     src={user.profile_picture} 
                     alt={user.full_name || user.display_name || user.email}
-                    className="w-20 h-20 rounded-full object-cover border-2 border-emerald-100"
+                    className="w-16 h-16 rounded-full object-cover border-2 border-emerald-100"
                   />
                 ) : (
-                  <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-3xl font-bold text-emerald-600">
+                  <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-2xl font-bold text-emerald-600">
                     {user?.full_name?.charAt(0) || user?.display_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
                   </div>
                 )}
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-slate-800">{user.display_name || user.full_name || user.email}</h2>
+                <h2 className="text-xl font-bold text-slate-800">{user.display_name || user.full_name || user.email}</h2>
                 {user.display_name && user.full_name && (
-                  <p className="text-sm text-slate-500">{user.full_name}</p>
+                  <p className="text-xs text-slate-500">{user.full_name}</p>
                 )}
-                <p className="text-slate-500">{user.email || '-'}</p>
+                <p className="text-xs text-slate-500">{user.email || '-'}</p>
                 {user.gender && (
                   <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-semibold mt-1">
                     {user.gender === 'M' ? 'Mees' : 'Naine'}
                   </span>
                 )}
-                {user.bio && <p className="text-slate-600 mt-2">{user.bio}</p>}
+                {user.bio && <p className="text-sm text-slate-600 mt-2">{user.bio}</p>}
               </div>
-              <Button onClick={handleEdit} variant="outline" size="sm">
+              <Button onClick={handleEdit} variant="outline" size="sm" className="rounded-2xl">
                 <Edit2 className="w-4 h-4 mr-2" />
                 Muuda
               </Button>
@@ -467,7 +505,7 @@ export default function Profile() {
                       className="w-20 h-20 rounded-full object-cover border-2 border-emerald-100"
                     />
                   ) : (
-                   <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-3xl font-bold text-emerald-600">
+                  <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-2xl font-bold text-emerald-600">
                      {editData.display_name?.charAt(0) || user?.full_name?.charAt(0) || 'U'}
                    </div>
                   )}
@@ -527,48 +565,58 @@ export default function Profile() {
         </div>
 
         {/* Stats */}
-         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-           <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-             <div className="flex items-center gap-2 mb-2">
-               <Trophy className="w-5 h-5 text-emerald-600" />
-               <span className="text-sm text-slate-500">Mängud</span>
+         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+           <div className="bg-white/80 rounded-[24px] p-4 shadow-[0_10px_24px_rgba(15,23,42,0.08)] border border-white/80 backdrop-blur">
+             <div className="flex items-center gap-2 text-[11px] text-slate-500">
+               <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                 <Trophy className="w-4 h-4" />
+               </span>
+               <span>Mängud</span>
              </div>
-             <div className="text-2xl font-bold text-slate-800">{totalGames}</div>
+             <div className="mt-2 text-2xl font-semibold text-slate-800">{totalGames}</div>
            </div>
            {atwStats.totalLaps > 0 && (
-             <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-               <div className="flex items-center gap-2 mb-2">
-                 <Trophy className="w-5 h-5 text-emerald-600" />
-                 <span className="text-sm text-slate-500">ATW ringe</span>
+             <div className="bg-white/80 rounded-[24px] p-4 shadow-[0_10px_24px_rgba(15,23,42,0.08)] border border-white/80 backdrop-blur">
+               <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                 <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                   <Trophy className="w-4 h-4" />
+                 </span>
+                 <span>ATW ringe</span>
                </div>
-               <div className="text-2xl font-bold text-emerald-600">{atwStats.totalLaps}</div>
+               <div className="mt-2 text-2xl font-semibold text-emerald-600">{atwStats.totalLaps}</div>
              </div>
            )}
-           <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-             <div className="flex items-center gap-2 mb-2">
-               <Target className="w-5 h-5 text-emerald-600" />
-               <span className="text-sm text-slate-500">Täpsus</span>
+           <div className="bg-white/80 rounded-[24px] p-4 shadow-[0_10px_24px_rgba(15,23,42,0.08)] border border-white/80 backdrop-blur">
+             <div className="flex items-center gap-2 text-[11px] text-slate-500">
+               <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                 <Target className="w-4 h-4" />
+               </span>
+               <span>Täpsus</span>
              </div>
-             <div className="text-2xl font-bold text-slate-800">{puttingPercentage}%</div>
+             <div className="mt-2 text-2xl font-semibold text-slate-800">{puttingPercentage}%</div>
            </div>
-           <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-             <div className="flex items-center gap-2 mb-2">
-               <TrendingUp className="w-5 h-5 text-emerald-600" />
-               <span className="text-sm text-slate-500">Keskmine skoor</span>
+           <div className="bg-white/80 rounded-[24px] p-4 shadow-[0_10px_24px_rgba(15,23,42,0.08)] border border-white/80 backdrop-blur">
+             <div className="flex items-center gap-2 text-[11px] text-slate-500">
+               <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                 <TrendingUp className="w-4 h-4" />
+               </span>
+               <span>Keskmine skoor</span>
              </div>
-             <div className="text-2xl font-bold text-slate-800">{avgScore}</div>
+             <div className="mt-2 text-2xl font-semibold text-slate-800">{avgScore}</div>
            </div>
-           <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-             <div className="flex items-center gap-2 mb-2">
-               <Trophy className="w-5 h-5 text-amber-500" />
-               <span className="text-sm text-slate-500">Parim skoor</span>
+           <div className="bg-white/80 rounded-[24px] p-4 shadow-[0_10px_24px_rgba(15,23,42,0.08)] border border-white/80 backdrop-blur">
+             <div className="flex items-center gap-2 text-[11px] text-slate-500">
+               <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+                 <Trophy className="w-4 h-4" />
+               </span>
+               <span>Parim skoor</span>
              </div>
-             <div className="text-2xl font-bold text-slate-800">{bestScore}</div>
+             <div className="mt-2 text-2xl font-semibold text-slate-800">{bestScore}</div>
            </div>
          </div>
 
          {/* Putt % Trend */}
-         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+         <div className={`${cardClass} mb-6`}>
            <div className="flex items-center justify-between mb-4">
              <div className="flex items-center gap-2 text-slate-800 font-semibold">
                <TrendingUp className="w-5 h-5 text-emerald-600" />
@@ -628,7 +676,7 @@ export default function Profile() {
          </div>
 
          {/* Game Format Best Scores */}
-         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+         <div className={`${cardClass} mb-6`}>
             <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-500" />
               Parimad skoorid formaadi järgi
@@ -682,7 +730,7 @@ export default function Profile() {
           </div>
 
          {/* Putt Style Performance */}
-         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+         <div className={`${cardClass} mb-6`}>
             <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
               <Target className="w-5 h-5" />
               Puti stiili statistika
@@ -715,7 +763,7 @@ export default function Profile() {
           </div>
 
         {/* Performance Analysis */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+        <div className={`${cardClass} mb-6`}>
           <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
             <Target className="w-5 h-5" />
             Soorituse analüüs
@@ -769,7 +817,7 @@ export default function Profile() {
 
         {/* Group Game Stats */}
         {groupGames.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+          <div className={`${cardClass} mb-6`}>
             <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
               <Award className="w-5 h-5" />
               Grupimängude statistika
@@ -788,8 +836,8 @@ export default function Profile() {
         )}
 
         {/* Tournament Results */}
-        {tournamentPlayers.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+        {isPuttingKingEnabled && tournamentPlayers.length > 0 && (
+          <div className={`${cardClass} mb-6`}>
             <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
               <Trophy className="w-5 h-5 text-purple-600" />
               Turniiri tulemused
@@ -842,7 +890,7 @@ export default function Profile() {
         <AIInsights games={myGames} userName={myDisplayName} />
 
         {/* Game History with Filters */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className={`${cardClass}`}>
           <div className="flex items-center justify-between mb-4">
              <h3 className="text-lg font-bold text-slate-800">Mängude ajalugu</h3>
              <div className="flex flex-wrap gap-2">

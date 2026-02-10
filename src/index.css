@@ -40,11 +40,11 @@
   }
 
   .dark {
-    --background: 0 0% 3.9%;
+    --background: 0 0% 0%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+    --card: 0 0% 6%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --popover: 0 0% 6%;
     --popover-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
@@ -56,21 +56,21 @@
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
+    --border: 0 0% 12%;
+    --input: 0 0% 12%;
     --ring: 0 0% 83.1%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
+    --sidebar-background: 0 0% 6%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-border: 0 0% 12%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
@@ -84,5 +84,173 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .dark [class*="bg-gradient-to"] {
+    background-image: none !important;
+    background-color: #000 !important;
+  }
+
+  .dark [class*="bg-[radial-gradient"] {
+    background-image: none !important;
+    background-color: #000 !important;
+  }
+
+  .dark .bg-white {
+    background-color: #0b0b0b !important;
+  }
+
+  .dark .bg-white\/70 {
+    background-color: rgba(11, 11, 11, 0.7) !important;
+  }
+
+  .dark .bg-slate-50,
+  .dark .bg-emerald-50,
+  .dark .bg-amber-50,
+  .dark .bg-purple-50,
+  .dark .bg-sky-50 {
+    background-color: #0b0b0b !important;
+  }
+
+  .dark .bg-slate-100,
+  .dark .bg-emerald-100,
+  .dark .bg-amber-100,
+  .dark .bg-purple-100,
+  .dark .bg-sky-100,
+  .dark .bg-blue-100,
+  .dark .bg-red-100 {
+    background-color: #141414 !important;
+  }
+
+  .dark .border-white\/70 {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .dark .border-slate-100,
+  .dark .border-slate-200,
+  .dark .border-slate-300 {
+    border-color: #1f1f1f !important;
+  }
+
+  .dark .text-slate-900,
+  .dark .text-slate-800 {
+    color: #f4f4f5 !important;
+  }
+
+  .dark .text-slate-700 {
+    color: #e4e4e7 !important;
+  }
+
+  .dark .text-slate-600,
+  .dark .text-slate-500 {
+    color: #a1a1aa !important;
+  }
+
+  .dark .text-slate-400 {
+    color: #71717a !important;
+  }
+
+  .dark[data-env="test"] .bg-white,
+  .dark[data-env="test"] .bg-white\/70,
+  .dark[data-env="test"] .bg-white\/80,
+  .dark[data-env="test"] .bg-white\/90 {
+    background-color: #0b0b0b !important;
+  }
+
+  .dark[data-env="test"] .bg-slate-50,
+  .dark[data-env="test"] .bg-slate-100,
+  .dark[data-env="test"] .bg-slate-200,
+  .dark[data-env="test"] .bg-slate-300,
+  .dark[data-env="test"] .bg-gray-50,
+  .dark[data-env="test"] .bg-gray-100,
+  .dark[data-env="test"] .bg-gray-200,
+  .dark[data-env="test"] .bg-gray-300,
+  .dark[data-env="test"] .bg-zinc-50,
+  .dark[data-env="test"] .bg-zinc-100,
+  .dark[data-env="test"] .bg-zinc-200,
+  .dark[data-env="test"] .bg-zinc-300,
+  .dark[data-env="test"] .bg-neutral-50,
+  .dark[data-env="test"] .bg-neutral-100,
+  .dark[data-env="test"] .bg-neutral-200,
+  .dark[data-env="test"] .bg-neutral-300,
+  .dark[data-env="test"] .bg-stone-50,
+  .dark[data-env="test"] .bg-stone-100,
+  .dark[data-env="test"] .bg-stone-200,
+  .dark[data-env="test"] .bg-stone-300,
+  .dark[data-env="test"] .bg-emerald-50,
+  .dark[data-env="test"] .bg-emerald-100,
+  .dark[data-env="test"] .bg-emerald-200,
+  .dark[data-env="test"] .bg-emerald-300,
+  .dark[data-env="test"] .bg-teal-50,
+  .dark[data-env="test"] .bg-teal-100,
+  .dark[data-env="test"] .bg-teal-200,
+  .dark[data-env="test"] .bg-teal-300,
+  .dark[data-env="test"] .bg-amber-50,
+  .dark[data-env="test"] .bg-amber-100,
+  .dark[data-env="test"] .bg-amber-200,
+  .dark[data-env="test"] .bg-amber-300,
+  .dark[data-env="test"] .bg-blue-50,
+  .dark[data-env="test"] .bg-blue-100,
+  .dark[data-env="test"] .bg-blue-200,
+  .dark[data-env="test"] .bg-blue-300,
+  .dark[data-env="test"] .bg-indigo-50,
+  .dark[data-env="test"] .bg-indigo-100,
+  .dark[data-env="test"] .bg-indigo-200,
+  .dark[data-env="test"] .bg-indigo-300,
+  .dark[data-env="test"] .bg-sky-50,
+  .dark[data-env="test"] .bg-sky-100,
+  .dark[data-env="test"] .bg-sky-200,
+  .dark[data-env="test"] .bg-sky-300,
+  .dark[data-env="test"] .bg-purple-50,
+  .dark[data-env="test"] .bg-purple-100,
+  .dark[data-env="test"] .bg-purple-200,
+  .dark[data-env="test"] .bg-purple-300,
+  .dark[data-env="test"] .bg-red-50,
+  .dark[data-env="test"] .bg-red-100,
+  .dark[data-env="test"] .bg-red-200,
+  .dark[data-env="test"] .bg-red-300 {
+    background-color: #0b0b0b !important;
+  }
+
+  .dark[data-env="test"] .border-white,
+  .dark[data-env="test"] .border-white\/70,
+  .dark[data-env="test"] .border-white\/80,
+  .dark[data-env="test"] .border-slate-100,
+  .dark[data-env="test"] .border-slate-200,
+  .dark[data-env="test"] .border-slate-300,
+  .dark[data-env="test"] .border-slate-400,
+  .dark[data-env="test"] .border-gray-200,
+  .dark[data-env="test"] .border-gray-300,
+  .dark[data-env="test"] .border-zinc-200,
+  .dark[data-env="test"] .border-zinc-300,
+  .dark[data-env="test"] .border-neutral-200,
+  .dark[data-env="test"] .border-neutral-300,
+  .dark[data-env="test"] .border-stone-200,
+  .dark[data-env="test"] .border-stone-300 {
+    border-color: #1f1f1f !important;
+  }
+
+  .dark[data-env="test"] .hover\:bg-white:hover,
+  .dark[data-env="test"] .hover\:bg-slate-100:hover,
+  .dark[data-env="test"] .hover\:bg-slate-200:hover,
+  .dark[data-env="test"] .hover\:bg-emerald-100:hover,
+  .dark[data-env="test"] .hover\:bg-emerald-200:hover,
+  .dark[data-env="test"] .hover\:bg-blue-100:hover,
+  .dark[data-env="test"] .hover\:bg-blue-200:hover,
+  .dark[data-env="test"] .hover\:bg-amber-100:hover,
+  .dark[data-env="test"] .hover\:bg-amber-200:hover,
+  .dark[data-env="test"] .hover\:bg-purple-100:hover,
+  .dark[data-env="test"] .hover\:bg-purple-200:hover {
+    background-color: #111 !important;
+  }
+
+  .dark[data-env="test"] .shadow-sm,
+  .dark[data-env="test"] .shadow,
+  .dark[data-env="test"] .shadow-md,
+  .dark[data-env="test"] .shadow-lg,
+  .dark[data-env="test"] [class*="shadow-["] {
+    filter: drop-shadow(0 0 16px rgba(16, 185, 129, 0.18));
   }
 }

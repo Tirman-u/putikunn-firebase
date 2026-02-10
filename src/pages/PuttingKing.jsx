@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Plus, Trophy, Settings, ArrowLeft, Trash2, BookOpen, Users } from 'lucide-react';
+import { Plus, Trophy, Settings, Trash2, BookOpen, Users } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import TournamentRulesDialog from '@/components/putting/TournamentRulesDialog';
 import JoinPuttingKing from '@/components/putting/JoinPuttingKing';
+import BackButton from '@/components/ui/back-button';
 
 export default function PuttingKing() {
   const navigate = useNavigate();
@@ -23,11 +24,15 @@ export default function PuttingKing() {
   const userRole = user?.app_role || 'user';
   const canManage = ['trainer', 'admin', 'super_admin'].includes(userRole);
 
-  const { data: tournaments = [] } = useQuery({
-    queryKey: ['putting-king-tournaments'],
-    queryFn: async () => {
-      return await base44.entities.PuttingKingTournament.list();
-    }
+  const { data: activeTournamentRows = [] } = useQuery({
+    queryKey: ['putting-king-tournaments', 'active'],
+    queryFn: () => base44.entities.PuttingKingTournament.filter({ status: 'active' })
+  });
+
+  const { data: myTournaments = [] } = useQuery({
+    queryKey: ['putting-king-tournaments', 'host', user?.email],
+    queryFn: () => base44.entities.PuttingKingTournament.filter({ host_user: user?.email }),
+    enabled: !!user?.email
   });
 
   const deleteMutation = useMutation({
@@ -37,8 +42,9 @@ export default function PuttingKing() {
     }
   });
 
-  const myTournaments = tournaments.filter(t => t.host_user === user?.email);
-  const activeTournaments = tournaments.filter(t => t.status === 'active' && t.current_round < t.total_rounds);
+  const activeTournaments = activeTournamentRows.filter(
+    t => t.status === 'active' && t.current_round < t.total_rounds
+  );
 
   if (mode === 'join') {
     return (
@@ -52,13 +58,7 @@ export default function PuttingKing() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
       <div className="max-w-4xl mx-auto pt-8">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-6"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Tagasi</span>
-        </button>
+        <BackButton className="mb-6" />
 
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -201,7 +201,7 @@ export default function PuttingKing() {
           </div>
         )}
 
-        {tournaments.length === 0 && (
+        {activeTournamentRows.length === 0 && myTournaments.length === 0 && (
           <div className="text-center py-12 text-slate-400">
             <Trophy className="w-16 h-16 mx-auto mb-4 opacity-50" />
             <p>Turniire pole veel. Loo uus turniir, et alustada!</p>

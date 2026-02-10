@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "putikunn-migration"
-  }
+  },
+  "targets": {
+    "putikunn-migration": {
+      "hosting": {
+        "prod": [
+          "putikunn-migration"
+        ],
+        "test": [
+          "putikunn-test"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

@@ -4,12 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Upload } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import BackButton from '@/components/ui/back-button';
 
 export default function SubmitDiscgolf() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   
   const [playerEmail, setPlayerEmail] = useState('');
@@ -20,7 +19,7 @@ export default function SubmitDiscgolf() {
   const [gender, setGender] = useState('M');
 
   const { data: user } = useQuery({
-    queryKey: ['current-user'],
+    queryKey: ['user'],
     queryFn: () => base44.auth.me()
   });
 
@@ -28,10 +27,14 @@ export default function SubmitDiscgolf() {
     queryKey: ['all-users'],
     queryFn: () => base44.entities.User.list()
   });
+  const selectableUsers = React.useMemo(
+    () => allUsers.filter((entry) => !entry.merged_into),
+    [allUsers]
+  );
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const selectedUser = allUsers.find(u => u.email === playerEmail);
+      const selectedUser = selectableUsers.find(u => u.email === playerEmail);
       const accuracy = parseInt(totalPutts) > 0 ? (parseInt(madePutts) / parseInt(totalPutts)) * 100 : 0;
 
       return await base44.entities.LeaderboardEntry.create({
@@ -80,7 +83,7 @@ export default function SubmitDiscgolf() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-slate-800 mb-2">Ligipääs keelatud</h1>
           <p className="text-slate-600 mb-6">Tulemuste sisestamiseks on vaja treeneri õigusi.</p>
-          <Button onClick={() => navigate(-1)}>Tagasi</Button>
+          <BackButton className="mx-auto" />
         </div>
       </div>
     );
@@ -90,13 +93,7 @@ export default function SubmitDiscgolf() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <div className="max-w-2xl mx-auto p-4">
         <div className="flex items-center justify-between mb-6 pt-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Tagasi</span>
-          </button>
+          <BackButton />
           <div className="w-16" />
         </div>
 
@@ -116,7 +113,7 @@ export default function SubmitDiscgolf() {
                 <SelectValue placeholder="Vali mängija" />
               </SelectTrigger>
               <SelectContent>
-                {allUsers.map(u => (
+                {selectableUsers.map(u => (
                   <SelectItem key={u.id} value={u.email}>
                     {u.full_name} ({u.email})
                   </SelectItem>

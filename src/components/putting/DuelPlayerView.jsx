@@ -238,10 +238,19 @@ export default function DuelPlayerView({ gameId }) {
   const opponent = opponentId ? state.players?.[opponentId] : null;
   const stationReady = isStationReady(state, player.station_index);
   const hasSubmitted = hasPendingSubmission(state, player.station_index, playerId);
-  const opponentSubmitted = opponentId
-    ? hasPendingSubmission(state, player.station_index, opponentId)
-    : false;
-  const canUndo = hasSubmitted && !opponentSubmitted;
+  const canUndo = hasSubmitted;
+  const pendingStation = state.pending?.[player.station_index];
+  const pendingSubmission = pendingStation?.submissions?.[playerId];
+  const opponentPending = opponentId ? pendingStation?.submissions?.[opponentId] : null;
+  const showPending = pendingSubmission && !pendingStation?.resolved;
+  const showOpponentPending = opponentPending && !pendingStation?.resolved;
+  const pendingMade = showPending ? pendingSubmission?.made : null;
+  const displayDistance = showPending
+    ? Math.min(DUEL_MAX_DISTANCE, pendingSubmission.distance + 1)
+    : player.distance;
+  const opponentDisplayDistance = showOpponentPending
+    ? Math.min(DUEL_MAX_DISTANCE, opponentPending.distance + 1)
+    : opponent?.distance || DUEL_START_DISTANCE;
 
   const discCount = game.disc_count || 3;
   const numberButtons = discCount === 3 ? [1, 2, 3] : discCount === 5 ? [1, 2, 3, 4, 5] : [];
@@ -268,10 +277,7 @@ export default function DuelPlayerView({ gameId }) {
 
   const handleUndo = async () => {
     try {
-      await updateGame((current) => ({
-        ...current,
-        state: undoSubmission(current.state || createEmptyDuelState(stationCount), player.station_index, playerId)
-      }));
+      await updateGame((current) => undoSubmission(current, player.station_index, playerId));
     } catch (error) {
       toast.error('Undo ebaõnnestus');
     }
@@ -304,8 +310,8 @@ export default function DuelPlayerView({ gameId }) {
           <div className="text-xs text-slate-500">Mõlemad sisestavad paralleelselt</div>
         </div>
         <div className="space-y-4">
-          <ProgressRow label="Sina" distance={player.distance} colorClass="bg-emerald-500 border-emerald-500" />
-          <ProgressRow label="Vastane" distance={opponent?.distance || DUEL_START_DISTANCE} colorClass="bg-sky-500 border-sky-500" />
+          <ProgressRow label="Sina" distance={displayDistance} colorClass="bg-emerald-500 border-emerald-500" />
+          <ProgressRow label="Vastane" distance={opponentDisplayDistance} colorClass="bg-sky-500 border-sky-500" />
         </div>
       </div>
 
@@ -340,7 +346,10 @@ export default function DuelPlayerView({ gameId }) {
               <button
                 onClick={() => handleSubmit(1)}
                 className={cn(
-                  'rounded-2xl border-2 border-emerald-200 bg-emerald-50 py-4 text-base font-semibold text-emerald-700 shadow-sm'
+                  'rounded-2xl border-2 py-4 text-base font-semibold shadow-sm transition-colors',
+                  pendingMade === 1
+                    ? 'border-emerald-400 bg-emerald-200 text-emerald-800'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'
                 )}
               >
                 Sees
@@ -348,7 +357,10 @@ export default function DuelPlayerView({ gameId }) {
               <button
                 onClick={() => handleSubmit(0)}
                 className={cn(
-                  'rounded-2xl border-2 border-rose-200 bg-rose-50 py-4 text-base font-semibold text-rose-700 shadow-sm'
+                  'rounded-2xl border-2 py-4 text-base font-semibold shadow-sm transition-colors',
+                  pendingMade === 0
+                    ? 'border-rose-400 bg-rose-200 text-rose-800'
+                    : 'border-rose-200 bg-rose-50 text-rose-700'
                 )}
               >
                 Mööda
@@ -361,18 +373,15 @@ export default function DuelPlayerView({ gameId }) {
                   key={`made-${num}`}
                   onClick={() => handleSubmit(num)}
                   className={cn(
-                    'rounded-2xl border-2 border-slate-200 bg-slate-50 py-3 text-base font-semibold text-slate-800 shadow-sm'
+                    'rounded-2xl border-2 py-3 text-base font-semibold shadow-sm transition-colors',
+                    pendingMade === num
+                      ? 'border-emerald-400 bg-emerald-200 text-emerald-800'
+                      : 'border-slate-200 bg-slate-50 text-slate-800'
                   )}
                 >
                   {num}
                 </button>
               ))}
-            </div>
-          )}
-
-          {hasSubmitted && (
-            <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              Vastane pole veel sisestanud – saad vajadusel oma tulemust muuta.
             </div>
           )}
 

@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Trophy, Play, Plus, Trash2, Users } from 'lucide-react';
+import { Trophy, Play, Plus, Trash2, Users } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import PuttingKingScoreInput from '@/components/putting/PuttingKingScoreInput';
@@ -11,6 +11,7 @@ import SuddenDeathDialog from '@/components/putting/SuddenDeathDialog';
 import PuttingKingRules from '@/components/putting/PuttingKingRules';
 import TournamentRulesDialog from '@/components/putting/TournamentRulesDialog';
 import LoadingState from '@/components/ui/loading-state';
+import BackButton from '@/components/ui/back-button';
 
 export default function PuttingKingOverview() {
   const navigate = useNavigate();
@@ -24,43 +25,41 @@ export default function PuttingKingOverview() {
 
   const { data: tournament } = useQuery({
     queryKey: ['tournament', tournamentId],
-    queryFn: async () => {
-      const tournaments = await base44.entities.PuttingKingTournament.list();
-      return tournaments.find(t => t.id === tournamentId);
-    },
+    queryFn: () => base44.entities.PuttingKingTournament.get(tournamentId),
     enabled: !!tournamentId,
-    refetchInterval: 5000
+    refetchInterval: 15000,
+    refetchOnWindowFocus: false
   });
 
   const { data: stations = [] } = useQuery({
     queryKey: ['tournament-stations', tournamentId],
     queryFn: async () => {
-      const allStations = await base44.entities.PuttingKingStation.list();
-      return allStations.filter(s => s.tournament_id === tournamentId)
-        .sort((a, b) => a.order_index - b.order_index);
+      const rows = await base44.entities.PuttingKingStation.filter({ tournament_id: tournamentId });
+      return rows.sort((a, b) => a.order_index - b.order_index);
     },
     enabled: !!tournamentId,
-    refetchInterval: 5000
+    refetchInterval: 15000,
+    refetchOnWindowFocus: false
   });
 
   const { data: matches = [] } = useQuery({
     queryKey: ['tournament-matches', tournamentId],
     queryFn: async () => {
-      const allMatches = await base44.entities.PuttingKingMatch.list();
-      return allMatches.filter(m => m.tournament_id === tournamentId);
+      return base44.entities.PuttingKingMatch.filter({ tournament_id: tournamentId });
     },
     enabled: !!tournamentId,
-    refetchInterval: 3000
+    refetchInterval: 5000,
+    refetchOnWindowFocus: false
   });
 
   const { data: players = [] } = useQuery({
     queryKey: ['tournament-players', tournamentId],
     queryFn: async () => {
-      const allPlayers = await base44.entities.PuttingKingPlayer.list();
-      return allPlayers.filter(p => p.tournament_id === tournamentId);
+      return base44.entities.PuttingKingPlayer.filter({ tournament_id: tournamentId });
     },
     enabled: !!tournamentId,
-    refetchInterval: 5000
+    refetchInterval: 15000,
+    refetchOnWindowFocus: false
   });
 
   const { data: user } = useQuery({
@@ -268,8 +267,7 @@ export default function PuttingKingOverview() {
       if (trimmed.includes('@')) {
         email = trimmed;
         try {
-          const allUsers = await base44.entities.User.list();
-          const foundUser = allUsers.find(u => u.email === email);
+          const [foundUser] = await base44.entities.User.filter({ email }, null, 1);
           if (foundUser) {
             displayName = foundUser.display_name || foundUser.full_name;
           } else {
@@ -316,15 +314,18 @@ export default function PuttingKingOverview() {
 
   const startTournamentMutation = useMutation({
     mutationFn: async () => {
-      // Get all stations
-      const allStations = await base44.entities.PuttingKingStation.list();
-      const tournamentStations = allStations.filter(s => s.tournament_id === tournament.id && s.enabled)
+      if (!stations.length) {
+        throw new Error('Jaamu ei leitud');
+      }
+      if (!players.length) {
+        throw new Error('Mängijaid ei leitud');
+      }
+      const tournamentStations = stations
+        .filter(s => s.enabled)
         .sort((a, b) => a.order_index - b.order_index);
 
-      // Get all players
-      const allPlayers = await base44.entities.PuttingKingPlayer.list();
-      const tournamentPlayers = allPlayers
-        .filter(p => p.tournament_id === tournament.id && p.active)
+      const tournamentPlayers = players
+        .filter(p => p.active)
         .sort(() => Math.random() - 0.5); // Shuffle
 
       const minRequired = tournamentStations.length * 4;
@@ -388,8 +389,11 @@ export default function PuttingKingOverview() {
       const nextRound = tournament.current_round + 1;
       
       // Get all stations sorted by order
-      const allStations = await base44.entities.PuttingKingStation.list();
-      const tournamentStations = allStations.filter(s => s.tournament_id === tournament.id && s.enabled)
+      if (!stations.length) {
+        throw new Error('Jaamu ei leitud');
+      }
+      const tournamentStations = stations
+        .filter(s => s.enabled)
         .sort((a, b) => a.order_index - b.order_index);
 
       // Get current round matches
@@ -522,13 +526,7 @@ export default function PuttingKingOverview() {
         <TournamentRulesDialog onClose={() => setShowRulesDialog(false)} />
       )}
       <div className="max-w-7xl mx-auto pt-8">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-6"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Tagasi</span>
-        </button>
+        <BackButton className="mb-6" />
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">{tournament.name}</h1>

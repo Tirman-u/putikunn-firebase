@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 export default function useRealtimeDuelGame({
   gameId,
   enabled = true,
+  allowCollection = false,
   throttleMs = 1000,
   eventTypes = ['update', 'delete'],
   onEvent,
@@ -15,6 +16,7 @@ export default function useRealtimeDuelGame({
   const onEventRef = useRef(onEvent);
   const filterRef = useRef(filterEvent);
   const onErrorRef = useRef(onError);
+  const eventTypesRef = useRef(eventTypes);
   const throttleRef = useRef({ timer: null, latest: null });
   const retryRef = useRef({ timer: null, delay: retryMs });
   const unsubscribeRef = useRef(null);
@@ -28,11 +30,16 @@ export default function useRealtimeDuelGame({
   }, [filterEvent]);
 
   useEffect(() => {
+    eventTypesRef.current = eventTypes;
+  }, [eventTypes]);
+
+  useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
 
   useEffect(() => {
     if (!enabled || !onEventRef.current) return undefined;
+    if (!gameId && !allowCollection) return undefined;
 
     let cancelled = false;
 
@@ -52,7 +59,8 @@ export default function useRealtimeDuelGame({
     const shouldHandleEvent = (event) => {
       const filterFn = filterRef.current;
       if (filterFn) return filterFn(event);
-      if (eventTypes && !eventTypes.includes(event.type)) return false;
+      const allowedTypes = eventTypesRef.current;
+      if (allowedTypes && !allowedTypes.includes(event.type)) return false;
       if (gameId && event.id !== gameId) return false;
       return true;
     };
@@ -91,7 +99,9 @@ export default function useRealtimeDuelGame({
     const subscribe = () => {
       if (cancelled) return;
       try {
-        const unsubscribe = base44.entities.DuelGame.subscribe(handleEvent);
+        const unsubscribe = gameId
+          ? base44.entities.DuelGame.subscribeDoc(gameId, handleEvent)
+          : base44.entities.DuelGame.subscribe(handleEvent);
         unsubscribeRef.current = unsubscribe;
         resetRetry();
       } catch (error) {
@@ -117,5 +127,5 @@ export default function useRealtimeDuelGame({
       resetThrottle();
       resetRetry();
     };
-  }, [enabled, eventTypes, gameId, maxRetryMs, retryMs, throttleMs]);
+  }, [allowCollection, enabled, gameId, maxRetryMs, retryMs, throttleMs]);
 }

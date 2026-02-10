@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Users, UserPlus, Settings, User, Target, Trophy } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Users, UserPlus, Settings, User, Target, Trophy, Crown, Shield, LogOut, GraduationCap, Users2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { isTestEnv } from '@/lib/env';
+import { FEATURE_FLAGS } from '@/lib/feature-flags';
 
 import HostSetup from '@/components/putting/HostSetup';
 import JoinGame from '@/components/putting/JoinGame';
@@ -12,15 +14,32 @@ import PlayerView from '@/components/putting/PlayerView';
 import AroundTheWorldSetup from '@/components/putting/AroundTheWorldSetup';
 import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
+import ThemeToggle from '@/components/ui/theme-toggle';
 
 export default function Home() {
-  const [mode, setMode] = useState(null); // null, 'host', 'player', 'atw-setup', 'atw-game', 'atw-host'
+  const [mode, setMode] = useState(null); // null, 'host-setup', 'join', 'solo', 'host', 'player', 'atw-setup', 'atw-game', 'atw-host'
   const [gameId, setGameId] = useState(null);
   const [playerName, setPlayerName] = useState(null);
   const [isSoloATW, setIsSoloATW] = useState(false);
   const [atwPin, setAtwPin] = useState(null);
   const [atwName, setAtwName] = useState(null);
   const [atwPuttType, setAtwPuttType] = useState(null);
+  const [playerReturnTo, setPlayerReturnTo] = useState('home');
+  const navigate = useNavigate();
+
+  const goHome = React.useCallback(() => {
+    setMode(null);
+    window.history.replaceState({}, '', createPageUrl('Home'));
+  }, []);
+
+  const handleLogout = React.useCallback(async () => {
+    await base44.auth.logout(true);
+  }, []);
+
+  const setSimpleMode = React.useCallback((nextMode) => {
+    setMode(nextMode);
+    window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=${nextMode}`);
+  }, []);
 
   // Check URL params for ATW mode and continuing games
   React.useEffect(() => {
@@ -28,8 +47,15 @@ export default function Home() {
     const urlMode = params.get('mode');
     const isSolo = params.get('solo') === '1';
     const urlGameId = params.get('gameId');
+    const urlFrom = params.get('from');
 
-    if (urlMode === 'atw-setup') {
+    if (urlMode === 'host-setup') {
+      setMode('host-setup');
+    } else if (urlMode === 'join') {
+      setMode('join');
+    } else if (urlMode === 'solo') {
+      setMode('solo');
+    } else if (urlMode === 'atw-setup') {
       setIsSoloATW(isSolo);
       setMode('atw-setup');
       // Store pin, name, and puttType if available
@@ -68,6 +94,7 @@ export default function Home() {
     } else if (urlMode === 'player' && urlGameId) {
       // Continue regular game from profile
       setGameId(urlGameId);
+      setPlayerReturnTo(urlFrom === 'training' ? 'training' : 'home');
       base44.auth.me().then(user => {
         const playerName = user?.display_name || user?.full_name || user?.email || 'Mängija';
         setPlayerName(playerName);
@@ -84,7 +111,162 @@ export default function Home() {
   const userRole = user?.app_role || 'user';
   const canHostGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
   const canManageGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
+  const canManageTraining = ['trainer', 'admin', 'super_admin'].includes(userRole);
+  const showTrainingFeatures = isTestEnv();
 
+  const trainingGroups = React.useMemo(() => {
+    const groups = user?.training_groups;
+    if (!groups || typeof groups !== 'object') return [];
+    return Object.values(groups).filter(Boolean);
+  }, [user]);
+  const trainingLabel = trainingGroups.length
+    ? (trainingGroups.length === 1 ? trainingGroups[0] : `${trainingGroups[0]} +${trainingGroups.length - 1}`)
+    : 'Liitu trenniga';
+  const trainingSub = trainingGroups.length ? 'Trenn' : 'Sisesta PIN';
+
+  const tileThemes = {
+    emerald: { bg: 'bg-emerald-100', icon: 'text-emerald-600', ring: 'ring-emerald-200', glow: 'shadow-emerald-100/60' },
+    sky: { bg: 'bg-sky-100', icon: 'text-sky-600', ring: 'ring-sky-200', glow: 'shadow-sky-100/60' },
+    amber: { bg: 'bg-amber-100', icon: 'text-amber-600', ring: 'ring-amber-200', glow: 'shadow-amber-100/60' },
+    purple: { bg: 'bg-purple-100', icon: 'text-purple-600', ring: 'ring-purple-200', glow: 'shadow-purple-100/60' },
+    blue: { bg: 'bg-blue-100', icon: 'text-blue-600', ring: 'ring-blue-200', glow: 'shadow-blue-100/60' },
+    slate: { bg: 'bg-slate-100', icon: 'text-slate-600', ring: 'ring-slate-200', glow: 'shadow-slate-100/60' },
+    red: { bg: 'bg-red-100', icon: 'text-red-600', ring: 'ring-red-200', glow: 'shadow-red-100/60' }
+  };
+
+  const homeTiles = [
+    {
+      key: 'host',
+      label: 'Hosti mäng',
+      sub: 'Loo sessioon',
+      icon: Users,
+      color: 'emerald',
+      onClick: () => setSimpleMode('host-setup'),
+      show: canHostGames
+    },
+    {
+      key: 'join',
+      label: 'Liitu mänguga',
+      sub: 'Sisesta PIN',
+      icon: UserPlus,
+      color: 'sky',
+      onClick: () => setSimpleMode('join'),
+      show: true
+    },
+    {
+      key: 'training-join',
+      label: trainingLabel,
+      sub: trainingSub,
+      icon: GraduationCap,
+      color: 'purple',
+      to: createPageUrl('JoinTraining'),
+      show: showTrainingFeatures
+    },
+    {
+      key: 'solo',
+      label: 'Soolotreening',
+      sub: 'Harjuta üksi',
+      icon: Target,
+      color: 'emerald',
+      onClick: () => setSimpleMode('solo'),
+      show: true
+    },
+    {
+      key: 'records',
+      label: 'Rekordid',
+      sub: 'Edetabelid',
+      icon: Trophy,
+      color: 'amber',
+      href: createPageUrl('PuttingRecordsPage'),
+      show: true
+    },
+    {
+      key: 'king',
+      label: 'Kuningas',
+      sub: 'Turniirid',
+      icon: Crown,
+      color: 'purple',
+      href: createPageUrl('PuttingKing'),
+      show: FEATURE_FLAGS.puttingKing
+    },
+    {
+      key: 'profile',
+      label: 'Minu profiil',
+      sub: 'Statistika',
+      icon: User,
+      color: 'slate',
+      to: createPageUrl('Profile'),
+      show: true
+    },
+    {
+      key: 'manage',
+      label: 'Halda mänge',
+      sub: 'Admin',
+      icon: Settings,
+      color: 'blue',
+      to: createPageUrl('ManageGames'),
+      show: canManageGames
+    },
+    {
+      key: 'trainer',
+      label: 'Treener',
+      sub: 'Grupid & projektor',
+      icon: Users2,
+      color: 'amber',
+      to: createPageUrl('TrainerGroups'),
+      show: canManageTraining && showTrainingFeatures
+    },
+    {
+      key: 'admin',
+      label: 'Kasutajad',
+      sub: 'Superadmin',
+      icon: Shield,
+      color: 'red',
+      to: createPageUrl('AdminUsers'),
+      show: userRole === 'super_admin'
+    }
+  ].filter((tile) => tile.show);
+
+  const renderTile = (tile) => {
+    const theme = tileThemes[tile.color] || tileThemes.emerald;
+    const Icon = tile.icon;
+    const content = (
+      <div className="flex flex-col items-center gap-2">
+        <div className={`flex h-16 w-16 items-center justify-center rounded-[22px] ring-1 ${theme.bg} ${theme.ring} shadow-sm ${theme.glow}`}>
+          <Icon className={`h-7 w-7 ${theme.icon}`} />
+        </div>
+        <div className="text-center">
+          <div className="text-[12px] font-semibold text-slate-800 leading-tight">{tile.label}</div>
+          <div className="text-[10px] text-slate-500 leading-tight">{tile.sub}</div>
+        </div>
+      </div>
+    );
+
+    const className =
+      "w-full rounded-[28px] border border-white/70 bg-white/70 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur-sm transition hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300";
+
+    if (tile.to) {
+      return (
+        <Link key={tile.key} to={tile.to} className={className}>
+          {content}
+        </Link>
+      );
+    }
+
+    if (tile.href) {
+      return (
+        <button key={tile.key} type="button" onClick={() => (window.location.href = tile.href)} className={className}>
+          {content}
+        </button>
+      );
+    }
+
+    return (
+      <button key={tile.key} type="button" onClick={tile.onClick} className={className}>
+        {content}
+      </button>
+    );
+  };
 
 
   const handleHostGame = async (gameData) => {
@@ -132,145 +314,28 @@ export default function Home() {
   // Initial selection screen
   if (!mode) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
-        <div className="max-w-lg mx-auto pt-16">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-slate-800 mb-2">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
+        <div className="max-w-2xl mx-auto pt-10 pb-12">
+          <div className="flex justify-end mb-4 gap-2">
+            <ThemeToggle />
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition hover:bg-white"
+            >
+              <LogOut className="w-4 h-4" />
+              Logi välja
+            </button>
+          </div>
+          <div className="text-center mb-8">
+            <h1 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-2">
               Tere tulemast, {user?.display_name || user?.full_name || 'Külaline'}!
             </h1>
-            <p className="text-slate-600 text-xl mb-8">Valmis puttama?</p>
+            <p className="text-slate-600 text-base sm:text-lg">Valmis puttama?</p>
           </div>
 
-          <div className="space-y-4">
-            {canHostGames && (
-              <button
-                onClick={() => setMode('host-setup')}
-                className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                    <Users className="w-7 h-7 text-emerald-600" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <h3 className="text-lg font-bold text-slate-800">Hosti mäng</h3>
-                    <p className="text-sm text-slate-500">Loo sessioon ja saa PIN</p>
-                  </div>
-                </div>
-              </button>
-            )}
-
-            <button
-              onClick={() => setMode('join')}
-              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                  <UserPlus className="w-7 h-7 text-emerald-600" />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Liitu mänguga</h3>
-                  <p className="text-sm text-slate-500">Sisesta PIN, et liituda sessiooniga</p>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setMode('solo')}
-              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-emerald-400 hover:shadow-lg transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                  <Target className="w-7 h-7 text-emerald-600" />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Soolotreening</h3>
-                  <p className="text-sm text-slate-500">Harjuta üksi ilma hostimata</p>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => window.location.href = createPageUrl('PuttingRecordsPage')}
-              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-amber-400 hover:shadow-lg transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center group-hover:bg-amber-200 transition-colors">
-                  <Trophy className="w-7 h-7 text-amber-600" />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Puttingu rekordid</h3>
-                  <p className="text-sm text-slate-500">Vaata edetabeleid ja parimaid tulemusi</p>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => window.location.href = createPageUrl('PuttingKing')}
-              className="w-full bg-white rounded-2xl p-6 shadow-sm border-2 border-slate-200 hover:border-purple-400 hover:shadow-lg transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                  <Trophy className="w-7 h-7 text-purple-600" />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Puttingu Kuningas</h3>
-                  <p className="text-sm text-slate-500">Liitu turniiridega ja võistle</p>
-                </div>
-              </div>
-            </button>
-
-
-
-            <div className="pt-8 border-t-2 border-slate-200 mt-8 space-y-3">
-            {canManageGames && (
-              <Link
-                to={createPageUrl('ManageGames')}
-                className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200 transition-colors">
-                    <Settings className="w-6 h-6 text-slate-600" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <h3 className="text-base font-bold text-slate-800">Halda mänge</h3>
-                    <p className="text-xs text-slate-500">Vaata ja halda oma mänge</p>
-                  </div>
-                </div>
-              </Link>
-            )}
-
-            <Link
-              to={createPageUrl('Profile')}
-              className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all group block"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-slate-200 transition-colors">
-                  <User className="w-6 h-6 text-slate-600" />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-base font-bold text-slate-800">Minu profiil</h3>
-                  <p className="text-xs text-slate-500">Statistika ja mänguajalugu</p>
-                </div>
-              </div>
-            </Link>
-
-            {userRole === 'super_admin' && (
-              <Link
-                to={createPageUrl('AdminUsers')}
-                className="w-full bg-white rounded-2xl p-5 shadow-sm border border-red-200 hover:border-red-300 hover:shadow-md transition-all group block"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center group-hover:bg-red-200 transition-colors">
-                    <User className="w-6 h-6 text-red-600" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <h3 className="text-base font-bold text-slate-800">Kasutajate haldus</h3>
-                    <p className="text-xs text-slate-500">Halda rolle ja õigusi</p>
-                  </div>
-                </div>
-              </Link>
-            )}
-            </div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-5">
+            {homeTiles.map(renderTile)}
           </div>
         </div>
       </div>
@@ -279,7 +344,7 @@ export default function Home() {
 
   // Host setup
   if (mode === 'host-setup') {
-    return <HostSetup onStartGame={handleHostGame} onBack={() => setMode(null)} />;
+    return <HostSetup onStartGame={handleHostGame} onBack={goHome} />;
   }
 
   // Solo mode
@@ -305,22 +370,30 @@ export default function Home() {
       setGameId(game.id);
       setPlayerName(user.full_name);
       setMode('player');
-    }} onBack={() => setMode(null)} isSolo={true} />;
+      window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=player&gameId=${game.id}`);
+    }} onBack={goHome} isSolo={true} />;
   }
 
   // Join game
   if (mode === 'join') {
-    return <JoinGame onJoin={handleJoinGame} onBack={() => setMode(null)} />;
+    return <JoinGame onJoin={handleJoinGame} onBack={goHome} />;
   }
 
   // Host view
   if (mode === 'host') {
-    return <HostView gameId={gameId} onExit={() => setMode(null)} />;
+    return <HostView gameId={gameId} onExit={goHome} />;
   }
 
   // Player view
   if (mode === 'player') {
-    return <PlayerView gameId={gameId} playerName={playerName} onExit={() => setMode(null)} />;
+    const handlePlayerExit = () => {
+      if (playerReturnTo === 'training') {
+        navigate(createPageUrl('JoinTraining'));
+        return;
+      }
+      goHome();
+    };
+    return <PlayerView gameId={gameId} playerName={playerName} onExit={handlePlayerExit} />;
   }
 
   // Around the World setup
@@ -332,10 +405,10 @@ export default function Home() {
         initialName={atwName}
         initialPuttType={atwPuttType}
         onBack={() => {
-          setMode(null);
           setAtwPin(null);
           setAtwName(null);
           setAtwPuttType(null);
+          goHome();
         }}
         onStart={async (setupData) => {
           const user = await base44.auth.me();
@@ -392,7 +465,7 @@ export default function Home() {
 
   // Around the World host view
   if (mode === 'atw-host') {
-    return <HostView gameId={gameId} onExit={() => setMode(null)} />;
+    return <HostView gameId={gameId} onExit={goHome} />;
   }
 
   // Around the World game view

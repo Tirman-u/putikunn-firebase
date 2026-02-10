@@ -2,11 +2,12 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trash2, Share2, Calendar, Upload } from 'lucide-react';
+import { Trash2, Share2, Calendar, Upload } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format as formatDate } from 'date-fns';
 import { GAME_FORMATS, getTotalRounds } from '@/components/putting/gameRules';
 import { toast } from 'sonner';
+import BackButton from '@/components/ui/back-button';
 import PerformanceAnalysis from '@/components/putting/PerformanceAnalysis';
 import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView';
 import HostView from '@/components/putting/HostView';
@@ -31,7 +32,7 @@ export default function GameResult() {
 
 
   const { data: user } = useQuery({
-    queryKey: ['current-user'],
+    queryKey: ['user'],
     queryFn: () => base44.auth.me()
   });
 
@@ -47,7 +48,9 @@ export default function GameResult() {
       return found;
     },
     enabled: !!gameId,
-    retry: false
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false
   });
 
   const mergeRealtimeGame = React.useCallback((previous, incoming) => {
@@ -90,9 +93,36 @@ export default function GameResult() {
     }
   });
 
-  const { data: leaderboardEntries = [] } = useQuery({
-    queryKey: ['leaderboard-entries'],
-    queryFn: () => base44.entities.LeaderboardEntry.list()
+  const { data: myLeaderboardEntries = [] } = useQuery({
+    queryKey: ['leaderboard-entries', gameId, user?.id || user?.email],
+    queryFn: async () => {
+      if (!gameId || !user) return [];
+      if (user?.id) {
+        return base44.entities.LeaderboardEntry.filter({
+          game_id: gameId,
+          leaderboard_type: 'general',
+          player_uid: user.id
+        }, null, 1);
+      }
+      if (user?.email) {
+        return base44.entities.LeaderboardEntry.filter({
+          game_id: gameId,
+          leaderboard_type: 'general',
+          player_email: user.email
+        }, null, 1);
+      }
+      return [];
+    },
+    enabled: !!gameId && !!user
+  });
+
+  const { data: discgolfEntries = [] } = useQuery({
+    queryKey: ['leaderboard-entries', gameId, 'discgolf'],
+    queryFn: () => base44.entities.LeaderboardEntry.filter({
+      game_id: gameId,
+      leaderboard_type: 'discgolf_ee'
+    }, null, 1),
+    enabled: !!gameId
   });
 
   const deleteGameMutation = useMutation({
@@ -267,7 +297,7 @@ export default function GameResult() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center p-4">
         <div className="text-center">
           <div className="text-slate-400 mb-4">Mängu ei leitud</div>
-          <Button onClick={() => navigate(-1)}>Tagasi</Button>
+          <BackButton />
         </div>
       </div>
     );
@@ -367,16 +397,8 @@ export default function GameResult() {
     }
   };
 
-  const isSubmittedToLeaderboard = leaderboardEntries.some(entry => 
-    entry.game_id === gameId &&
-    entry.leaderboard_type === 'general' &&
-    (user?.id ? entry.player_uid === user.id : entry.player_email === user?.email)
-  );
-
-  const isSubmittedToDgEe = leaderboardEntries.some(entry => 
-    entry.game_id === gameId && 
-    entry.leaderboard_type === 'discgolf_ee'
-  );
+  const isSubmittedToLeaderboard = myLeaderboardEntries.length > 0;
+  const isSubmittedToDgEe = discgolfEntries.length > 0;
 
   // Check if this is a solo ATW game
   const isSoloATW = game.game_type === 'around_the_world' && game.pin === '0000';
@@ -386,13 +408,7 @@ export default function GameResult() {
       <div className="max-w-4xl mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Tagasi</span>
-          </button>
+            <BackButton />
           <h1 className="text-2xl font-bold text-slate-800">{game.name}</h1>
           <div className="w-16" />
         </div>

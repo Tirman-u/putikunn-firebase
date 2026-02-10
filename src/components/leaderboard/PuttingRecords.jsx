@@ -8,11 +8,13 @@ import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { toast } from 'sonner';
+import { normalizeLeaderboardGender } from '@/lib/leaderboard-utils';
 
 export default function PuttingRecords() {
   const [selectedView, setSelectedView] = useState('general_classic');
   const [selectedGender, setSelectedGender] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
+  const [dgMode, setDgMode] = useState('classic');
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const PAGE_SIZE = 20;
@@ -31,7 +33,7 @@ export default function PuttingRecords() {
   ];
 
   const { data: user } = useQuery({
-    queryKey: ['current-user'],
+    queryKey: ['user'],
     queryFn: () => base44.auth.me()
   });
 
@@ -42,10 +44,23 @@ export default function PuttingRecords() {
   });
 
   const currentView = viewTypes.find(v => v.id === selectedView);
+  const effectiveView = useMemo(() => {
+    if (!currentView) return null;
+    if (currentView.id === 'discgolf_ee') {
+      return { ...currentView, gameType: dgMode };
+    }
+    return currentView;
+  }, [currentView, dgMode]);
 
   useEffect(() => {
     setPage(1);
-  }, [selectedView, selectedGender, selectedMonth]);
+  }, [selectedView, selectedGender, selectedMonth, dgMode]);
+
+  useEffect(() => {
+    if (selectedView === 'discgolf_ee') {
+      setDgMode('classic');
+    }
+  }, [selectedView]);
 
   const fetchLeaderboardRows = async (filter) => {
     const rows = [];
@@ -66,12 +81,12 @@ export default function PuttingRecords() {
   };
 
   const { data: leaderboardEntries = [] } = useQuery({
-    queryKey: ['leaderboard-entries', selectedView],
+    queryKey: ['leaderboard-entries', selectedView, dgMode],
     queryFn: async () => {
-      if (!currentView) return [];
+      if (!effectiveView) return [];
       const filter = {
-        leaderboard_type: currentView.leaderboardType,
-        game_type: currentView.gameType
+        leaderboard_type: effectiveView.leaderboardType,
+        game_type: effectiveView.gameType
       };
       return fetchLeaderboardRows(filter);
     },
@@ -185,7 +200,7 @@ export default function PuttingRecords() {
 
   const getResolvedGender = (entry) => {
     const profile = resolveEntryUser(entry);
-    return profile?.gender || entry?.player_gender || null;
+    return normalizeLeaderboardGender(profile?.gender || entry?.player_gender) || null;
   };
 
   const getResolvedPlayerName = (entry) => {
@@ -210,12 +225,12 @@ export default function PuttingRecords() {
   };
 
   const filteredEntries = leaderboardEntries.filter(entry => {
-    if (!currentView) return false;
-    if (entry.leaderboard_type !== currentView.leaderboardType) return false;
+    if (!effectiveView) return false;
+    if (entry.leaderboard_type !== effectiveView.leaderboardType) return false;
     if (!entry?.game_id || !gamesById?.[entry.game_id]) return false;
     
-    if (entry.game_type !== currentView.gameType) return false;
-    if (currentView.hostedOnly && !isHostedEntry(entry)) return false;
+    if (entry.game_type !== effectiveView.gameType) return false;
+    if (effectiveView.hostedOnly && !isHostedEntry(entry)) return false;
     
     const resolvedGender = getResolvedGender(entry);
     if (selectedGender !== 'all') {
@@ -234,7 +249,7 @@ export default function PuttingRecords() {
     return true;
   });
 
-  const isATWView = currentView?.gameType === 'around_the_world';
+  const isATWView = effectiveView?.gameType === 'around_the_world';
   const getAtwDiscsLabel = (entry) => {
     if (!isATWView) return null;
     const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
@@ -302,6 +317,29 @@ export default function PuttingRecords() {
         {viewTypes.map(type => (
           <TabsContent key={type.id} value={type.id}>
             <div className="space-y-4">
+              {type.id === 'discgolf_ee' && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="inline-flex rounded-full bg-slate-100 p-1 shadow-sm">
+                    {[
+                      { id: 'classic', label: 'Classic' },
+                      { id: 'short', label: 'Short' }
+                    ].map(option => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setDgMode(option.id)}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-full transition ${
+                          dgMode === option.id
+                            ? 'bg-white text-slate-800 shadow'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-3 flex-wrap">
                 <Select value={selectedGender} onValueChange={setSelectedGender}>
                   <SelectTrigger className="w-32">
@@ -349,7 +387,7 @@ export default function PuttingRecords() {
                         <th className="text-center py-3 px-2 text-slate-600 font-semibold">Tulemus</th>
                         {!isATWView && (
                           <th className="text-center py-3 px-2 text-slate-600 font-semibold">
-                            {currentView.gameType === 'streak_challenge' ? 'Distants' : 'Täpsus'}
+                            {effectiveView?.gameType === 'streak_challenge' ? 'Distants' : 'Täpsus'}
                           </th>
                         )}
                         {!isATWView && (
@@ -412,7 +450,7 @@ export default function PuttingRecords() {
                           {!isATWView && (
                             <td className="py-3 px-2 text-center text-slate-700">
                               <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
-                                {currentView.gameType === 'streak_challenge' 
+                                {effectiveView?.gameType === 'streak_challenge' 
                                   ? `${entry.streak_distance || 0}m` 
                                   : (entry.accuracy ? `${entry.accuracy.toFixed(1)}%` : '-')
                                 }

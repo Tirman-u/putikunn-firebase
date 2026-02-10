@@ -3,7 +3,8 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { ArrowLeft, Copy } from 'lucide-react';
+import { Copy } from 'lucide-react';
+import BackButton from '@/components/ui/back-button';
 import { useNavigate } from 'react-router-dom';
 import DuelHostView from '@/components/putting/DuelHostView';
 import { createEmptyDuelState } from '@/lib/duel-utils';
@@ -15,14 +16,27 @@ export default function DuelHost() {
   const [gameId, setGameId] = React.useState(null);
   const [creating, setCreating] = React.useState(false);
   const [gameName, setGameName] = React.useState('');
+  const [isNameLocked, setIsNameLocked] = React.useState(false);
   const [discCount, setDiscCount] = React.useState('3');
   const [stationCount, setStationCount] = React.useState(6);
-  const [pin] = React.useState(() => Math.floor(1000 + Math.random() * 9000).toString());
+  const [pin, setPin] = React.useState(() => Math.floor(1000 + Math.random() * 9000).toString());
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     if (id) setGameId(id);
+    const nameParam = params.get('name');
+    if (nameParam) {
+      const decodedName = decodeURIComponent(nameParam);
+      if (decodedName.trim()) {
+        setGameName(decodedName);
+        setIsNameLocked(true);
+      }
+    }
+    const pinParam = params.get('pin');
+    if (pinParam && /^\d{4}$/.test(pinParam)) {
+      setPin(pinParam);
+    }
   }, []);
 
   const handleCreate = async () => {
@@ -55,13 +69,7 @@ export default function DuelHost() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
         <div className="max-w-5xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="font-medium">Tagasi</span>
-            </button>
+            <BackButton onClick={() => navigate(-1)} />
             <div className="text-sm font-semibold text-slate-700">Sõbraduell (HOST)</div>
             <div className="w-12" />
           </div>
@@ -76,29 +84,30 @@ export default function DuelHost() {
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
       <div className="max-w-lg mx-auto px-4 pb-10">
         <div className="flex items-center justify-between pt-6 pb-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Tagasi</span>
-          </button>
+          <BackButton onClick={() => navigate(-1)} />
           <div className="text-sm font-semibold text-slate-700">Sõbraduell (HOST)</div>
           <div className="w-12" />
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Mängu nimi
-            </label>
-            <Input
-              value={gameName}
-              onChange={(e) => setGameName(e.target.value)}
-              placeholder="nt Kolmapäeva duell"
-              className="h-12 rounded-xl border-slate-200"
-            />
-          </div>
+          {!isNameLocked ? (
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Mängu nimi
+              </label>
+              <Input
+                value={gameName}
+                onChange={(e) => setGameName(e.target.value)}
+                placeholder="nt Kolmapäeva duell"
+                className="h-12 rounded-xl border-slate-200"
+              />
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="text-xs font-semibold text-slate-500 uppercase">Mängu nimi</div>
+              <div className="text-base font-semibold text-slate-800">{gameName}</div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">

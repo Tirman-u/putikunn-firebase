@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LogIn, ArrowLeft, Clock, Users } from 'lucide-react';
+import { LogIn, Clock, Users } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { GAME_FORMATS } from './gameRules';
-import useRealtimeGame from '@/hooks/use-realtime-game';
+import BackButton from '@/components/ui/back-button';
 
 export default function JoinGame({ onJoin, onBack }) {
   const [pin, setPin] = useState('');
@@ -18,8 +18,6 @@ export default function JoinGame({ onJoin, onBack }) {
     queryKey: ['user'],
     queryFn: () => base44.auth.me()
   });
-
-  const queryClient = useQueryClient();
 
   const { data: recentGames = [] } = useQuery({
     queryKey: ['recent-games'],
@@ -38,15 +36,7 @@ export default function JoinGame({ onJoin, onBack }) {
     refetchInterval: false
   });
 
-  useRealtimeGame({
-    enabled: !!user,
-    eventTypes: ['create', 'update'],
-    throttleMs: 1000,
-    filterEvent: (event) => event.type === 'create' || event.type === 'update',
-    onEvent: () => {
-      queryClient.invalidateQueries({ queryKey: ['recent-games'] });
-    }
-  });
+  // Realtime updates removed to keep Firestore read usage low.
 
   useEffect(() => {
     if (!user) return;
@@ -190,13 +180,7 @@ export default function JoinGame({ onJoin, onBack }) {
       <div className="max-w-lg mx-auto pt-3 sm:pt-4">
         {/* Back Button */}
         <div className="mb-6">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Tagasi</span>
-          </button>
+          <BackButton onClick={onBack} />
         </div>
 
         <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 space-y-3 sm:space-y-4">

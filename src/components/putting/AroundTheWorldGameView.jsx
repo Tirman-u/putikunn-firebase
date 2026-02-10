@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowUp, ArrowDown, Undo2, Trophy, Eye, EyeOff, LogOut, Target } from 'lucide-react';
+import { ArrowUp, ArrowDown, Undo2, Trophy, Eye, EyeOff, LogOut, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
 import LoadingState from '@/components/ui/loading-state';
 import useATWGameState from '@/hooks/use-atw-game-state';
 import { deleteGameAndLeaderboardEntries } from '@/lib/leaderboard-utils';
+import BackButton from '@/components/ui/back-button';
 
 
 
@@ -44,13 +45,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
         <div className="max-w-4xl mx-auto px-4 pt-8 pb-12">
           <div className="flex items-center justify-between mb-6">
-            <button
-              onClick={() => setShowLeaderboard(false)}
-              className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="font-medium">Tagasi</span>
-            </button>
+            <BackButton onClick={() => setShowLeaderboard(false)} />
             <h1 className="text-2xl font-bold text-slate-800">{game.name}</h1>
             <div className="w-16" />
           </div>
@@ -107,32 +102,16 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         gameId, submitToLeaderboardMutation, user 
         }) => {
         const attemptsCount = playerState.attempts_count || 0;
-        const [hasAskedSubmit, setHasAskedSubmit] = useState(false);
         const failedTurns = useMemo(() => 
         playerState.history.filter(turn => turn.failed_to_advance || turn.missed_all),
         [playerState.history]
         );
 
-    React.useEffect(() => {
-      if (!isSolo || hasAskedSubmit || submitToLeaderboardMutation.isSuccess) return;
-      setHasAskedSubmit(true);
-      const shouldSubmit = window.confirm('Kas soovid tulemuse rekorditabelisse lisada?');
-      if (shouldSubmit) {
-        submitToLeaderboardMutation.mutate();
-      }
-    }, [hasAskedSubmit, isSolo, submitToLeaderboardMutation]);
-
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
         <div className="max-w-md mx-auto px-4 pt-8">
           <div className="flex items-center justify-between mb-6">
-            <button
-              onClick={() => window.location.href = createPageUrl('Home')}
-              className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="font-medium">Tagasi</span>
-            </button>
+            <BackButton onClick={() => window.location.href = createPageUrl('Home')} />
           </div>
 
           <div className="text-center mb-8">
@@ -261,8 +240,13 @@ const ActiveGameView = React.memo(({
   const [shotResults, setShotResults] = React.useState(
     Array.from({ length: discsPerTurn }, () => null)
   );
+  const resetTimeoutRef = React.useRef(null);
 
   React.useEffect(() => {
+    if (resetTimeoutRef.current) {
+      clearTimeout(resetTimeoutRef.current);
+      resetTimeoutRef.current = null;
+    }
     setShotResults(Array.from({ length: discsPerTurn }, () => null));
   }, [playerState.turns_played, currentDistance, discsPerTurn]);
 
@@ -277,7 +261,13 @@ const ActiveGameView = React.memo(({
     if (nextIndex === discsPerTurn - 1) {
       const madeCount = nextResults.filter(Boolean).length;
       handleSubmitPutts(madeCount);
-      setShotResults(Array.from({ length: discsPerTurn }, () => null));
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
+      }
+      resetTimeoutRef.current = setTimeout(() => {
+        setShotResults(Array.from({ length: discsPerTurn }, () => null));
+        resetTimeoutRef.current = null;
+      }, 300);
     }
   };
 
@@ -285,13 +275,7 @@ const ActiveGameView = React.memo(({
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <div className="max-w-md mx-auto px-4 pt-8">
         <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={onExit}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Välju</span>
-          </button>
+          <BackButton onClick={onExit} label="Välju" />
           <div className="text-sm text-slate-600">
             {isSolo ? 'Treening' : game.name}
           </div>

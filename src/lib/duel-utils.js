@@ -156,15 +156,39 @@ export const markPlayerReady = (state, playerId) => {
   return next;
 };
 
-export const undoSubmission = (state, stationIndex, playerId) => {
-  const next = cloneState(state);
-  const pending = next.pending?.[stationIndex];
-  if (!pending?.submissions?.[playerId]) return next;
-  delete pending.submissions[playerId];
-  if (Object.keys(pending.submissions).length === 0) {
-    delete next.pending[stationIndex];
+export const undoSubmission = (game, stationIndex, playerId) => {
+  const stationCount = game.station_count || 1;
+  const nextGame = { ...game };
+  const nextState = cloneState(game.state || createEmptyDuelState(stationCount));
+  const pending = nextState.pending?.[stationIndex];
+  if (!pending?.submissions?.[playerId]) {
+    nextGame.state = nextState;
+    return nextGame;
   }
-  return next;
+
+  const isSoloMode = game.mode === 'solo' && stationCount === 1;
+  if (isSoloMode && pending.resolved && pending.snapshot) {
+    const snapshotPlayers = pending.snapshot.players || {};
+    Object.entries(snapshotPlayers).forEach(([id, data]) => {
+      if (nextState.players?.[id]) {
+        nextState.players[id] = { ...nextState.players[id], ...data };
+      }
+    });
+    nextGame.status = pending.snapshot.gameStatus || nextGame.status;
+    nextGame.winner_id = pending.snapshot.winnerId || null;
+    nextGame.ended_at = pending.snapshot.endedAt || null;
+  }
+
+  delete pending.submissions[playerId];
+  pending.resolved = false;
+  delete pending.snapshot;
+
+  if (Object.keys(pending.submissions).length === 0) {
+    delete nextState.pending[stationIndex];
+  }
+
+  nextGame.state = nextState;
+  return nextGame;
 };
 
 export const submitDuelScore = (game, playerId, made) => {
@@ -196,6 +220,35 @@ export const submitDuelScore = (game, playerId, made) => {
     submissions: {}
   };
 
+  const isSoloMode = game.mode === 'solo' && stationCount === 1;
+  const hasPlayerSubmission = Boolean(pending.submissions?.[playerId]);
+  const hasOpponentSubmission = Boolean(opponentId && pending.submissions?.[opponentId]);
+  const playerDistanceChanged =
+    hasPlayerSubmission && pending.submissions[playerId]?.distance !== player.distance;
+  const opponentDistanceChanged =
+    hasOpponentSubmission && pending.submissions[opponentId]?.distance !== opponent?.distance;
+
+  if (pending.resolved && (playerDistanceChanged || opponentDistanceChanged)) {
+    pending.submissions = {};
+    pending.round_id = station.round_id + 1;
+    pending.resolved = false;
+    delete pending.snapshot;
+  }
+
+  if (isSoloMode && pending.resolved && pending.snapshot) {
+    const snapshotPlayers = pending.snapshot.players || {};
+    Object.entries(snapshotPlayers).forEach(([id, data]) => {
+      if (nextState.players?.[id]) {
+        nextState.players[id] = { ...nextState.players[id], ...data };
+      }
+    });
+    nextGame.status = pending.snapshot.gameStatus || nextGame.status;
+    nextGame.winner_id = pending.snapshot.winnerId || null;
+    nextGame.ended_at = pending.snapshot.endedAt || null;
+    pending.resolved = false;
+    delete pending.snapshot;
+  }
+
   pending.submissions[playerId] = {
     made,
     distance: player.distance,
@@ -211,7 +264,7 @@ export const submitDuelScore = (game, playerId, made) => {
   }
 
   const roundId = pending.round_id;
-  if (roundId <= station.last_resolved_round) {
+  if (!isSoloMode && roundId <= station.last_resolved_round) {
     nextGame.state = nextState;
     return nextGame;
   }
@@ -223,6 +276,34 @@ export const submitDuelScore = (game, playerId, made) => {
 
   station.round_id = roundId;
   station.last_resolved_round = roundId;
+
+  if (isSoloMode) {
+    pending.snapshot = {
+      gameStatus: nextGame.status,
+      winnerId: nextGame.winner_id || null,
+      endedAt: nextGame.ended_at || null,
+      players: {
+        [playerId]: {
+          distance: nextState.players[playerId]?.distance,
+          points: nextState.players[playerId]?.points,
+          wins: nextState.players[playerId]?.wins,
+          losses: nextState.players[playerId]?.losses,
+          station_index: nextState.players[playerId]?.station_index,
+          status: nextState.players[playerId]?.status,
+          ready: nextState.players[playerId]?.ready
+        },
+        [opponentId]: {
+          distance: nextState.players[opponentId]?.distance,
+          points: nextState.players[opponentId]?.points,
+          wins: nextState.players[opponentId]?.wins,
+          losses: nextState.players[opponentId]?.losses,
+          station_index: nextState.players[opponentId]?.station_index,
+          status: nextState.players[opponentId]?.status,
+          ready: nextState.players[opponentId]?.ready
+        }
+      }
+    };
+  }
 
   const logEntry = {
     id: `${stationIndex}-${roundId}`,
@@ -241,8 +322,12 @@ export const submitDuelScore = (game, playerId, made) => {
 
   if (playerMade === opponentMade) {
     logEntry.result = 'tie';
-    nextState.log = [...(nextState.log || []), logEntry];
-    delete nextState.pending[stationIndex];
+    const nextLog = (nextState.log || []).filter((entry) => entry.id !== logEntry.id);
+    nextState.log = [...nextLog, logEntry];
+    pending.resolved = true;
+    if (!isSoloMode) {
+      delete nextState.pending[stationIndex];
+    }
     nextGame.state = nextState;
     return nextGame;
   }
@@ -260,14 +345,18 @@ export const submitDuelScore = (game, playerId, made) => {
 
   logEntry.result = winnerId;
   logEntry.points = pointsAwarded;
-  nextState.log = [...(nextState.log || []), logEntry];
+  const nextLog = (nextState.log || []).filter((entry) => entry.id !== logEntry.id);
+  nextState.log = [...nextLog, logEntry];
 
   if (winnerDistance >= DUEL_MAX_DISTANCE) {
     if (game.mode === 'solo' && stationCount === 1) {
       nextGame.status = 'finished';
       nextGame.ended_at = new Date().toISOString();
       nextGame.winner_id = winnerId;
-      delete nextState.pending[stationIndex];
+      pending.resolved = true;
+      if (!isSoloMode) {
+        delete nextState.pending[stationIndex];
+      }
       nextGame.state = nextState;
       return nextGame;
     }
@@ -291,7 +380,10 @@ export const submitDuelScore = (game, playerId, made) => {
     winner.distance = Math.min(DUEL_MAX_DISTANCE, winner.distance + 1);
   }
 
-  delete nextState.pending[stationIndex];
+  pending.resolved = true;
+  if (!isSoloMode) {
+    delete nextState.pending[stationIndex];
+  }
   nextGame.state = nextState;
   return nextGame;
 };

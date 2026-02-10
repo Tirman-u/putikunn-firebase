@@ -3,11 +3,12 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Trash2, FolderPlus, Folder, Calendar, ChevronRight, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Trash2, FolderPlus, Folder, Calendar, ChevronRight, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import BackButton from '@/components/ui/back-button';
 import {
   deleteGameAndLeaderboardEntries,
   getLeaderboardEmail,
@@ -30,31 +31,44 @@ export default function ManageGames() {
   });
 
   const { data: games = [] } = useQuery({
-    queryKey: ['my-games'],
+    queryKey: ['my-games', user?.email, user?.app_role],
     queryFn: async () => {
-      const allGames = await base44.entities.Game.list();
+      if (!user) return [];
       const userRole = user?.app_role || 'user';
       const canSeeAllHosted = ['admin', 'super_admin'].includes(userRole);
       if (canSeeAllHosted) {
-        return allGames.filter((g) => g?.pin && g.pin !== '0000');
+        return base44.entities.Game.filter({ pin: { $ne: '0000' } }, 'pin');
       }
-      return allGames.filter(g => g.host_user === user?.email);
+      return base44.entities.Game.filter({ host_user: user?.email });
     },
     enabled: !!user
   });
 
   const { data: groups = [] } = useQuery({
-    queryKey: ['game-groups'],
-    queryFn: async () => {
-      const allGroups = await base44.entities.GameGroup.list();
-      return allGroups.filter(g => g.created_by === user?.email);
-    },
-    enabled: !!user
+    queryKey: ['game-groups', user?.email],
+    queryFn: () => base44.entities.GameGroup.filter({ created_by: user?.email }),
+    enabled: !!user?.email
   });
 
+  const gameIds = React.useMemo(() => games.map(g => g.id).filter(Boolean), [games]);
+
   const { data: leaderboardEntries = [] } = useQuery({
-    queryKey: ['leaderboard-entries'],
-    queryFn: () => base44.entities.LeaderboardEntry.list()
+    queryKey: ['leaderboard-entries', gameIds.join('|')],
+    queryFn: async () => {
+      if (!gameIds.length) return [];
+      const results = [];
+      const chunkSize = 10;
+      for (let i = 0; i < gameIds.length; i += chunkSize) {
+        const chunk = gameIds.slice(i, i + chunkSize);
+        const entries = await base44.entities.LeaderboardEntry.filter({
+          game_id: { $in: chunk },
+          leaderboard_type: 'general'
+        });
+        results.push(...entries);
+      }
+      return results;
+    },
+    enabled: gameIds.length > 0
   });
 
   const completeGameMutation = useMutation({
@@ -514,10 +528,7 @@ export default function ManageGames() {
       <div className="max-w-4xl mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-4">
-          <Link to={createPageUrl('Home')} className="flex items-center gap-2 text-slate-600 hover:text-slate-800">
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Tagasi</span>
-          </Link>
+          <BackButton fallbackTo={createPageUrl('Home')} />
           <h1 className="text-2xl font-bold text-slate-800">Halda mänge</h1>
           <div className="w-16" />
         </div>

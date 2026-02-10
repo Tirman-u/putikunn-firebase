@@ -6,14 +6,17 @@ import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
 import useRealtimeDuelGame from '@/hooks/use-realtime-duel-game';
 import {
+  addPlayerToState,
   createEmptyDuelState,
   getLeaderboardRows,
   startDuelGame
 } from '@/lib/duel-utils';
 import { cn } from '@/lib/utils';
+import { isTestEnv } from '@/lib/env';
 
 export default function DuelHostView({ gameId }) {
   const queryClient = useQueryClient();
+  const isTest = isTestEnv();
 
   const { data: game, isLoading } = useQuery({
     queryKey: ['duel-game', gameId],
@@ -72,6 +75,38 @@ export default function DuelHostView({ gameId }) {
       toast.success('Mäng lõpetatud');
     } catch (error) {
       toast.error('Mängu lõpetamine ebaõnnestus');
+    }
+  };
+
+  const handleAddTestPlayers = async () => {
+    try {
+      await updateGame((current) => {
+        const stationCount = current.station_count || 1;
+        const baseState = current.state || createEmptyDuelState(stationCount);
+        const nextState = JSON.parse(JSON.stringify(baseState));
+        const existingCount = Object.keys(nextState.players || {}).length;
+        const now = Date.now();
+        const totalToAdd = 12;
+
+        for (let i = 0; i < totalToAdd; i += 1) {
+          const nameIndex = existingCount + i + 1;
+          const id = `test-${now}-${i}`;
+          addPlayerToState(nextState, {
+            id,
+            name: `Test ${nameIndex}`,
+            email: `test${nameIndex}@example.com`,
+            desired_station: ((i % stationCount) + 1)
+          });
+        }
+
+        return {
+          ...current,
+          state: nextState
+        };
+      });
+      toast.success('Lisatud 12 testmängijat');
+    } catch (error) {
+      toast.error('Testmängijate lisamine ebaõnnestus');
     }
   };
 
@@ -139,6 +174,26 @@ export default function DuelHostView({ gameId }) {
           {game.status === 'active' && (
             <Button variant="outline" className="rounded-xl" onClick={handleEnd}>
               Lõpeta mäng
+            </Button>
+          )}
+          {isTest && (
+            <Button variant="outline" className="rounded-xl" onClick={handleAddTestPlayers}>
+              Lisa 12 testmängijat
+            </Button>
+          )}
+          {isTest && (
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() =>
+                window.open(
+                  `${createPageUrl('DuelHostControl')}?id=${gameId}`,
+                  '_blank',
+                  'noopener'
+                )
+              }
+            >
+              Ava võistlusaken
             </Button>
           )}
           <Button

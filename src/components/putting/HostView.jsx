@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Copy, Check, Users, Upload, Trophy, Target, XCircle } from 'lucide-react';
+import { Copy, Check, Users, Upload, Trophy, Target, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -15,6 +15,7 @@ import {
   isHostedClassicGame,
   resolveLeaderboardPlayer
 } from '@/lib/leaderboard-utils';
+import BackButton from '@/components/ui/back-button';
 
 export default function HostView({ gameId, onExit }) {
   const [copied, setCopied] = useState(false);
@@ -22,7 +23,7 @@ export default function HostView({ gameId, onExit }) {
   const baseGameRef = React.useRef(null);
 
   const { data: user } = useQuery({
-    queryKey: ['current-user'],
+    queryKey: ['user'],
     queryFn: () => base44.auth.me()
   });
 
@@ -32,7 +33,9 @@ export default function HostView({ gameId, onExit }) {
       const games = await base44.entities.Game.filter({ id: gameId });
       return games[0];
     },
-    refetchInterval: false
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false
   });
 
   useEffect(() => {
@@ -323,13 +326,7 @@ export default function HostView({ gameId, onExit }) {
       <div className="max-w-6xl mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-4">
-          <button
-            onClick={onExit}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Välju</span>
-          </button>
+          <BackButton onClick={onExit} label="Välju" />
           <h2 className="text-xl font-bold text-slate-800">{game.name}</h2>
           <div className="w-16" />
         </div>

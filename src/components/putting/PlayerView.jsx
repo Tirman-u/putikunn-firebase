@@ -2,7 +2,7 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, Upload, Eye, EyeOff } from 'lucide-react';
+import { Trophy, Upload, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import ClassicScoreInput from './ClassicScoreInput';
@@ -11,7 +11,6 @@ import BackAndForthScoreInput from './BackAndForthScoreInput';
 import StreakChallengeInput from './StreakChallengeInput';
 import MobileLeaderboard from './MobileLeaderboard';
 import PerformanceAnalysis from './PerformanceAnalysis';
-import { createPageUrl } from '@/utils';
 import useRealtimeGame from '@/hooks/use-realtime-game';
 import LoadingState from '@/components/ui/loading-state';
 import { logSyncMetric } from '@/lib/metrics';
@@ -29,6 +28,7 @@ import {
   getTotalRounds,
   isGameComplete 
 } from './gameRules';
+import BackButton from '@/components/ui/back-button';
 
 const PLAYER_STATE_KEYS = [
   'player_putts',
@@ -41,8 +41,6 @@ const PLAYER_STATE_KEYS = [
 export default function PlayerView({ gameId, playerName, onExit }) {
   const [showLeaderboard, setShowLeaderboard] = React.useState(false);
   const [hasSubmitted, setHasSubmitted] = React.useState(false);
-  const [hasAskedSoloSubmit, setHasAskedSoloSubmit] = React.useState(false);
-  const [redirectedToResults, setRedirectedToResults] = React.useState(false);
   const [streakDistanceSelected, setStreakDistanceSelected] = React.useState(false);
   const [hideScore, setHideScore] = React.useState(false);
   const [streakComplete, setStreakComplete] = React.useState(false);
@@ -65,6 +63,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const gameIdRef = React.useRef(gameId);
   const baseGameRef = React.useRef(null);
   const lastLoadedGameIdRef = React.useRef(null);
+  const hydratedFromStorageRef = React.useRef(false);
   const queryClient = useQueryClient();
 
   React.useEffect(() => {
@@ -72,10 +71,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   }, [gameId]);
 
   const { user, game, isLoading, isSoloGame } = usePlayerGameState({ gameId });
-
-  React.useEffect(() => {
-    setHasAskedSoloSubmit(false);
-  }, [gameId]);
+  const soloStorageKey = React.useMemo(() => {
+    if (!isSoloGame || !gameId) return null;
+    return `putikunn:solo:${gameId}`;
+  }, [gameId, isSoloGame]);
 
   const getLatestState = React.useCallback(() => {
     return localGameStateRef.current || game || {};
@@ -119,6 +118,35 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   React.useEffect(() => {
     localGameStateRef.current = localGameState;
   }, [localGameState]);
+
+  React.useEffect(() => {
+    if (!soloStorageKey || !gameId || !isSoloGame) return;
+    if (hydratedFromStorageRef.current) return;
+    try {
+      const stored = localStorage.getItem(soloStorageKey);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (!parsed || (parsed.id && parsed.id !== gameId)) return;
+      hydratedFromStorageRef.current = true;
+      setLocalGameState(parsed);
+      localGameStateRef.current = parsed;
+    } catch {
+      // ignore storage errors
+    }
+  }, [gameId, isSoloGame, soloStorageKey]);
+
+  React.useEffect(() => {
+    if (!soloStorageKey || !isSoloGame || !localGameState) return;
+    if (localGameState.status === 'completed') {
+      localStorage.removeItem(soloStorageKey);
+      return;
+    }
+    try {
+      localStorage.setItem(soloStorageKey, JSON.stringify(localGameState));
+    } catch {
+      // ignore storage errors
+    }
+  }, [isSoloGame, localGameState, soloStorageKey]);
 
   const mergeIncomingGame = React.useCallback((incoming) => {
     if (!incoming) return localGameStateRef.current || incoming;
@@ -223,7 +251,15 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     lastLoadedGameIdRef.current = game.id;
 
     if (isSoloGame) {
-      if (!localGameStateRef.current || isNewGame) {
+      if (localGameStateRef.current) {
+        if (hydratedFromStorageRef.current) {
+          const merged = mergeIncomingGame(game);
+          setLocalGameState(merged);
+          localGameStateRef.current = merged;
+        }
+        return;
+      }
+      if (isNewGame) {
         setLocalGameState(nextState);
         localGameStateRef.current = nextState;
       }
@@ -240,10 +276,12 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const updateGameMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       const startedAt = performance.now();
-      const latestGames = await base44.entities.Game.filter({ id });
-      const latestGame = latestGames?.[0];
+      const latestGame = queryClient.getQueryData(['game', id]) || game;
       const payload = mergeWithLatest(latestGame, data);
-      const updated = await base44.entities.Game.update(id, payload);
+      const updated = await base44.entities.Game.update(id, payload, {
+        returnSnapshot: false,
+        mergeWith: latestGame
+      });
       logSyncMetric('player_sync', performance.now() - startedAt, {
         game_id: id,
         game_type: game?.game_type || 'unknown'
@@ -306,7 +344,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     pendingLiveRef.current = null;
     try {
       const mergedPayload = buildLivePayload(payload, id);
-      await base44.entities.Game.update(id, mergedPayload);
+      await base44.entities.Game.update(id, mergedPayload, { returnSnapshot: false });
     } catch (error) {
       pendingLiveRef.current = payload;
     } finally {
@@ -408,6 +446,23 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     }
   };
 
+  const handleExit = React.useCallback(() => {
+    if (pendingUpdateRef.current && gameIdRef.current) {
+      flushPending(gameIdRef.current);
+    }
+    if (pendingLiveRef.current && gameIdRef.current) {
+      flushLivePending(gameIdRef.current);
+    }
+    if (isSoloGame && soloStorageKey && localGameStateRef.current) {
+      try {
+        localStorage.setItem(soloStorageKey, JSON.stringify(localGameStateRef.current));
+      } catch {
+        // ignore storage errors
+      }
+    }
+    onExit?.();
+  }, [flushLivePending, flushPending, isSoloGame, onExit, soloStorageKey]);
+
   React.useEffect(() => {
     return () => {
       if (syncTimeoutRef.current) {
@@ -448,6 +503,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['game', gameId]);
+      if (isSoloGame && soloStorageKey) {
+        localStorage.removeItem(soloStorageKey);
+      }
     }
   });
 
@@ -670,15 +728,13 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   // Handle Finish Training for Streak Challenge
   const handleFinishTraining = () => {
     const updateData = { status: 'completed' };
-    
-    // For solo games, save everything to DB now
+    updateGameState(updateData, { forceSync: true });
+
     if (isSoloGame) {
+      const nextState = localGameStateRef.current || { ...getLatestState(), ...updateData };
       saveSoloGameMutation.mutate({
         id: game.id,
-        data: {
-          ...localGameState,
-          ...updateData
-        }
+        data: nextState
       });
     } else {
       setStreakComplete(true);
@@ -778,20 +834,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const isHost = Boolean(user?.email && currentState?.host_user && user.email === currentState.host_user);
   const canSubmitHosted = isHost || canAdminSubmit;
 
-  React.useEffect(() => {
-    if (!currentState || !isComplete || !isSoloGame || hasSubmitted || hasAskedSoloSubmit) return;
-    setHasAskedSoloSubmit(true);
-    const shouldSubmit = window.confirm('Kas soovid tulemuse rekorditabelisse lisada?');
-    if (shouldSubmit) {
-      submitToLeaderboardMutation.mutate();
-    }
-  }, [currentState, hasAskedSoloSubmit, hasSubmitted, isComplete, isSoloGame, submitToLeaderboardMutation]);
-
-  React.useEffect(() => {
-    if (!currentState || !isComplete || !isSoloGame || redirectedToResults || !hasAskedSoloSubmit || !game?.id) return;
-    setRedirectedToResults(true);
-    window.location.href = `${createPageUrl('GameResult')}?id=${game.id}`;
-  }, [currentState, game?.id, hasAskedSoloSubmit, isComplete, isSoloGame, redirectedToResults]);
+  // Solo game completion uses the in-page end screen (no popup prompts).
 
   if (isLoading || !game) {
     return <LoadingState />;
@@ -837,7 +880,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
               Vaata edetabelit
             </Button>
             <Button
-              onClick={onExit}
+              onClick={handleExit}
               variant="outline"
               className="w-full h-14 rounded-xl"
             >
@@ -863,12 +906,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       <div className="max-w-lg mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 pt-4">
-          <button
-            onClick={onExit}
-            className="text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+          <BackButton onClick={handleExit} showLabel={false} className="px-2" />
           <div className="text-center">
             <h2 className="text-lg font-bold text-slate-800">{currentState.name || game.name}</h2>
             <p className="text-sm text-slate-500">

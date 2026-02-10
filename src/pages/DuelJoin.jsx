@@ -2,7 +2,7 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft } from 'lucide-react';
+import BackButton from '@/components/ui/back-button';
 import { useNavigate } from 'react-router-dom';
 import DuelPlayerView from '@/components/putting/DuelPlayerView';
 import { addPlayerToState, createEmptyDuelState } from '@/lib/duel-utils';
@@ -14,6 +14,7 @@ export default function DuelJoin() {
   const [displayName, setDisplayName] = React.useState('');
   const [joining, setJoining] = React.useState(false);
   const [gameId, setGameId] = React.useState(null);
+  const [userProfile, setUserProfile] = React.useState(null);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -21,10 +22,29 @@ export default function DuelJoin() {
     if (urlPin) setPin(urlPin);
   }, []);
 
+  React.useEffect(() => {
+    let active = true;
+    base44.auth
+      .me()
+      .then((user) => {
+        if (!active) return;
+        setUserProfile(user);
+        setDisplayName((current) => {
+          if (current) return current;
+          return user?.display_name || user?.full_name || user?.email || '';
+        });
+      })
+      .catch(() => null);
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleJoin = async () => {
     try {
       setJoining(true);
-      const user = await base44.auth.me();
+      const user = userProfile || (await base44.auth.me());
       const games = await base44.entities.DuelGame.filter({ pin });
       const game = games?.[0];
       if (!game) {
@@ -70,13 +90,7 @@ export default function DuelJoin() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
         <div className="max-w-xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="font-medium">Tagasi</span>
-            </button>
+            <BackButton onClick={() => navigate(-1)} />
             <div className="text-sm font-semibold text-slate-700">Sõbraduell</div>
             <div className="w-12" />
           </div>
@@ -91,13 +105,7 @@ export default function DuelJoin() {
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
       <div className="max-w-lg mx-auto px-4 pb-10">
         <div className="flex items-center justify-between pt-6 pb-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Tagasi</span>
-          </button>
+          <BackButton onClick={() => navigate(-1)} />
           <div className="text-sm font-semibold text-slate-700">Sõbraduell (Liitu)</div>
           <div className="w-12" />
         </div>

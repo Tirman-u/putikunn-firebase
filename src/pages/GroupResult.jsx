@@ -1,12 +1,14 @@
 import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Trophy, Calendar } from 'lucide-react';
+import { Trophy, Calendar, MonitorPlay } from 'lucide-react';
+import { isTestEnv } from '@/lib/env';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import LoadingState from '@/components/ui/loading-state';
+import BackButton from '@/components/ui/back-button';
 
 export default function GroupResult() {
   const [searchParams] = useSearchParams();
@@ -16,8 +18,7 @@ export default function GroupResult() {
   const { data: group, isLoading: groupLoading } = useQuery({
     queryKey: ['group', groupId],
     queryFn: async () => {
-      const groups = await base44.entities.GameGroup.list();
-      return groups.find(g => g.id === groupId);
+      return base44.entities.GameGroup.get(groupId);
     },
     enabled: !!groupId
   });
@@ -25,8 +26,9 @@ export default function GroupResult() {
   const { data: games = [], isLoading: gamesLoading } = useQuery({
     queryKey: ['group-games', groupId],
     queryFn: async () => {
-      const allGames = await base44.entities.Game.list();
-      return allGames.filter(g => group?.game_ids?.includes(g.id));
+      const gameIds = group?.game_ids || [];
+      if (!gameIds.length) return [];
+      return base44.entities.Game.filter({ id: { $in: gameIds } });
     },
     enabled: !!group
   });
@@ -109,15 +111,19 @@ export default function GroupResult() {
       <div className="max-w-6xl mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Tagasi</span>
-          </button>
+          <BackButton />
           <h1 className="text-2xl font-bold text-slate-800">{group.name}</h1>
-          <div className="w-16" />
+          {isTestEnv() ? (
+            <Link
+              to={`${createPageUrl('GroupProjector')}?id=${group.id}`}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:border-emerald-200 hover:text-emerald-700"
+            >
+              <MonitorPlay className="w-4 h-4" />
+              Projektor
+            </Link>
+          ) : (
+            <div className="w-16" />
+          )}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">

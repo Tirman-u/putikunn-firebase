@@ -33,8 +33,62 @@ const ENTITY_COLLECTIONS = {
   PuttingKingStation: 'putting_king_stations',
   PuttingKingTournament: 'putting_king_tournaments',
   TournamentRules: 'tournament_rules',
+  TrainingGroup: 'training_groups',
   DuelGame: 'duel_games',
   ErrorLog: 'error_logs'
+};
+
+const ROLE_PRIORITY = {
+  user: 0,
+  trainer: 1,
+  admin: 2,
+  super_admin: 3
+};
+
+const normalizeEmail = (email) => (email || '').trim().toLowerCase();
+
+const pickHigherRole = (currentRole, legacyRole) => {
+  const currentPriority = ROLE_PRIORITY[currentRole] ?? ROLE_PRIORITY.user;
+  const legacyPriority = ROLE_PRIORITY[legacyRole] ?? ROLE_PRIORITY.user;
+  return legacyPriority > currentPriority ? legacyRole : currentRole;
+};
+
+const dedupeArray = (items = []) => {
+  const seen = new Set();
+  return items.filter((item) => {
+    if (!item) return false;
+    if (seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+};
+
+const replaceUidInArray = (items = [], fromUid, toUid) => {
+  let changed = false;
+  const next = items.map((item) => {
+    if (item === fromUid) {
+      changed = true;
+      return toUid;
+    }
+    return item;
+  });
+  const deduped = dedupeArray(next);
+  if (deduped.length !== items.length) {
+    changed = true;
+  }
+  return { next: deduped, changed };
+};
+
+const replaceUidInMap = (map, fromUid, toUid) => {
+  if (!map || typeof map !== 'object' || !map[fromUid]) {
+    return { map, changed: false };
+  }
+  const next = { ...map };
+  if (!next[toUid]) {
+    next[toUid] = next[fromUid];
+  }
+  delete next[fromUid];
+  return { map: next, changed: true };
 };
 
 const buildFallbackProfile = (firebaseUser) => {
@@ -50,6 +104,222 @@ const buildFallbackProfile = (firebaseUser) => {
     created_date: new Date().toISOString(),
     _auth_only: true
   };
+};
+
+const migrateTrainingGroupMemberships = async (groupIds, legacyUid, currentUid, legacyProfile) => {
+  if (!groupIds.length) return;
+  for (const groupId of groupIds) {
+    const groupRef = doc(db, ENTITY_COLLECTIONS.TrainingGroup, groupId);
+    const snapshot = await getDoc(groupRef);
+    if (!snapshot.exists()) continue;
+    const group = snapshot.data() || {};
+
+    let changed = false;
+    const updates = {};
+
+    const members = { ...(group.members || {}) };
+    const legacyMember = members[legacyUid];
+    const currentMember = members[currentUid];
+    const fallbackName =
+      legacyProfile?.display_name ||
+      legacyProfile?.full_name ||
+      legacyProfile?.displayName ||
+      legacyProfile?.fullName ||
+      legacyProfile?.email ||
+      currentUid;
+
+    if (!currentMember && (legacyMember || legacyProfile)) {
+      members[currentUid] = legacyMember || { name: fallbackName, email: legacyProfile?.email || '' };
+      changed = true;
+    }
+    if (legacyMember) {
+      delete members[legacyUid];
+      changed = true;
+    }
+    if (changed) {
+      updates.members = members;
+    }
+
+    const existingMemberUids = Array.isArray(group.member_uids)
+      ? [...group.member_uids]
+      : Object.keys(members);
+    const nextMemberUids = dedupeArray(
+      existingMemberUids.filter((uid) => uid !== legacyUid).concat(currentUid)
+    );
+    if (
+      nextMemberUids.length !== existingMemberUids.length ||
+      !existingMemberUids.includes(currentUid) ||
+      existingMemberUids.includes(legacyUid)
+    ) {
+      updates.member_uids = nextMemberUids;
+      changed = true;
+    }
+
+    let slotsChanged = false;
+    const nextSlots = (group.slots || []).map((slot) => {
+      if (!Array.isArray(slot.roster_uids)) return slot;
+      const { next: rosterUids, changed: rosterChanged } = replaceUidInArray(
+        slot.roster_uids,
+        legacyUid,
+        currentUid
+      );
+      if (!rosterChanged) return slot;
+      slotsChanged = true;
+      return {
+        ...slot,
+        roster_uids: rosterUids
+      };
+    });
+    if (slotsChanged) {
+      updates.slots = nextSlots;
+      changed = true;
+    }
+
+    const attendance = group.attendance || {};
+    const attendanceUpdates = {};
+    let attendanceChanged = false;
+    Object.entries(attendance).forEach(([weekKey, weekData]) => {
+      if (!weekData || typeof weekData !== 'object') return;
+      let weekChanged = false;
+      const nextWeek = { ...weekData };
+      Object.entries(weekData).forEach(([slotKey, slotData]) => {
+        if (!slotData || typeof slotData !== 'object') return;
+        let slotChanged = false;
+        const nextSlot = { ...slotData };
+        ['released_uids', 'claimed_uids', 'waitlist_uids', 'request_uids'].forEach((key) => {
+          if (!Array.isArray(slotData[key])) return;
+          const { next, changed: arrayChanged } = replaceUidInArray(slotData[key], legacyUid, currentUid);
+          if (arrayChanged) {
+            nextSlot[key] = next;
+            slotChanged = true;
+          }
+        });
+        ['released_meta', 'claimed_meta', 'waitlist_meta', 'request_meta'].forEach((key) => {
+          if (!slotData[key]) return;
+          const { map: nextMap, changed: mapChanged } = replaceUidInMap(slotData[key], legacyUid, currentUid);
+          if (mapChanged) {
+            nextSlot[key] = nextMap;
+            slotChanged = true;
+          }
+        });
+        if (slotChanged) {
+          nextWeek[slotKey] = nextSlot;
+          weekChanged = true;
+        }
+      });
+      if (weekChanged) {
+        attendanceUpdates[weekKey] = nextWeek;
+        attendanceChanged = true;
+      }
+    });
+    if (attendanceChanged) {
+      updates.attendance = { ...attendance, ...attendanceUpdates };
+      changed = true;
+    }
+
+    if (changed) {
+      await updateDoc(groupRef, updates);
+    }
+  }
+};
+
+const mergeLegacyUsers = async (firebaseUser, currentProfile) => {
+  const email = normalizeEmail(firebaseUser?.email);
+  if (!email || currentProfile?.legacy_merge_done) {
+    return currentProfile;
+  }
+
+  const duplicatesQuery = query(
+    collection(db, ENTITY_COLLECTIONS.User),
+    where('email', '==', email)
+  );
+  const snapshot = await getDocs(duplicatesQuery);
+  const legacyDocs = snapshot.docs
+    .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+    .filter((docSnap) => docSnap.id !== firebaseUser.uid && !docSnap.merged_into);
+
+  if (legacyDocs.length === 0) {
+    await updateDoc(doc(db, ENTITY_COLLECTIONS.User, firebaseUser.uid), {
+      legacy_merge_done: true,
+      legacy_merge_checked_at: new Date().toISOString()
+    });
+    return currentProfile;
+  }
+
+  const patch = {};
+  const currentName =
+    currentProfile.display_name ||
+    currentProfile.full_name ||
+    currentProfile.displayName ||
+    currentProfile.fullName ||
+    '';
+  const currentEmail = normalizeEmail(currentProfile.email);
+  const legacyName =
+    legacyDocs
+      .map((docSnap) => docSnap.display_name || docSnap.full_name || docSnap.displayName || docSnap.fullName)
+      .find(Boolean) || '';
+
+  if (!currentName || currentName === currentEmail) {
+    if (legacyName) {
+      patch.display_name = legacyName;
+      patch.displayName = legacyName;
+      patch.full_name = legacyName;
+      patch.fullName = legacyName;
+    }
+  }
+
+  const mergedTrainingGroups = legacyDocs.reduce((acc, docSnap) => {
+    if (docSnap.training_groups && typeof docSnap.training_groups === 'object') {
+      return { ...docSnap.training_groups, ...acc };
+    }
+    return acc;
+  }, { ...(currentProfile.training_groups || {}) });
+
+  if (Object.keys(mergedTrainingGroups).length > 0) {
+    patch.training_groups = mergedTrainingGroups;
+  }
+
+  const fieldsToCopy = ['bio', 'gender', 'profile_picture'];
+  fieldsToCopy.forEach((field) => {
+    if (!currentProfile[field]) {
+      const legacyValue = legacyDocs.map((docSnap) => docSnap[field]).find(Boolean);
+      if (legacyValue) {
+        patch[field] = legacyValue;
+      }
+    }
+  });
+
+  const mergedRole = legacyDocs.reduce(
+    (role, docSnap) => pickHigherRole(role, docSnap.app_role),
+    currentProfile.app_role || 'user'
+  );
+  if (mergedRole && mergedRole !== currentProfile.app_role) {
+    patch.app_role = mergedRole;
+  }
+
+  patch.merged_from = dedupeArray([
+    ...(currentProfile.merged_from || []),
+    ...legacyDocs.map((docSnap) => docSnap.id)
+  ]);
+  patch.legacy_merge_done = true;
+  patch.legacy_merge_checked_at = new Date().toISOString();
+
+  if (Object.keys(patch).length > 0) {
+    await updateDoc(doc(db, ENTITY_COLLECTIONS.User, firebaseUser.uid), patch);
+  }
+
+  for (const legacyDoc of legacyDocs) {
+    const legacyRef = doc(db, ENTITY_COLLECTIONS.User, legacyDoc.id);
+    await updateDoc(legacyRef, {
+      merged_into: firebaseUser.uid,
+      merged_at: new Date().toISOString()
+    });
+
+    const legacyGroupIds = Object.keys(legacyDoc.training_groups || {});
+    await migrateTrainingGroupMemberships(legacyGroupIds, legacyDoc.id, firebaseUser.uid, legacyDoc);
+  }
+
+  return { ...currentProfile, ...patch, id: firebaseUser.uid };
 };
 
 const ensureUserProfile = async (firebaseUser) => {
@@ -74,14 +344,17 @@ const ensureUserProfile = async (firebaseUser) => {
         fullName: fallback.fullName
       };
       await setDoc(userRef, patch, { merge: true });
-      return { id: firebaseUser.uid, ...data, ...patch };
+      const mergedProfile = { id: firebaseUser.uid, ...data, ...patch };
+      return await mergeLegacyUsers(firebaseUser, mergedProfile);
     }
-    return { id: firebaseUser.uid, ...data };
+    const mergedProfile = { id: firebaseUser.uid, ...data };
+    return await mergeLegacyUsers(firebaseUser, mergedProfile);
   }
 
   const profile = buildFallbackProfile(firebaseUser);
   await setDoc(userRef, profile, { merge: true });
-  return { ...profile, id: firebaseUser.uid };
+  const mergedProfile = { ...profile, id: firebaseUser.uid };
+  return await mergeLegacyUsers(firebaseUser, mergedProfile);
 };
 
 const normalizeSort = (sort) => {
@@ -155,6 +428,10 @@ const applyFilterToQuery = (collectionRef, filter) => {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       if (Object.prototype.hasOwnProperty.call(value, '$in')) {
         constraints.push(where(field, 'in', value.$in));
+      } else if (Object.prototype.hasOwnProperty.call(value, '$arrayContains')) {
+        constraints.push(where(field, 'array-contains', value.$arrayContains));
+      } else if (Object.prototype.hasOwnProperty.call(value, '$arrayContainsAny')) {
+        constraints.push(where(field, 'array-contains-any', value.$arrayContainsAny));
       } else if (Object.prototype.hasOwnProperty.call(value, '$ne')) {
         constraints.push(where(field, '!=', value.$ne));
       } else if (Object.prototype.hasOwnProperty.call(value, '$gte')) {
@@ -215,7 +492,7 @@ const createEntityApi = (entityName) => {
       const docRef = await addDoc(collectionRef, payload);
       return { id: docRef.id, ...payload };
     },
-    async update(id, data = {}) {
+    async update(id, data = {}, options = {}) {
       if (!id) return null;
       const docRef = doc(db, collectionName, id);
       const payload = {
@@ -224,6 +501,10 @@ const createEntityApi = (entityName) => {
         _server_updated_at: serverTimestamp()
       };
       await updateDoc(docRef, payload);
+      if (options.returnSnapshot === false) {
+        const merged = options.mergeWith ? { ...options.mergeWith, ...payload } : payload;
+        return { id, ...merged };
+      }
       const snapshot = await getDoc(docRef);
       return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : { id, ...payload };
     },
@@ -234,8 +515,9 @@ const createEntityApi = (entityName) => {
       return true;
     },
     async filter(filter = {}, sort, limit, skip) {
-      const { constraints, idFilter } = applyFilterToQuery(collectionRef, filter);
+      const { constraints: filterConstraints, idFilter } = applyFilterToQuery(collectionRef, filter);
       const sortConfig = normalizeSort(sort);
+      const constraints = [...filterConstraints];
 
       if (idFilter && typeof idFilter === 'string') {
         const docRef = doc(db, collectionName, idFilter);
@@ -299,17 +581,26 @@ const createEntityApi = (entityName) => {
       try {
         return await readDocs(queryRef, skip, limit);
       } catch (error) {
-        // Fallback when Firestore index is missing: client-side filter & sort.
-        const snapshot = await getDocs(collectionRef);
-        let rows = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
-        rows = rows.filter((row) => matchesFilter(row, filter));
-        rows = sortRows(rows, sortConfig);
-        if (typeof skip === 'number' && skip > 0) {
-          rows = rows.slice(skip, limit ? skip + limit : undefined);
-        } else if (typeof limit === 'number') {
-          rows = rows.slice(0, limit);
+        // Fallback when Firestore index is missing: retry without ordering.
+        try {
+          const fallbackConstraints = [...filterConstraints];
+          if (typeof limit === 'number') {
+            fallbackConstraints.push(limitDocs(limit + (skip || 0)));
+          }
+          const fallbackQuery = fallbackConstraints.length
+            ? query(collectionRef, ...fallbackConstraints)
+            : collectionRef;
+          return await readDocs(fallbackQuery, skip, limit);
+        } catch (fallbackError) {
+          console.error('Firestore query failed (index missing?)', {
+            entity: entityName,
+            filter,
+            sort,
+            limit,
+            skip
+          });
+          throw fallbackError;
         }
-        return rows;
       }
     },
     subscribe(handler) {
@@ -326,6 +617,22 @@ const createEntityApi = (entityName) => {
             id: change.doc.id,
             data: { id: change.doc.id, ...change.doc.data() }
           });
+        });
+      });
+      return unsubscribe;
+    },
+    subscribeDoc(id, handler) {
+      if (!id || typeof handler !== 'function') return () => {};
+      const docRef = doc(db, collectionName, id);
+      const unsubscribe = onSnapshot(docRef, (snapshot) => {
+        if (!snapshot.exists()) {
+          handler({ type: 'delete', id, data: null });
+          return;
+        }
+        handler({
+          type: 'update',
+          id: snapshot.id,
+          data: { id: snapshot.id, ...snapshot.data() }
         });
       });
       return unsubscribe;

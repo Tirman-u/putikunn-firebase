@@ -14,8 +14,8 @@ export default function usePlayerGameState({ gameId }) {
       return games[0];
     },
     refetchInterval: false,
-    refetchOnWindowFocus: true,
-    refetchOnMount: true
+    refetchOnWindowFocus: false,
+    refetchOnMount: false
   });
 
   const isSoloGame = game?.pin === '0000';

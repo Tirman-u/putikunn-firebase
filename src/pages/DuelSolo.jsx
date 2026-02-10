@@ -3,27 +3,48 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { ArrowLeft, Copy } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Copy } from 'lucide-react';
 import DuelPlayerView from '@/components/putting/DuelPlayerView';
 import { addPlayerToState, createEmptyDuelState } from '@/lib/duel-utils';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
+import BackButton from '@/components/ui/back-button';
 
 export default function DuelSolo() {
-  const navigate = useNavigate();
   const [gameId, setGameId] = React.useState(null);
   const [creating, setCreating] = React.useState(false);
+  const [joining, setJoining] = React.useState(false);
   const [gameName, setGameName] = React.useState('');
   const [discCount, setDiscCount] = React.useState('3');
   const [displayName, setDisplayName] = React.useState('');
   const [joinPin, setJoinPin] = React.useState('');
+  const [viewMode, setViewMode] = React.useState('host');
+  const [userProfile, setUserProfile] = React.useState(null);
   const [pin] = React.useState(() => Math.floor(1000 + Math.random() * 9000).toString());
+
+  React.useEffect(() => {
+    let active = true;
+    base44.auth
+      .me()
+      .then((user) => {
+        if (!active) return;
+        setUserProfile(user);
+        setDisplayName((current) => {
+          if (current) return current;
+          return user?.display_name || user?.full_name || user?.email || '';
+        });
+      })
+      .catch(() => null);
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleCreate = async () => {
     try {
       setCreating(true);
-      const user = await base44.auth.me();
+      const user = userProfile || (await base44.auth.me());
       const playerName = displayName || user?.display_name || user?.full_name || user?.email || 'Mängija';
       const state = createEmptyDuelState(1);
       addPlayerToState(state, {
@@ -45,10 +66,58 @@ export default function DuelSolo() {
         state
       });
       setGameId(game.id);
+      setViewMode('host');
     } catch (error) {
       toast.error('Mängu loomine ebaõnnestus');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleJoinFromSolo = async () => {
+    try {
+      const trimmed = joinPin.trim();
+      if (!trimmed) {
+        toast.error('Sisesta PIN');
+        return;
+      }
+      setJoining(true);
+      const user = userProfile || (await base44.auth.me());
+      const games = await base44.entities.DuelGame.filter({ pin: trimmed });
+      const game = games?.[0];
+      if (!game) {
+        toast.error('Mängu PIN ei leitud');
+        return;
+      }
+      if (game.status === 'finished') {
+        toast.error('Mäng on lõpetatud');
+        return;
+      }
+
+      const playerName = displayName || user?.display_name || user?.full_name || user?.email || 'Mängija';
+      const stationCount = game.station_count || 1;
+      const nextState = addPlayerToState(
+        game.state || createEmptyDuelState(stationCount),
+        {
+          id: user?.id || user?.email,
+          name: playerName,
+          email: user?.email,
+          joined_at: new Date().toISOString(),
+          desired_station: stationCount
+        }
+      );
+
+      await base44.entities.DuelGame.update(game.id, {
+        ...game,
+        state: nextState
+      });
+      setGameId(game.id);
+      setViewMode('join');
+      toast.success('Liitusid mänguga');
+    } catch (error) {
+      toast.error('Liitumine ebaõnnestus');
+    } finally {
+      setJoining(false);
     }
   };
 
@@ -58,37 +127,33 @@ export default function DuelSolo() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
         <div className="max-w-xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="font-medium">Tagasi</span>
-            </button>
+            <BackButton />
             <div className="text-sm font-semibold text-slate-700">Sõbraduell (SOLO)</div>
             <div className="w-12" />
           </div>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs text-slate-500">PIN</div>
-                <div className="text-2xl font-semibold text-slate-800">{pin}</div>
+          {viewMode === 'host' && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-slate-500">PIN</div>
+                  <div className="text-2xl font-semibold text-slate-800">{pin}</div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => {
+                    navigator.clipboard.writeText(joinUrl);
+                    toast.success('Join link kopeeritud');
+                  }}
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Kopeeri link
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={() => {
-                  navigator.clipboard.writeText(joinUrl);
-                  toast.success('Join link kopeeritud');
-                }}
-              >
-                <Copy className="w-4 h-4 mr-2" />
-                Kopeeri link
-              </Button>
+              <div className="mt-2 text-xs text-slate-500">Jaga linki vastasega</div>
             </div>
-            <div className="mt-2 text-xs text-slate-500">Jaga linki vastasega</div>
-          </div>
+          )}
 
           <DuelPlayerView gameId={gameId} />
         </div>
@@ -100,13 +165,7 @@ export default function DuelSolo() {
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
       <div className="max-w-lg mx-auto px-4 pb-10">
         <div className="flex items-center justify-between pt-6 pb-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Tagasi</span>
-          </button>
+          <BackButton />
           <div className="text-sm font-semibold text-slate-700">Sõbraduell (SOLO)</div>
           <div className="w-12" />
         </div>
@@ -178,16 +237,10 @@ export default function DuelSolo() {
           <Button
             variant="outline"
             className="w-full h-12 rounded-2xl"
-            onClick={() => {
-              const trimmed = joinPin.trim();
-              if (!trimmed) {
-                toast.error('Sisesta PIN');
-                return;
-              }
-              navigate(`${createPageUrl('DuelJoin')}?pin=${trimmed}`);
-            }}
+            onClick={handleJoinFromSolo}
+            disabled={joining}
           >
-            Liitu duelliga
+            {joining ? 'Liitun...' : 'Liitu duelliga'}
           </Button>
         </div>
       </div>

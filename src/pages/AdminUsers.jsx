@@ -3,16 +3,17 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Shield, UserCog } from 'lucide-react';
+import { Shield, UserCog } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import BackButton from '@/components/ui/back-button';
 
 export default function AdminUsers() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: currentUser } = useQuery({
-    queryKey: ['current-user'],
+    queryKey: ['user'],
     queryFn: () => base44.auth.me()
   });
 
@@ -36,15 +37,20 @@ export default function AdminUsers() {
       await base44.auth.updateMe({ app_role: 'super_admin' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      queryClient.invalidateQueries({ queryKey: ['user'] });
       toast.success('Sa oled nüüd superadmin!');
     }
   });
 
+  const visibleUsers = React.useMemo(
+    () => users.filter((entry) => !entry.merged_into),
+    [users]
+  );
+
   const isSuperAdmin = currentUser?.app_role === 'super_admin';
 
   if (!isSuperAdmin) {
-    const hasSuperAdmin = users.some(u => u.app_role === 'super_admin');
+    const hasSuperAdmin = visibleUsers.some(u => u.app_role === 'super_admin');
     
     return (
       <div className="min-h-screen bg-gradient-to-b from-red-50 to-white flex items-center justify-center p-4">
@@ -68,10 +74,10 @@ export default function AdminUsers() {
               >
                 Tee mind superadminiks
               </Button>
-              <Button onClick={() => navigate(-1)} variant="outline">Tühista</Button>
+              <BackButton onClick={() => navigate(-1)} />
             </div>
           ) : (
-            <Button onClick={() => navigate(-1)}>Tagasi</Button>
+            <BackButton onClick={() => navigate(-1)} />
           )}
         </div>
       </div>
@@ -96,13 +102,7 @@ export default function AdminUsers() {
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <div className="max-w-5xl mx-auto p-4">
         <div className="flex items-center justify-between mb-6 pt-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Tagasi</span>
-          </button>
+          <BackButton />
           <div className="flex items-center gap-2">
             <UserCog className="w-6 h-6 text-slate-700" />
             <h1 className="text-2xl font-bold text-slate-800">Kasutajate haldus</h1>
@@ -144,7 +144,7 @@ export default function AdminUsers() {
                 </tr>
               </thead>
               <tbody>
-                {users.map(user => (
+                {visibleUsers.map(user => (
                   <tr key={user.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="py-3 px-2 font-medium text-slate-700">{user.full_name}</td>
                     <td className="py-3 px-2 text-slate-600">{user.email}</td>

@@ -3,7 +3,8 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Trophy, Calendar } from 'lucide-react';
+import { Trophy, Calendar } from 'lucide-react';
+import BackButton from '@/components/ui/back-button';
 
 export default function JoinPuttingKing({ onJoin, onBack }) {
   const [pin, setPin] = useState('');
@@ -16,11 +17,10 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
 
   const { data: tournaments = [] } = useQuery({
     queryKey: ['active-tournaments'],
-    queryFn: async () => {
-      const all = await base44.entities.PuttingKingTournament.list();
-      return all.filter(t => t.status === 'active' || t.status === 'setup');
-    },
-    refetchInterval: 3000
+    queryFn: () => base44.entities.PuttingKingTournament.filter({
+      status: { $in: ['active', 'setup'] }
+    }),
+    refetchInterval: 5000
   });
 
   const handleJoin = async () => {
@@ -52,8 +52,10 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
       }
 
       // Check if tournament has completed all rounds
-      const allMatches = await base44.entities.PuttingKingMatch.list();
-      const tournamentMatches = allMatches.filter(m => m.tournament_id === tournament.id && m.round_number === tournament.current_round);
+      const tournamentMatches = await base44.entities.PuttingKingMatch.filter({
+        tournament_id: tournament.id,
+        round_number: tournament.current_round
+      });
       const allMatchesFinished = tournamentMatches.length > 0 && tournamentMatches.every(m => m.status === 'finished');
       const isTournamentComplete = tournament.current_round === tournament.total_rounds && allMatchesFinished;
       
@@ -63,10 +65,10 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
       }
 
       // Check if user is already a player
-      const allPlayers = await base44.entities.PuttingKingPlayer.list();
-      const existingPlayer = allPlayers.find(
-        p => p.tournament_id === tournament.id && p.user_email === user.email
-      );
+      const [existingPlayer] = await base44.entities.PuttingKingPlayer.filter({
+        tournament_id: tournament.id,
+        user_email: user.email
+      }, null, 1);
 
       if (!existingPlayer) {
         // Add user as a player with display_name (nickname) or fallback to full_name
@@ -93,13 +95,9 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
       <div className="max-w-lg mx-auto pt-16">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-8"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Tagasi</span>
-        </button>
+        <div className="mb-8">
+          <BackButton onClick={onBack} />
+        </div>
 
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">

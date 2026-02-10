@@ -2,10 +2,11 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import LoadingState from '@/components/ui/loading-state';
+import BackButton from '@/components/ui/back-button';
 
 export default function PuttingKingScoring() {
   const navigate = useNavigate();
@@ -15,30 +16,24 @@ export default function PuttingKingScoring() {
 
   const { data: match } = useQuery({
     queryKey: ['match', matchId],
-    queryFn: async () => {
-      const matches = await base44.entities.PuttingKingMatch.list();
-      return matches.find(m => m.id === matchId);
-    },
+    queryFn: () => base44.entities.PuttingKingMatch.get(matchId),
     enabled: !!matchId,
-    refetchInterval: 1000
+    refetchInterval: 2000,
+    refetchOnWindowFocus: false
   });
 
   const { data: tournament } = useQuery({
     queryKey: ['tournament', match?.tournament_id],
-    queryFn: async () => {
-      const tournaments = await base44.entities.PuttingKingTournament.list();
-      return tournaments.find(t => t.id === match.tournament_id);
-    },
-    enabled: !!match
+    queryFn: () => base44.entities.PuttingKingTournament.get(match.tournament_id),
+    enabled: !!match,
+    refetchOnWindowFocus: false
   });
 
   const { data: players = [] } = useQuery({
     queryKey: ['match-players', match?.tournament_id],
-    queryFn: async () => {
-      const allPlayers = await base44.entities.PuttingKingPlayer.list();
-      return allPlayers.filter(p => p.tournament_id === match.tournament_id);
-    },
-    enabled: !!match
+    queryFn: () => base44.entities.PuttingKingPlayer.filter({ tournament_id: match.tournament_id }),
+    enabled: !!match,
+    refetchOnWindowFocus: false
   });
 
   const scoreMutation = useMutation({
@@ -143,7 +138,7 @@ export default function PuttingKingScoring() {
           </div>
           <h1 className="text-3xl font-bold text-slate-800 mb-2">Mäng lõpetatud!</h1>
           <p className="text-slate-600 mb-6">Võitja: Tiim {match.winner_team}</p>
-          <Button onClick={() => navigate(-1)}>Tagasi ülevaatesse</Button>
+          <BackButton label="Tagasi ülevaatesse" className="mx-auto text-sm" />
         </div>
       </div>
     );
@@ -154,13 +149,7 @@ export default function PuttingKingScoring() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
       <div className="max-w-2xl mx-auto pt-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-6"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Tagasi</span>
-        </button>
+        <BackButton className="mb-6" />
 
         {/* Team Cards with Integrated Scoring */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

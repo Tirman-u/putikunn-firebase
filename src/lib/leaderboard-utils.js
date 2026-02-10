@@ -54,7 +54,8 @@ async function getUserByEmail(email, cache) {
 export function normalizeLeaderboardGender(gender) {
   if (!gender) return undefined;
   const normalized = typeof gender === 'string' ? gender.trim().toUpperCase() : gender;
-  if (normalized === 'N' || normalized === 'M') return normalized;
+  if (['N', 'F', 'FEMALE', 'NAINE', 'W', 'WOMAN', 'WOMEN'].includes(normalized)) return 'N';
+  if (['M', 'MALE', 'MEES', 'MAN', 'MEN'].includes(normalized)) return 'M';
   return undefined;
 }
 

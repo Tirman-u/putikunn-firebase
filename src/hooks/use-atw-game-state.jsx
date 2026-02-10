@@ -23,6 +23,11 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
   const lastSyncRef = React.useRef(0);
   const turnsSinceSyncRef = React.useRef(0);
   const UNDO_SOFT_LOCK_MS = 200;
+  const hydratedFromStorageRef = React.useRef(false);
+  const atwStorageKey = React.useMemo(() => {
+    if (!gameId || !playerName) return null;
+    return `putikunn:atw:${gameId}:${playerName}`;
+  }, [gameId, playerName]);
 
   const bumpLocalSeq = useCallback(() => {
     localSeqRef.current += 1;
@@ -41,9 +46,59 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       return games[0];
     },
     refetchInterval: false,
-    refetchOnWindowFocus: true,
-    refetchOnMount: true
+    refetchOnWindowFocus: false,
+    refetchOnMount: false
   });
+
+  React.useEffect(() => {
+    if (!atwStorageKey || hydratedFromStorageRef.current) return;
+    try {
+      const stored = localStorage.getItem(atwStorageKey);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (!parsed || (parsed.id && parsed.id !== gameId)) return;
+      const latestGame = queryClient.getQueryData(['game', gameId]);
+      const localSeq = parsed?.atw_state?.[playerName]?.client_seq ?? 0;
+      const serverSeq = latestGame?.atw_state?.[playerName]?.client_seq ?? 0;
+      if (!latestGame || localSeq > serverSeq) {
+        const merged = {
+          ...(latestGame || {}),
+          ...parsed,
+          atw_state: {
+            ...(latestGame?.atw_state || {}),
+            ...(parsed.atw_state || {})
+          },
+          total_points: {
+            ...(latestGame?.total_points || {}),
+            ...(parsed.total_points || {})
+          }
+        };
+        queryClient.setQueryData(['game', gameId], merged);
+      }
+      hydratedFromStorageRef.current = true;
+    } catch {
+      // ignore storage errors
+    }
+  }, [atwStorageKey, gameId, playerName, queryClient]);
+
+  React.useEffect(() => {
+    if (!atwStorageKey || !game) return;
+    if (game.status === 'completed' || game.status === 'closed') {
+      localStorage.removeItem(atwStorageKey);
+      return;
+    }
+    const playerState = game.atw_state?.[playerName];
+    if (!playerState) return;
+    try {
+      localStorage.setItem(atwStorageKey, JSON.stringify({
+        id: game.id,
+        atw_state: { [playerName]: playerState },
+        total_points: { [playerName]: game.total_points?.[playerName] || 0 }
+      }));
+    } catch {
+      // ignore storage errors
+    }
+  }, [atwStorageKey, game, playerName]);
 
   const getLatestGame = useCallback(() => {
     return queryClient.getQueryData(['game', gameId]) || game;
@@ -111,8 +166,8 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
   }, [playerName]);
 
   const updateGameWithLatest = useCallback(async ({ updatedState, updatedPoints, status }) => {
-    const games = await base44.entities.Game.filter({ id: gameId });
-    const latestGame = games?.[0];
+    const cachedGame = queryClient.getQueryData(['game', gameId]);
+    const latestGame = cachedGame || (await base44.entities.Game.filter({ id: gameId }))?.[0];
     if (!latestGame) return;
 
     const latestSeq = latestGame.atw_state?.[playerName]?.client_seq;
@@ -124,13 +179,16 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
     const payload = mergePlayerUpdate(latestGame, updatedState, updatedPoints);
     const updatePayload = status ? { ...payload, status } : payload;
     const startedAt = performance.now();
-    await base44.entities.Game.update(gameId, updatePayload);
+    await base44.entities.Game.update(gameId, updatePayload, {
+      returnSnapshot: false,
+      mergeWith: latestGame
+    });
     logSyncMetric('atw_sync', performance.now() - startedAt, {
       game_id: gameId,
       player: playerName,
       status: status || latestGame.status || 'active'
     });
-  }, [gameId, mergePlayerUpdate, playerName]);
+  }, [gameId, mergePlayerUpdate, playerName, queryClient]);
 
   const submitTurnMutation = useMutation({
     mutationFn: async ({ updatedState, updatedPoints }) => {
@@ -337,7 +395,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
             best_score: bestScore
           }
         }
-      });
+      }, { returnSnapshot: false });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
@@ -475,7 +533,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
           best_accuracy: Math.max(bestAccuracy, currentAccuracy)
         }
       }
-    });
+    }, { returnSnapshot: false });
 
     if (isSolo) {
       handleCompleteGame();

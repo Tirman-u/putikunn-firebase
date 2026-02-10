@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft } from 'lucide-react';
+import BackButton from '@/components/ui/back-button';
 import { toast } from 'sonner';
 import PuttTypeSelector from './PuttTypeSelector';
 
@@ -49,13 +49,9 @@ export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPi
 
   return (
     <div className="max-w-md mx-auto px-4 pt-8">
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-6"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        <span className="font-medium">Tagasi</span>
-      </button>
+      <div className="mb-6">
+        <BackButton onClick={onBack} />
+      </div>
 
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-slate-800 mb-2">

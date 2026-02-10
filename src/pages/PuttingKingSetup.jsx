@@ -3,10 +3,11 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
+import { Plus, Trash2, Save } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { toast } from 'sonner';
+import BackButton from '@/components/ui/back-button';
 
 export default function PuttingKingSetup() {
   const navigate = useNavigate();
@@ -30,8 +31,7 @@ export default function PuttingKingSetup() {
   const { data: tournament, isLoading: tournamentLoading } = useQuery({
     queryKey: ['tournament-edit', tournamentId],
     queryFn: async () => {
-      const tournaments = await base44.entities.PuttingKingTournament.list();
-      return tournaments.find(t => t.id === tournamentId);
+      return base44.entities.PuttingKingTournament.get(tournamentId);
     },
     enabled: !!tournamentId
   });
@@ -39,9 +39,8 @@ export default function PuttingKingSetup() {
   const { data: existingStations = [] } = useQuery({
     queryKey: ['tournament-stations-edit', tournamentId],
     queryFn: async () => {
-      const allStations = await base44.entities.PuttingKingStation.list();
-      return allStations.filter(s => s.tournament_id === tournamentId)
-        .sort((a, b) => a.order_index - b.order_index);
+      const rows = await base44.entities.PuttingKingStation.filter({ tournament_id: tournamentId });
+      return rows.sort((a, b) => a.order_index - b.order_index);
     },
     enabled: !!tournamentId
   });
@@ -179,13 +178,7 @@ export default function PuttingKingSetup() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
       <div className="max-w-2xl mx-auto pt-8">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-6"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Tagasi</span>
-        </button>
+        <BackButton className="mb-6" />
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">

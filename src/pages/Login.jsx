@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   GoogleAuthProvider,
-  FacebookAuthProvider,
-  OAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -16,18 +14,6 @@ const providerMap = {
   google: {
     label: 'Google',
     provider: new GoogleAuthProvider()
-  },
-  apple: {
-    label: 'Apple',
-    provider: new OAuthProvider('apple.com')
-  },
-  microsoft: {
-    label: 'Microsoft',
-    provider: new OAuthProvider('microsoft.com')
-  },
-  facebook: {
-    label: 'Facebook',
-    provider: new FacebookAuthProvider()
   }
 };
 
@@ -150,7 +136,7 @@ export default function Login() {
 
         <div className="space-y-2">
           <p className="text-xs text-slate-400 text-center">Või logi sisse teenusega</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             {Object.entries(providerMap).map(([key, meta]) => (
               <button
                 key={key}

@@ -86,6 +86,18 @@ const FORMAT_RULES = {
       'Viigi korral mängitakse sama distants uuesti',
       '10m võit lõpetab duelli antud jaamas'
     ]
+  },
+  time_ladder: {
+    title: 'Aja väljakutse reeglid',
+    range: '5m - 10m',
+    start: '5m',
+    rules: [
+      'Alusta 5m pealt',
+      '5 järjest sees → distants +1m',
+      'Mööda → seeria nulli',
+      'Mäng lõpeb, kui 10m peal saad 5 järjest sisse',
+      'Tulemus = aeg (väiksem on parem)'
+    ]
   }
 };
 

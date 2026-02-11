@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Target, Medal, Swords, ArrowLeftRight, ArrowDownRight, ArrowUpRight, Flame, Shuffle, Globe } from 'lucide-react';
+import { Check, Target, Medal, Swords, ArrowLeftRight, ArrowDownRight, ArrowUpRight, Flame, Shuffle, Globe, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const GAME_FORMATS = [
@@ -68,6 +68,14 @@ const GAME_FORMATS = [
     description: 'Juhuslik distants igas ringis',
     color: 'indigo',
     icon: Shuffle
+  },
+  {
+    id: 'time_ladder',
+    name: 'Aja väljakutse',
+    distance: '5-10m',
+    description: '5 järjest sees → +1m, aeg',
+    color: 'emerald',
+    icon: Timer
   },
   {
     id: 'around_the_world',

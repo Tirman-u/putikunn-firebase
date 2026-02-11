@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Trophy, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import useRealtimeGame from '@/hooks/use-realtime-game';
+import { formatDuration } from '@/lib/time-format';
 
 export default function MobileLeaderboard({ game, onClose }) {
   const [liveGame, setLiveGame] = useState(game);
@@ -18,6 +19,7 @@ export default function MobileLeaderboard({ game, onClose }) {
 
   const currentGame = liveGame || game;
   if (!currentGame) return null;
+  const isTimeLadder = currentGame.game_type === 'time_ladder';
 
   const playerStats = currentGame.players.map(player => {
     const putts = currentGame.player_putts?.[player] || [];
@@ -35,7 +37,12 @@ export default function MobileLeaderboard({ game, onClose }) {
       totalPutts,
       madePutts
     };
-  }).sort((a, b) => b.totalPoints - a.totalPoints);
+  }).sort((a, b) => {
+    if (isTimeLadder) {
+      return (a.totalPoints || 0) - (b.totalPoints || 0);
+    }
+    return (b.totalPoints || 0) - (a.totalPoints || 0);
+  });
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -88,7 +95,7 @@ export default function MobileLeaderboard({ game, onClose }) {
                   "text-2xl font-bold",
                   index === 0 ? "text-amber-600" : "text-slate-700"
                 )}>
-                  {player.totalPoints}
+                  {isTimeLadder ? formatDuration(player.totalPoints) : player.totalPoints}
                 </div>
               </div>
             </div>

@@ -14,6 +14,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   const [copied, setCopied] = useState(false);
   const [activePuttTooltip, setActivePuttTooltip] = useState(null);
   const tooltipTimerRef = useRef(null);
+  const excludeFormats = isSolo ? [] : ['time_ladder'];
   // Generate random 4-digit PIN
   const [pin] = useState(() => 
     Math.floor(1000 + Math.random() * 9000).toString()
@@ -33,6 +34,12 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
       const nameParam = gameName ? '&name=' + encodeURIComponent(gameName) : '';
       const puttTypeParam = '&puttType=' + puttType;
       window.location.href = createPageUrl('Home') + '?mode=atw-setup&solo=' + (isSolo ? '1' : '0') + (isSolo ? '' : '&pin=' + pin + nameParam) + puttTypeParam;
+      return;
+    }
+    if (gameType === 'time_ladder') {
+      const nameParam = gameName ? '&name=' + encodeURIComponent(gameName) : '';
+      const puttTypeParam = '&puttType=' + puttType;
+      window.location.href = createPageUrl('Home') + '?mode=time-ladder-setup&solo=' + (isSolo ? '1' : '0') + nameParam + puttTypeParam;
       return;
     }
     if (gameType === 'duel') {
@@ -176,7 +183,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
               </label>
               <FormatRulesPopup format={gameType} />
             </div>
-            <GameFormatSelector selected={gameType} onSelect={setGameType} size="compact" />
+            <GameFormatSelector selected={gameType} onSelect={setGameType} size="compact" excludeFormats={excludeFormats} />
           </div>
 
         </div>

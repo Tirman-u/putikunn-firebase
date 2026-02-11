@@ -9,12 +9,14 @@ import ClassicScoreInput from './ClassicScoreInput';
 import BackAndForthInput from './BackAndForthInput';
 import BackAndForthScoreInput from './BackAndForthScoreInput';
 import StreakChallengeInput from './StreakChallengeInput';
+import TimeLadderInput from './TimeLadderInput';
 import MobileLeaderboard from './MobileLeaderboard';
 import PerformanceAnalysis from './PerformanceAnalysis';
 import useRealtimeGame from '@/hooks/use-realtime-game';
 import LoadingState from '@/components/ui/loading-state';
 import { logSyncMetric } from '@/lib/metrics';
 import usePlayerGameState from '@/hooks/use-player-game-state';
+import { formatDuration } from '@/lib/time-format';
 import {
   buildLeaderboardIdentityFilter,
   getLeaderboardEmail,
@@ -36,7 +38,9 @@ const PLAYER_STATE_KEYS = [
   'total_points',
   'player_distances',
   'player_current_streaks',
-  'player_highest_streaks'
+  'player_highest_streaks',
+  'player_time_started_at',
+  'player_time_finished_at'
 ];
 
 export default function PlayerView({ gameId, playerName, onExit }) {
@@ -154,7 +158,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const localState = localGameStateRef.current || {};
     const merged = { ...localState, ...incoming };
     const fallback = baseGameRef.current || localState;
-    const staticKeys = ['name', 'pin', 'host_user', 'game_type', 'putt_type', 'status', 'date'];
+    const staticKeys = ['name', 'pin', 'host_user', 'game_type', 'putt_type', 'status', 'date', 'time_ladder_config'];
     staticKeys.forEach((key) => {
       if (merged?.[key] === undefined || merged?.[key] === null) {
         merged[key] = fallback?.[key];
@@ -174,7 +178,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       'total_points',
       'player_distances',
       'player_current_streaks',
-      'player_highest_streaks'
+      'player_highest_streaks',
+      'player_time_started_at',
+      'player_time_finished_at'
     ];
     mapKeys.forEach((key) => {
       const incomingMap = incoming[key] || {};
@@ -250,6 +256,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       player_distances: game.player_distances || {},
       player_current_streaks: game.player_current_streaks || {},
       player_highest_streaks: game.player_highest_streaks || {},
+      player_time_started_at: game.player_time_started_at || {},
+      player_time_finished_at: game.player_time_finished_at || {},
+      time_ladder_config: game.time_ladder_config,
       status: game.status
     };
 
@@ -555,7 +564,11 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       });
 
       if (existingEntry) {
-        if (leaderboardData.score > existingEntry.score) {
+        const isTimeLadder = game.game_type === 'time_ladder';
+        const currentScore = Number(leaderboardData.score || 0);
+        const existingScore = Number(existingEntry.score || 0);
+        const isBetter = isTimeLadder ? currentScore < existingScore : currentScore > existingScore;
+        if (isBetter) {
           await base44.entities.LeaderboardEntry.update(existingEntry.id, leaderboardData);
         }
         return existingEntry;
@@ -644,9 +657,13 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const format = GAME_FORMATS[gameType];
     const currentState = getLatestState();
     const playerDist = currentState.player_distances || {};
-    const currentDistance = playerDist[playerName] || format.startDistance;
+    const timeConfig = currentState.time_ladder_config || {};
+    const startDistance = gameType === 'time_ladder'
+      ? (timeConfig.start_distance || format.startDistance)
+      : format.startDistance;
+    const currentDistance = playerDist[playerName] || startDistance;
     const result = wasMade ? 'made' : 'missed';
-    const points = wasMade ? currentDistance : 0;
+    const points = gameType === 'time_ladder' ? 0 : (wasMade ? currentDistance : 0);
 
     const newPutt = {
       distance: currentDistance,
@@ -668,6 +685,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     // For Streak Challenge, handle streak tracking
     let nextDistance = currentDistance;
     let streakUpdate = {};
+    let timeUpdate = {};
+    let forceComplete = false;
 
     if (gameType === 'streak_challenge') {
       const currentStreaks = currentState.player_current_streaks || {};
@@ -689,6 +708,47 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
       // Use highest streak as the points for leaderboard
       newTotalPoints[playerName] = playerHighestStreak;
+    } else if (gameType === 'time_ladder') {
+      const targetStreak = timeConfig?.streak_target || format?.streakTarget || 5;
+      const maxDistance = timeConfig?.end_distance || format.maxDistance;
+      const currentStreaks = currentState.player_current_streaks || {};
+      let playerCurrentStreak = currentStreaks[playerName] || 0;
+      if (wasMade) {
+        playerCurrentStreak += 1;
+      } else {
+        playerCurrentStreak = 0;
+      }
+      let nextStreak = playerCurrentStreak;
+      let completed = false;
+
+      if (playerCurrentStreak >= targetStreak) {
+        if (currentDistance >= maxDistance) {
+          completed = true;
+        } else {
+          nextDistance = Math.min(currentDistance + 1, maxDistance);
+          nextStreak = 0;
+        }
+      }
+
+      streakUpdate = {
+        player_current_streaks: { ...currentStreaks, [playerName]: nextStreak }
+      };
+
+      const timeStartMap = currentState.player_time_started_at || {};
+      const startAt = timeStartMap[playerName] || new Date().toISOString();
+      const nextTimeStartMap = { ...timeStartMap, [playerName]: startAt };
+      timeUpdate = { player_time_started_at: nextTimeStartMap };
+
+      if (completed) {
+        const now = new Date();
+        const elapsedSeconds = Math.max(0, (now.getTime() - new Date(startAt).getTime()) / 1000);
+        newTotalPoints[playerName] = Math.round(elapsedSeconds * 10) / 10;
+        timeUpdate.player_time_finished_at = {
+          ...(currentState.player_time_finished_at || {}),
+          [playerName]: now.toISOString()
+        };
+        forceComplete = true;
+      }
     } else if (gameType === 'back_and_forth') {
       nextDistance = getNextDistanceBackAndForth(currentDistance, wasMade);
     }
@@ -698,24 +758,28 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
     // Check if game is complete after this update (for back_and_forth)
     const updatedPuttsLength = allPlayerPutts[playerName].length;
-    const willBeComplete = gameType !== 'streak_challenge' && isGameComplete(gameType, updatedPuttsLength);
+    const willBeComplete =
+      gameType !== 'streak_challenge' &&
+      gameType !== 'time_ladder' &&
+      isGameComplete(gameType, updatedPuttsLength);
 
     const updateData = {
       player_putts: allPlayerPutts,
       total_points: newTotalPoints,
       player_distances: newPlayerDistances,
       ...streakUpdate,
-      ...(willBeComplete && isSoloGame ? { status: 'completed' } : {})
+      ...timeUpdate,
+      ...((willBeComplete || forceComplete) && isSoloGame ? { status: 'completed' } : {})
     };
 
     // For solo games that are complete, save to DB
-    if (isSoloGame && willBeComplete) {
+    if (isSoloGame && (willBeComplete || forceComplete)) {
       saveSoloGameMutation.mutate({
         id: game.id,
         data: updateData
       });
     } else {
-      updateGameState(updateData, { forceSync: willBeComplete });
+      updateGameState(updateData, { forceSync: willBeComplete || forceComplete });
     }
   };
 
@@ -821,11 +885,15 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   // Use local state for solo games, otherwise use game data
   const currentState = localGameState || game || {};
   const gameType = currentState?.game_type || 'classic';
+  const isTimeLadder = gameType === 'time_ladder';
   const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
+  const timeConfig = currentState?.time_ladder_config || {};
+  const timeStartDistance = timeConfig?.start_distance || format.startDistance;
+  const timeTargetStreak = timeConfig?.streak_target || format?.streakTarget || 5;
   const playerPutts = currentState?.player_putts?.[playerName] || [];
   const playerDistances = currentState?.player_distances || {};
-  const currentDistance = playerDistances[playerName] || format.startDistance;
-  const canUndo = playerPutts.length > 0;
+  const currentDistance = playerDistances[playerName] || (isTimeLadder ? timeStartDistance : format.startDistance);
+  const canUndo = !isTimeLadder && playerPutts.length > 0;
   const currentStreaks = currentState?.player_current_streaks || {};
   const currentStreak = currentStreaks[playerName] || 0;
   const currentScore = gameType === 'streak_challenge'
@@ -833,12 +901,43 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     : (currentState?.total_points?.[playerName] || 0);
   const isComplete = Boolean(currentState) && (
     isGameComplete(gameType, playerPutts.length) ||
-    (gameType === 'streak_challenge' && (currentState.status === 'completed' || streakComplete))
+    (gameType === 'streak_challenge' && (currentState.status === 'completed' || streakComplete)) ||
+    (gameType === 'time_ladder' && currentState.status === 'completed')
   );
   const userRole = user?.app_role || 'user';
   const canAdminSubmit = ['trainer', 'admin', 'super_admin'].includes(userRole);
   const isHost = Boolean(user?.email && currentState?.host_user && user.email === currentState.host_user);
   const canSubmitHosted = isHost || canAdminSubmit;
+
+  const timeDiscLabel = timeConfig?.discs_per_turn ? `${timeConfig.discs_per_turn} ketast` : null;
+  const timeStartedAt = currentState?.player_time_started_at?.[playerName];
+  const timeFinishedAt = currentState?.player_time_finished_at?.[playerName];
+  const [timerNow, setTimerNow] = React.useState(Date.now());
+
+  React.useEffect(() => {
+    if (!isTimeLadder || !timeStartedAt || timeFinishedAt) return;
+    const interval = setInterval(() => {
+      setTimerNow(Date.now());
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isTimeLadder, timeStartedAt, timeFinishedAt]);
+
+  const elapsedSeconds = timeStartedAt
+    ? Math.max(
+        0,
+        ((timeFinishedAt ? new Date(timeFinishedAt).getTime() : timerNow) - new Date(timeStartedAt).getTime()) / 1000
+      )
+    : 0;
+  const timeLabel = formatDuration(isComplete ? currentScore : elapsedSeconds);
+
+  const handleStartTimeLadder = React.useCallback(() => {
+    const current = getLatestState();
+    const startMap = current.player_time_started_at || {};
+    if (startMap[playerName]) return;
+    updateGameState({
+      player_time_started_at: { ...startMap, [playerName]: new Date().toISOString() }
+    });
+  }, [getLatestState, playerName]);
 
   // Solo game completion uses the in-page end screen (no popup prompts).
 
@@ -860,8 +959,12 @@ export default function PlayerView({ gameId, playerName, onExit }) {
               <Trophy className="w-16 h-16 text-white" />
             </div>
             <h1 className="text-4xl font-bold text-slate-800 mb-4">🎉 Lõpetatud!</h1>
-            <p className="text-xl text-slate-600 mb-2">Lõpetasid kõik ringid</p>
-            <p className="text-4xl font-bold text-emerald-600">{currentScore} punkti</p>
+            <p className="text-xl text-slate-600 mb-2">
+              {isTimeLadder ? 'Lõpetasid väljakutse' : 'Lõpetasid kõik ringid'}
+            </p>
+            <p className="text-4xl font-bold text-emerald-600">
+              {isTimeLadder ? timeLabel : `${currentScore} punkti`}
+            </p>
             </motion.div>
 
             {/* Performance Analysis */}
@@ -904,8 +1007,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   }
 
   // Scoring View
-  const currentRound = gameType === 'streak_challenge' ? 1 : Math.floor(playerPutts.length / format.puttsPerRound) + 1;
-  const totalRounds = gameType === 'streak_challenge' ? 1 : getTotalRounds(gameType);
+  const currentRound = gameType === 'streak_challenge' || isTimeLadder
+    ? 1
+    : Math.floor(playerPutts.length / format.puttsPerRound) + 1;
+  const totalRounds = gameType === 'streak_challenge' || isTimeLadder ? 1 : getTotalRounds(gameType);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -919,7 +1024,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           <div className="text-center">
             <h2 className="text-lg font-bold text-slate-800">{currentState.name || game.name}</h2>
             <p className="text-sm text-slate-500">
-              {format.name} • Ring {currentRound}/{totalRounds}
+              {format.name} • {isTimeLadder ? `${currentDistance}m` : `Ring ${currentRound}/${totalRounds}`}
+              {isTimeLadder && timeDiscLabel ? ` • ${timeDiscLabel}` : ''}
             </p>
           </div>
           <button
@@ -931,7 +1037,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         </div>
 
         {/* Your Stats */}
-        {gameType !== 'streak_challenge' && (
+        {!isTimeLadder && gameType !== 'streak_challenge' && (
           <div className="bg-white rounded-xl p-2 sm:p-3 shadow-sm border border-slate-100 mb-3 sm:mb-4">
             <div className="flex items-center justify-around text-center">
               <div>
@@ -966,7 +1072,18 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         )}
 
         {/* Score Input */}
-         {gameType === 'streak_challenge' ? (
+         {gameType === 'time_ladder' ? (
+           <TimeLadderInput
+             timeLabel={timeLabel}
+             currentDistance={currentDistance}
+             currentStreak={currentStreak}
+             targetStreak={timeTargetStreak}
+             isStarted={Boolean(timeStartedAt)}
+             onStart={handleStartTimeLadder}
+             onMade={() => handleBackAndForthPutt(true)}
+             onMissed={() => handleBackAndForthPutt(false)}
+           />
+         ) : gameType === 'streak_challenge' ? (
            <StreakChallengeInput
                player={playerName}
                currentDistance={currentDistance}

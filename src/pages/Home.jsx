@@ -12,17 +12,20 @@ import HostView from '@/components/putting/HostView';
 import PlayerView from '@/components/putting/PlayerView';
 import AroundTheWorldSetup from '@/components/putting/AroundTheWorldSetup';
 import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView';
+import TimeLadderSetup from '@/components/putting/TimeLadderSetup';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import ThemeToggle from '@/components/ui/theme-toggle';
 
 export default function Home() {
-  const [mode, setMode] = useState(null); // null, 'host-setup', 'join', 'solo', 'host', 'player', 'atw-setup', 'atw-game', 'atw-host'
+  const [mode, setMode] = useState(null); // null, 'host-setup', 'join', 'solo', 'host', 'player', 'atw-setup', 'atw-game', 'atw-host', 'time-ladder-setup'
   const [gameId, setGameId] = useState(null);
   const [playerName, setPlayerName] = useState(null);
   const [isSoloATW, setIsSoloATW] = useState(false);
   const [atwPin, setAtwPin] = useState(null);
   const [atwName, setAtwName] = useState(null);
   const [atwPuttType, setAtwPuttType] = useState(null);
+  const [timeLadderName, setTimeLadderName] = useState(null);
+  const [timeLadderPuttType, setTimeLadderPuttType] = useState(null);
   const [playerReturnTo, setPlayerReturnTo] = useState('home');
   const navigate = useNavigate();
 
@@ -54,6 +57,16 @@ export default function Home() {
       setMode('join');
     } else if (urlMode === 'solo') {
       setMode('solo');
+    } else if (urlMode === 'time-ladder-setup') {
+      setMode('time-ladder-setup');
+      const urlName = params.get('name');
+      const urlPuttType = params.get('puttType');
+      if (urlName) {
+        setTimeLadderName(decodeURIComponent(urlName));
+      }
+      if (urlPuttType) {
+        setTimeLadderPuttType(urlPuttType);
+      }
     } else if (urlMode === 'atw-setup') {
       setIsSoloATW(isSolo);
       setMode('atw-setup');
@@ -457,6 +470,49 @@ export default function Home() {
             setMode('atw-host');
             window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=atw-host&gameId=${game.id}`);
           }
+        }}
+      />
+    );
+  }
+
+  if (mode === 'time-ladder-setup') {
+    return (
+      <TimeLadderSetup
+        isSolo
+        initialName={timeLadderName}
+        initialPuttType={timeLadderPuttType}
+        onBack={() => {
+          setTimeLadderName(null);
+          setTimeLadderPuttType(null);
+          goHome();
+        }}
+        onStart={async (setupData) => {
+          const user = await base44.auth.me();
+          const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
+
+          const game = await base44.entities.Game.create({
+            name: setupData.name,
+            pin: '0000',
+            game_type: setupData.gameType,
+            putt_type: setupData.puttType || 'regular',
+            host_user: user.email,
+            players: [playerName],
+            player_distances: { [playerName]: 5 },
+            player_putts: { [playerName]: [] },
+            total_points: { [playerName]: 0 },
+            player_current_streaks: { [playerName]: 0 },
+            player_uids: { [playerName]: user.id },
+            player_emails: { [playerName]: user.email },
+            join_closed: false,
+            status: 'active',
+            date: new Date().toISOString(),
+            time_ladder_config: setupData.config
+          });
+
+          setGameId(game.id);
+          setPlayerName(playerName);
+          setMode('player');
+          window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=player&gameId=${game.id}`);
         }}
       />
     );

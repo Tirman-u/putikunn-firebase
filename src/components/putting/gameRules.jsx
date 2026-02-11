@@ -68,6 +68,16 @@ export const GAME_FORMATS = {
     startDistance: 7,
     puttsPerRound: 5,
     randomMode: true
+  },
+  time_ladder: {
+    name: 'Aja väljakutse',
+    minDistance: 5,
+    maxDistance: 10,
+    startDistance: 5,
+    puttsPerRound: 1,
+    singlePuttMode: true,
+    streakTarget: 5,
+    timeMode: true
   }
 };
 
@@ -132,6 +142,9 @@ export function calculateRoundScore(distance, madeCount) {
 export function isGameComplete(gameType, puttCount) {
   // Streak challenge never auto-completes
   if (gameType === 'streak_challenge') {
+    return false;
+  }
+  if (gameType === 'time_ladder') {
     return false;
   }
   const format = GAME_FORMATS[gameType];

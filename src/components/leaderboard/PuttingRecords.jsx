@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { toast } from 'sonner';
 import { normalizeLeaderboardGender } from '@/lib/leaderboard-utils';
+import { formatDuration } from '@/lib/time-format';
 
 export default function PuttingRecords() {
   const [selectedView, setSelectedView] = useState('general_classic');
@@ -28,6 +29,7 @@ export default function PuttingRecords() {
     { id: 'general_short', label: 'Short', leaderboardType: 'general', gameType: 'short' },
     { id: 'general_streak_challenge', label: 'Streak', leaderboardType: 'general', gameType: 'streak_challenge' },
     { id: 'general_random_distance', label: 'Random', leaderboardType: 'general', gameType: 'random_distance' },
+    { id: 'general_time_ladder', label: 'Aja väljakutse', leaderboardType: 'general', gameType: 'time_ladder' },
     { id: 'general_around_the_world', label: 'Around the World', leaderboardType: 'general', gameType: 'around_the_world' },
     { id: 'discgolf_ee', label: 'DG.ee', leaderboardType: 'general', gameType: 'classic', hostedOnly: true }
   ];
@@ -56,13 +58,13 @@ export default function PuttingRecords() {
     }
   }, [selectedView]);
 
-  const fetchLeaderboardRows = async (filter) => {
+  const fetchLeaderboardRows = async (filter, sortOrder) => {
     const rows = [];
     let skip = 0;
 
     while (rows.length < MAX_FETCH) {
       const limit = Math.min(FETCH_BATCH_SIZE, MAX_FETCH - rows.length);
-      const chunk = await base44.entities.LeaderboardEntry.filter(filter, '-score', limit, skip);
+      const chunk = await base44.entities.LeaderboardEntry.filter(filter, sortOrder, limit, skip);
       if (!chunk?.length) break;
 
       rows.push(...chunk);
@@ -82,13 +84,15 @@ export default function PuttingRecords() {
         leaderboard_type: effectiveView.leaderboardType,
         game_type: effectiveView.gameType
       };
-      return fetchLeaderboardRows(filter);
+      const sortOrder = effectiveView.gameType === 'time_ladder' ? 'score' : '-score';
+      return fetchLeaderboardRows(filter, sortOrder);
     },
     staleTime: 120000,
     refetchInterval: 120000
   });
 
   const isATWView = effectiveView?.gameType === 'around_the_world';
+  const isTimeView = effectiveView?.gameType === 'time_ladder';
   const needsGameData = Boolean(effectiveView?.hostedOnly || isATWView);
 
   const leaderboardGameIds = useMemo(() => {
@@ -238,12 +242,18 @@ export default function PuttingRecords() {
   filteredEntries.forEach(entry => {
     const key = getPlayerKey(entry);
     const existing = bestScoresByPlayer[key];
-    if (!existing || entry.score > existing.score || (entry.score === existing.score && entry.date > existing.date)) {
+    const isBetter = isTimeView
+      ? (!existing || entry.score < existing.score || (entry.score === existing.score && entry.date > existing.date))
+      : (!existing || entry.score > existing.score || (entry.score === existing.score && entry.date > existing.date));
+    if (isBetter) {
       bestScoresByPlayer[key] = entry;
     }
   });
 
-  const uniqueEntries = Object.values(bestScoresByPlayer).sort((a, b) => b.score - a.score);
+  const uniqueEntries = Object.values(bestScoresByPlayer).sort((a, b) => {
+    if (isTimeView) return a.score - b.score;
+    return b.score - a.score;
+  });
   const totalPages = Math.max(1, Math.ceil(uniqueEntries.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageStart = (safePage - 1) * PAGE_SIZE;
@@ -401,7 +411,9 @@ export default function PuttingRecords() {
                           </td>
                           <td className="py-3 px-2 text-center">
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
-                              <span className="text-lg font-bold text-emerald-600">{entry.score}</span>
+                              <span className="text-lg font-bold text-emerald-600">
+                                {isTimeView ? formatDuration(entry.score) : entry.score}
+                              </span>
                             </Link>
                           </td>
                           {!isATWView && (

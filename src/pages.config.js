@@ -23,6 +23,9 @@ import HostDuelPreviewPage from './pages/HostDuelPreview';
 import PlayerDuelPreviewPage from './pages/PlayerDuelPreview';
 import SoloDuelPreviewPage from './pages/SoloDuelPreview';
 import SubmitDiscgolf from './pages/SubmitDiscgolf';
+import TrainingLeague from './pages/TrainingLeague';
+import TrainingSeason from './pages/TrainingSeason';
+import TrainingSession from './pages/TrainingSession';
 import { FEATURE_FLAGS } from './lib/feature-flags';
 
 
@@ -48,6 +51,9 @@ export const PAGES = {
     "PlayerDuelPreview": PlayerDuelPreviewPage,
     "SoloDuelPreview": SoloDuelPreviewPage,
     "SubmitDiscgolf": SubmitDiscgolf,
+    "TrainingLeague": TrainingLeague,
+    "TrainingSeason": TrainingSeason,
+    "TrainingSession": TrainingSession,
 }
 
 if (FEATURE_FLAGS.puttingKing) {

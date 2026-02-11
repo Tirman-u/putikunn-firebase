@@ -907,11 +907,21 @@ export default function TrainerGroupDashboard() {
           <HomeButton />
         </div>
 
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-800">{group?.name || 'Treening'}</h1>
-          <p className="text-sm text-slate-500">
-            {canManageTraining ? 'Treeneri dashboard' : 'Treeningu vaade'}
-          </p>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">{group?.name || 'Treening'}</h1>
+            <p className="text-sm text-slate-500">
+              {canManageTraining ? 'Treeneri dashboard' : 'Treeningu vaade'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`${createPageUrl('TrainingLeague')}?groupId=${groupId}`)}
+            className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 dark:bg-black dark:border-white/10 dark:text-emerald-300"
+          >
+            <Trophy className="w-4 h-4" />
+            LIIGA
+          </button>
         </div>
 
         <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-8 dark:bg-black dark:border-white/10">

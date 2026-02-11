@@ -1,7 +1,7 @@
 import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { GraduationCap, Users, LogOut, Plus } from 'lucide-react';
+import { GraduationCap, Users, LogOut, Plus, Trophy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { db } from '@/lib/firebase';
@@ -542,6 +542,20 @@ export default function JoinTraining() {
                         {(!isPrivileged && !confirmedByGroup[group.id]) ? 'Ootab kinnitust' : 'Ava trenn'}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => navigate(`${createPageUrl('TrainingLeague')}?groupId=${group.id}`)}
+                      disabled={!isPrivileged && !confirmedByGroup[group.id]}
+                      className={cn(
+                        'inline-flex items-center gap-1 text-[11px] font-semibold',
+                        !isPrivileged && !confirmedByGroup[group.id]
+                          ? 'text-slate-400 cursor-not-allowed'
+                          : 'text-emerald-600 hover:text-emerald-700'
+                      )}
+                    >
+                      <Trophy className="w-3 h-3" />
+                      LIIGA
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleLeaveGroup(group.id, group.name)}

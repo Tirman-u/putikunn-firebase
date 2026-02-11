@@ -7,6 +7,7 @@ Reegel: arendus ainult TEST keskkonnas (test.putikunn.ee). Prod jääb puutumata
 - Putting King: flow + loogika review, parandused, et mäng tööle saada.
 - Uus SOLO mäng: 5m start → 10m, 5 järjest sees liigutab +1m, ajapõhine tabel; kettavalik 3/5/7.
 - Treeningu liigatabel: treeningu lõpu mäng(ud) + offline mäng → punktid; hooaja tabel (putikuningas) + “paranda oma parimat” boonus.
+- Treeningu liiga (HC): grupp + kellaaeg; hooaeg start/end + “trenni jäänud”; osalus 1p + HC boonus; ATW/Classic/Short kõik HC; offline punktid käsitsi.
 
 ## ✅ Done (viimati tehtud)
 - Treeneri süsteem päriselt tööle (grupid/PIN/UI/permissions).

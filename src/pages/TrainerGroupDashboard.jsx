@@ -157,25 +157,56 @@ export default function TrainerGroupDashboard() {
 
   const slots = Array.isArray(group?.slots) ? group.slots : [];
 
+  const collapsedStorageKey = React.useMemo(() => {
+    if (!groupId) return null;
+    return `training_slots_collapsed_${groupId}`;
+  }, [groupId]);
+
+  const persistCollapsedSlots = React.useCallback((next) => {
+    if (!collapsedStorageKey || typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(collapsedStorageKey, JSON.stringify(next));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [collapsedStorageKey]);
+
   React.useEffect(() => {
     if (!slots.length) return;
+    let stored = {};
+    if (collapsedStorageKey && typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(collapsedStorageKey);
+        stored = raw ? JSON.parse(raw) : {};
+      } catch {
+        stored = {};
+      }
+    }
     setCollapsedSlots((prev) => {
       const next = { ...prev };
       slots.forEach((slot) => {
+        if (stored?.[slot.id] !== undefined) {
+          next[slot.id] = stored[slot.id];
+          return;
+        }
         if (next[slot.id] === undefined) {
           next[slot.id] = defaultCollapsed;
         }
       });
       return next;
     });
-  }, [slots, defaultCollapsed]);
+  }, [slots, defaultCollapsed, collapsedStorageKey]);
 
   const toggleSlotCollapse = React.useCallback((slotId) => {
-    setCollapsedSlots((prev) => ({
-      ...prev,
-      [slotId]: !prev[slotId]
-    }));
-  }, []);
+    setCollapsedSlots((prev) => {
+      const next = {
+        ...prev,
+        [slotId]: !prev[slotId]
+      };
+      persistCollapsedSlots(next);
+      return next;
+    });
+  }, [persistCollapsedSlots]);
   const attendanceBySlot = (slot) => getSlotAvailability(slot, group, weekKey);
   const normalizeSlotData = (slotData = {}) => ({
     ...slotData,
@@ -1782,46 +1813,6 @@ export default function TrainerGroupDashboard() {
             </div>
           )}
 
-          {canManageTraining && (
-            <div className="mt-6 rounded-[22px] border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10">
-              <div className="text-xs font-semibold text-slate-500 mb-3">Lisa uus aeg</div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <select
-                  value={newSlot.day}
-                  onChange={(event) => setNewSlot((prev) => ({ ...prev, day: event.target.value }))}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
-                >
-                  {TRAINING_DAYS.map((day) => (
-                    <option key={day.value} value={day.value}>
-                      {day.full}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="time"
-                  value={newSlot.time}
-                  onChange={(event) => setNewSlot((prev) => ({ ...prev, time: event.target.value }))}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
-                />
-                <input
-                  type="number"
-                  min={1}
-                  value={newSlot.maxSpots}
-                  onChange={(event) => setNewSlot((prev) => ({ ...prev, maxSpots: event.target.value }))}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
-                  placeholder="Kohti"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddSlot}
-                  disabled={isSavingSlot}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
-                >
-                  <Plus className="w-3 h-3" /> Lisa
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {(canManageTraining || hasConfirmedSpot) && (
@@ -1922,6 +1913,47 @@ export default function TrainerGroupDashboard() {
               </div>
             )}
           </div>
+          </div>
+        )}
+
+        {canManageTraining && (
+          <div className="mt-6 rounded-[22px] border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10">
+            <div className="text-xs font-semibold text-slate-500 mb-3">Lisa uus aeg</div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <select
+                value={newSlot.day}
+                onChange={(event) => setNewSlot((prev) => ({ ...prev, day: event.target.value }))}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+              >
+                {TRAINING_DAYS.map((day) => (
+                  <option key={day.value} value={day.value}>
+                    {day.full}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="time"
+                value={newSlot.time}
+                onChange={(event) => setNewSlot((prev) => ({ ...prev, time: event.target.value }))}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+              />
+              <input
+                type="number"
+                min={1}
+                value={newSlot.maxSpots}
+                onChange={(event) => setNewSlot((prev) => ({ ...prev, maxSpots: event.target.value }))}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+                placeholder="Kohti"
+              />
+              <button
+                type="button"
+                onClick={handleAddSlot}
+                disabled={isSavingSlot}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
+              >
+                <Plus className="w-3 h-3" /> Lisa
+              </button>
+            </div>
           </div>
         )}
       </div>

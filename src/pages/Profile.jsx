@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
+import { formatDuration } from '@/lib/time-format';
 import AIInsights from '@/components/profile/AIInsights';
 import AchievementsList, { getAchievements } from '@/components/profile/AchievementsList';
 import LoadingState from '@/components/ui/loading-state';
@@ -983,6 +984,9 @@ export default function Profile() {
                       const made = putts.filter(p => p.result === 'made').length;
                       const percentage = putts.length > 0 ? ((made / putts.length) * 100).toFixed(0) : 0;
                       const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+                      const isTimeLadder = game.game_type === 'time_ladder';
+                      const scoreLabel = isTimeLadder ? formatDuration(score) : score;
+                      const percentageLabel = isTimeLadder ? '—' : `${percentage}%`;
                       const gameFormat = GAME_FORMATS[game.game_type || 'classic'];
                       const canDeleteThis = canDeleteGame(game);
                       const isSelected = selectedGameIds.includes(game.id);
@@ -1024,10 +1028,10 @@ export default function Profile() {
                              </span>
                            </td>
                            <td className="py-3 px-2 text-right font-bold text-emerald-600">
-                             {score}
+                             {scoreLabel}
                            </td>
                            <td className="py-3 px-2 text-right text-slate-700">
-                             {percentage}%
+                             {percentageLabel}
                            </td>
                            <td className="py-3 px-2 text-center">
                              <span className={`text-xs px-2 py-1 rounded ${

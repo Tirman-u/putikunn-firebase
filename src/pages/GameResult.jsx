@@ -15,6 +15,7 @@ import HostView from '@/components/putting/HostView';
 import { createPageUrl } from '@/utils';
 import LoadingState from '@/components/ui/loading-state';
 import useRealtimeGame from '@/hooks/use-realtime-game';
+import { formatDuration } from '@/lib/time-format';
 import {
   buildLeaderboardIdentityFilter,
   deleteGameAndLeaderboardEntries,
@@ -191,7 +192,10 @@ export default function GameResult() {
       };
 
       if (existingEntry) {
-        if (score > existingEntry.score) {
+        const existingScore = Number(existingEntry.score || 0);
+        const currentScore = Number(score || 0);
+        const isBetter = isTimeLadder ? currentScore < existingScore : currentScore > existingScore;
+        if (isBetter) {
           await base44.entities.LeaderboardEntry.update(existingEntry.id, payload);
           return { updated: true };
         }
@@ -205,7 +209,10 @@ export default function GameResult() {
       if (result.updated) {
         toast.success('Tulemus edetabelisse saadetud!');
       } else {
-        toast.info(`Sinu parim tulemus (${result.existing}) on sellest mängust kõrgem`);
+        const existingLabel = isTimeLadder
+          ? formatDuration(result.existing)
+          : result.existing;
+        toast.info(`Sinu parim tulemus (${existingLabel}) on sellest mängust kõrgem`);
       }
       setShowSubmitDialog(false);
     }
@@ -353,6 +360,12 @@ export default function GameResult() {
 
   const gameType = game.game_type || 'classic';
   const gameFormat = GAME_FORMATS[gameType];
+  const isTimeLadder = gameType === 'time_ladder';
+  const timeConfig = game.time_ladder_config || {};
+  const timeStartDistance = timeConfig.start_distance || gameFormat.minDistance;
+  const timeEndDistance = timeConfig.end_distance || gameFormat.maxDistance;
+  const timeRangeLabel = `${timeStartDistance}m - ${timeEndDistance}m`;
+  const timeDiscLabel = timeConfig.discs_per_turn ? `${timeConfig.discs_per_turn} ketast` : null;
   const totalRounds = getTotalRounds(gameType);
   const isHostedGame = Boolean(game.pin && game.pin !== '0000');
   const canSubmitDgForGame = canSubmitDiscgolf && isHostedClassicGame(game);
@@ -388,11 +401,16 @@ export default function GameResult() {
       putts,
       frames
     };
-  }).sort((a, b) => b.totalPoints - a.totalPoints);
+  }).sort((a, b) => (isTimeLadder ? a.totalPoints - b.totalPoints : b.totalPoints - a.totalPoints));
+  const bestTimeLabel = isTimeLadder && playerStats.length > 0
+    ? formatDuration(playerStats[0].totalPoints)
+    : null;
 
   const handleShare = async () => {
     const shareText = `${game.name} - ${gameFormat.name}\n\nTulemused:\n${playerStats.map(p => 
-      `${p.name}: ${p.totalPoints} punkti (${p.puttingPercentage}%)`
+      isTimeLadder
+        ? `${p.name}: ${formatDuration(p.totalPoints)}`
+        : `${p.name}: ${p.totalPoints} punkti (${p.puttingPercentage}%)`
     ).join('\n')}`;
     
     try {
@@ -444,7 +462,9 @@ export default function GameResult() {
             <div>
               <div className="text-sm text-slate-500 mb-1">Formaat</div>
               <div className="font-bold text-slate-800">{gameFormat.name}</div>
-              <div className="text-xs text-slate-500">{gameFormat.minDistance}m - {gameFormat.maxDistance}m</div>
+              <div className="text-xs text-slate-500">
+                {isTimeLadder ? timeRangeLabel : `${gameFormat.minDistance}m - ${gameFormat.maxDistance}m`}
+              </div>
             </div>
             <div>
               <div className="text-sm text-slate-500 mb-1 flex items-center gap-1">
@@ -494,13 +514,56 @@ export default function GameResult() {
           </div>
         </div>
 
+        {isTimeLadder && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Aja väljakutse</h2>
+                <div className="text-xs text-slate-500">
+                  {timeRangeLabel}
+                  {timeDiscLabel ? ` • ${timeDiscLabel}` : ''}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-slate-500">Parim aeg</div>
+                <div className="text-2xl font-bold text-emerald-600">
+                  {bestTimeLabel || '—'}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {playerStats.map((player, index) => (
+                <div
+                  key={player.name}
+                  className="flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
+                      {index + 1}
+                    </div>
+                    <div className="font-semibold text-slate-800">{player.name}</div>
+                  </div>
+                  <div className="text-lg font-bold text-emerald-600">
+                    {formatDuration(player.totalPoints)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 text-xs text-slate-500">
+              Stopper: Start alguses, Stop finišis. 5 järjest sees → +1m, mööda → seeria nulli.
+            </div>
+          </div>
+        )}
+
         {/* Performance Analysis for single player games */}
-        {game.players.length === 1 && (
+        {game.players.length === 1 && !isTimeLadder && (
           <PerformanceAnalysis playerPutts={game.player_putts?.[game.players[0]] || []} />
         )}
 
         {/* Player Results */}
-        {!gameFormat.singlePuttMode ? (
+        {isTimeLadder ? null : !gameFormat.singlePuttMode ? (
           // Table view for classic, short, long formats
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="overflow-x-auto">

@@ -7,6 +7,7 @@ import { GAME_FORMATS } from '@/components/putting/gameRules';
 import LoadingState from '@/components/ui/loading-state';
 import { createPageUrl } from '@/utils';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 const TOP_N = 10;
 
@@ -82,7 +83,10 @@ export default function GroupProjector() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),_rgba(255,255,255,1)_55%)] px-6 pb-10 dark:bg-black">
       <div className="max-w-7xl mx-auto pt-6">
         <div className="flex items-center justify-between mb-6">
-          <BackButton />
+          <div className="flex items-center gap-2">
+            <BackButton />
+            <HomeButton />
+          </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-slate-800">{group.name}</h1>
             <p className="text-xs text-slate-500">Projektorivaade</p>

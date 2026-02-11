@@ -9,6 +9,7 @@ import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 import {
   deleteGameAndLeaderboardEntries,
   getLeaderboardEmail,
@@ -528,7 +529,10 @@ export default function ManageGames() {
       <div className="max-w-4xl mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-4">
-          <BackButton fallbackTo={createPageUrl('Home')} />
+          <div className="flex items-center gap-2">
+            <BackButton fallbackTo={createPageUrl('Home')} />
+            <HomeButton />
+          </div>
           <h1 className="text-2xl font-bold text-slate-800">Halda mänge</h1>
           <div className="w-16" />
         </div>

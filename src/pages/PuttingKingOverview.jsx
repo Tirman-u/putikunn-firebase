@@ -12,6 +12,7 @@ import PuttingKingRules from '@/components/putting/PuttingKingRules';
 import TournamentRulesDialog from '@/components/putting/TournamentRulesDialog';
 import LoadingState from '@/components/ui/loading-state';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 export default function PuttingKingOverview() {
   const navigate = useNavigate();
@@ -526,7 +527,10 @@ export default function PuttingKingOverview() {
         <TournamentRulesDialog onClose={() => setShowRulesDialog(false)} />
       )}
       <div className="max-w-7xl mx-auto pt-8">
-        <BackButton className="mb-6" />
+        <div className="mb-6 flex items-center gap-2">
+          <BackButton />
+          <HomeButton />
+        </div>
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">{tournament.name}</h1>

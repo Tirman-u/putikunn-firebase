@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { GAME_FORMATS } from './gameRules';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 export default function JoinGame({ onJoin, onBack }) {
   const [pin, setPin] = useState('');
@@ -179,8 +180,9 @@ export default function JoinGame({ onJoin, onBack }) {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
       <div className="max-w-lg mx-auto pt-6 pb-12">
         {/* Back Button */}
-        <div className="mb-6">
+        <div className="mb-6 flex items-center gap-2">
           <BackButton onClick={onBack} />
+          <HomeButton />
         </div>
 
         <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm space-y-4 dark:bg-black dark:border-white/10">

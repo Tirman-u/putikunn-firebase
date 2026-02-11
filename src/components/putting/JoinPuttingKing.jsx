@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Trophy, Calendar } from 'lucide-react';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 export default function JoinPuttingKing({ onJoin, onBack }) {
   const [pin, setPin] = useState('');
@@ -95,8 +96,9 @@ export default function JoinPuttingKing({ onJoin, onBack }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
       <div className="max-w-lg mx-auto pt-16">
-        <div className="mb-8">
+        <div className="mb-8 flex items-center gap-2">
           <BackButton onClick={onBack} />
+          <HomeButton />
         </div>
 
         <div className="text-center mb-8">

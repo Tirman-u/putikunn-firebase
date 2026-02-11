@@ -8,6 +8,7 @@ import { db } from '@/lib/firebase';
 import { createPageUrl } from '@/utils';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 import { getDayFullLabel, getSlotAvailability, getWeekKey } from '@/lib/training-utils';
 import { cn } from '@/lib/utils';
 import {
@@ -488,8 +489,9 @@ export default function JoinTraining() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
       <div className="max-w-xl mx-auto pt-6 pb-12">
-        <div className="mb-6">
+        <div className="mb-6 flex items-center gap-2">
           <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
+          <HomeButton />
         </div>
 
         <div className="mb-6">

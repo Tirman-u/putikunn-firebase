@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 import { Button } from '@/components/ui/button';
 import useRealtimeDuelGame from '@/hooks/use-realtime-duel-game';
 import {
@@ -72,7 +73,10 @@ export default function DuelHostControl() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
         <div className="max-w-3xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
-            <BackButton onClick={() => navigate(-1)} />
+            <div className="flex items-center gap-2">
+              <BackButton onClick={() => navigate(-1)} />
+              <HomeButton />
+            </div>
             <div className="text-sm font-semibold text-slate-700">Sõbraduell (Võistlusaken)</div>
             <div className="w-12" />
           </div>
@@ -89,7 +93,10 @@ export default function DuelHostControl() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
         <div className="max-w-3xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
-            <BackButton onClick={() => navigate(-1)} />
+            <div className="flex items-center gap-2">
+              <BackButton onClick={() => navigate(-1)} />
+              <HomeButton />
+            </div>
             <div className="text-sm font-semibold text-slate-700">Sõbraduell (Võistlusaken)</div>
             <div className="w-12" />
           </div>
@@ -106,7 +113,10 @@ export default function DuelHostControl() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
         <div className="max-w-3xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
-            <BackButton onClick={() => navigate(-1)} />
+            <div className="flex items-center gap-2">
+              <BackButton onClick={() => navigate(-1)} />
+              <HomeButton />
+            </div>
             <div className="text-sm font-semibold text-slate-700">Sõbraduell (Võistlusaken)</div>
             <div className="w-12" />
           </div>
@@ -182,7 +192,10 @@ export default function DuelHostControl() {
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
       <div className="max-w-5xl mx-auto px-4 pb-10">
         <div className="flex items-center justify-between pt-6 pb-4">
-          <BackButton fallbackTo={`${createPageUrl('DuelHost')}?id=${gameId}`} />
+          <div className="flex items-center gap-2">
+            <BackButton fallbackTo={`${createPageUrl('DuelHost')}?id=${gameId}`} />
+            <HomeButton />
+          </div>
           <div className="text-sm font-semibold text-slate-700">Sõbraduell (Võistlusaken)</div>
           <div className="w-12" />
         </div>

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Copy } from 'lucide-react';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 import { createPageUrl } from '@/utils';
 import DuelHostView from '@/components/putting/DuelHostView';
 import { createEmptyDuelState } from '@/lib/duel-utils';
@@ -66,7 +67,10 @@ export default function DuelHost() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
         <div className="max-w-5xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
-            <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
+            <div className="flex items-center gap-2">
+              <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
+              <HomeButton />
+            </div>
             <div className="text-sm font-semibold text-slate-700">Sõbraduell (HOST)</div>
             <div className="w-12" />
           </div>
@@ -81,7 +85,10 @@ export default function DuelHost() {
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
       <div className="max-w-lg mx-auto px-4 pb-10">
         <div className="flex items-center justify-between pt-6 pb-4">
-          <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
+          <div className="flex items-center gap-2">
+            <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
+            <HomeButton />
+          </div>
           <div className="text-sm font-semibold text-slate-700">Sõbraduell (HOST)</div>
           <div className="w-12" />
         </div>

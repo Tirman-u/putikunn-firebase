@@ -7,6 +7,7 @@ import { Shield, UserCog } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 export default function AdminUsers() {
   const navigate = useNavigate();
@@ -74,10 +75,16 @@ export default function AdminUsers() {
               >
                 Tee mind superadminiks
               </Button>
-              <BackButton onClick={() => navigate(-1)} />
+              <div className="flex items-center gap-2">
+                <BackButton onClick={() => navigate(-1)} />
+                <HomeButton />
+              </div>
             </div>
           ) : (
-            <BackButton onClick={() => navigate(-1)} />
+            <div className="flex items-center gap-2">
+              <BackButton onClick={() => navigate(-1)} />
+              <HomeButton />
+            </div>
           )}
         </div>
       </div>
@@ -102,7 +109,10 @@ export default function AdminUsers() {
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <div className="max-w-5xl mx-auto p-4">
         <div className="flex items-center justify-between mb-6 pt-4">
-          <BackButton />
+          <div className="flex items-center gap-2">
+            <BackButton />
+            <HomeButton />
+          </div>
           <div className="flex items-center gap-2">
             <UserCog className="w-6 h-6 text-slate-700" />
             <h1 className="text-2xl font-bold text-slate-800">Kasutajate haldus</h1>

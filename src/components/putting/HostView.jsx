@@ -16,6 +16,7 @@ import {
   resolveLeaderboardPlayer
 } from '@/lib/leaderboard-utils';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 export default function HostView({ gameId, onExit }) {
   const [copied, setCopied] = useState(false);
@@ -326,7 +327,10 @@ export default function HostView({ gameId, onExit }) {
       <div className="max-w-6xl mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-4">
-          <BackButton onClick={onExit} label="Välju" />
+          <div className="flex items-center gap-2">
+            <BackButton onClick={onExit} label="Välju" />
+            <HomeButton />
+          </div>
           <h2 className="text-xl font-bold text-slate-800">{game.name}</h2>
           <div className="w-16" />
         </div>

@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { toast } from 'sonner';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 export default function PuttingKingSetup() {
   const navigate = useNavigate();
@@ -178,7 +179,10 @@ export default function PuttingKingSetup() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
       <div className="max-w-2xl mx-auto pt-8">
-        <BackButton className="mb-6" />
+        <div className="mb-6 flex items-center gap-2">
+          <BackButton />
+          <HomeButton />
+        </div>
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">

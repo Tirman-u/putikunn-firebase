@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import TournamentRulesDialog from '@/components/putting/TournamentRulesDialog';
 import JoinPuttingKing from '@/components/putting/JoinPuttingKing';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 export default function PuttingKing() {
   const navigate = useNavigate();
@@ -58,7 +59,10 @@ export default function PuttingKing() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
       <div className="max-w-4xl mx-auto pt-8">
-        <BackButton className="mb-6" />
+        <div className="mb-6 flex items-center gap-2">
+          <BackButton />
+          <HomeButton />
+        </div>
 
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg">

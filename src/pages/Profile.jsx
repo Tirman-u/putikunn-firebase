@@ -10,6 +10,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import AIInsights from '@/components/profile/AIInsights';
 import AchievementsList, { getAchievements } from '@/components/profile/AchievementsList';
@@ -453,7 +454,10 @@ export default function Profile() {
         {/* Header */}
         <div className="mb-5 pt-2">
           <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3">
-            <BackButton onClick={() => navigate(-1)} showLabel={false} className="h-9 w-9 justify-center px-0" />
+            <div className="flex items-center gap-2">
+              <BackButton onClick={() => navigate(-1)} showLabel={false} className="h-9 w-9 justify-center px-0" />
+              <HomeButton showLabel={false} className="h-9 w-9 justify-center px-0" />
+            </div>
             <div className="text-center text-sm font-semibold text-slate-800">Minu profiil</div>
             <div className="h-9 w-9" />
           </div>

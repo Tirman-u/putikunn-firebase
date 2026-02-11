@@ -29,6 +29,7 @@ import {
   isGameComplete 
 } from './gameRules';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 const PLAYER_STATE_KEYS = [
   'player_putts',
@@ -906,7 +907,10 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       <div className="max-w-lg mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 pt-4">
-          <BackButton onClick={handleExit} showLabel={false} className="px-2" />
+          <div className="flex items-center gap-2">
+            <BackButton onClick={handleExit} showLabel={false} className="px-2" />
+            <HomeButton showLabel={false} className="px-2" />
+          </div>
           <div className="text-center">
             <h2 className="text-lg font-bold text-slate-800">{currentState.name || game.name}</h2>
             <p className="text-sm text-slate-500">

@@ -7,6 +7,7 @@ import LoadingState from '@/components/ui/loading-state';
 import useATWGameState from '@/hooks/use-atw-game-state';
 import { deleteGameAndLeaderboardEntries } from '@/lib/leaderboard-utils';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 
 
@@ -45,7 +46,10 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
         <div className="max-w-4xl mx-auto px-4 pt-8 pb-12">
           <div className="flex items-center justify-between mb-6">
-            <BackButton onClick={() => setShowLeaderboard(false)} />
+            <div className="flex items-center gap-2">
+              <BackButton onClick={() => setShowLeaderboard(false)} />
+              <HomeButton />
+            </div>
             <h1 className="text-2xl font-bold text-slate-800">{game.name}</h1>
             <div className="w-16" />
           </div>
@@ -111,7 +115,10 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
         <div className="max-w-md mx-auto px-4 pt-8">
           <div className="flex items-center justify-between mb-6">
-            <BackButton onClick={() => window.location.href = createPageUrl('Home')} />
+            <div className="flex items-center gap-2">
+              <BackButton onClick={() => window.location.href = createPageUrl('Home')} />
+              <HomeButton />
+            </div>
           </div>
 
           <div className="text-center mb-8">
@@ -275,7 +282,10 @@ const ActiveGameView = React.memo(({
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <div className="max-w-md mx-auto px-4 pt-8">
         <div className="flex items-center justify-between mb-6">
-          <BackButton onClick={onExit} label="Välju" />
+          <div className="flex items-center gap-2">
+            <BackButton onClick={onExit} label="Välju" />
+            <HomeButton />
+          </div>
           <div className="text-sm text-slate-600">
             {isSolo ? 'Treening' : game.name}
           </div>

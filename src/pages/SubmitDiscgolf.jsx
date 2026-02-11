@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 export default function SubmitDiscgolf() {
   const queryClient = useQueryClient();
@@ -83,7 +84,10 @@ export default function SubmitDiscgolf() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-slate-800 mb-2">Ligipääs keelatud</h1>
           <p className="text-slate-600 mb-6">Tulemuste sisestamiseks on vaja treeneri õigusi.</p>
-          <BackButton className="mx-auto" />
+          <div className="flex items-center justify-center gap-2">
+            <BackButton />
+            <HomeButton />
+          </div>
         </div>
       </div>
     );
@@ -93,7 +97,10 @@ export default function SubmitDiscgolf() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <div className="max-w-2xl mx-auto p-4">
         <div className="flex items-center justify-between mb-6 pt-4">
-          <BackButton />
+          <div className="flex items-center gap-2">
+            <BackButton />
+            <HomeButton />
+          </div>
           <div className="w-16" />
         </div>
 

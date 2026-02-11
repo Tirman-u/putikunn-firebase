@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import LoadingState from '@/components/ui/loading-state';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 export default function GroupResult() {
   const [searchParams] = useSearchParams();
@@ -110,7 +111,10 @@ export default function GroupResult() {
       <div className="max-w-6xl mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-4">
-          <BackButton />
+          <div className="flex items-center gap-2">
+            <BackButton />
+            <HomeButton />
+          </div>
           <h1 className="text-2xl font-bold text-slate-800">{group.name}</h1>
           <Link
             to={`${createPageUrl('GroupProjector')}?id=${group.id}`}

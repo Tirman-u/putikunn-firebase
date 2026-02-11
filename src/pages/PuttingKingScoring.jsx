@@ -7,6 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import LoadingState from '@/components/ui/loading-state';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 export default function PuttingKingScoring() {
   const navigate = useNavigate();
@@ -138,7 +139,10 @@ export default function PuttingKingScoring() {
           </div>
           <h1 className="text-3xl font-bold text-slate-800 mb-2">Mäng lõpetatud!</h1>
           <p className="text-slate-600 mb-6">Võitja: Tiim {match.winner_team}</p>
-          <BackButton label="Tagasi ülevaatesse" className="mx-auto text-sm" />
+          <div className="flex items-center justify-center gap-2">
+            <BackButton label="Tagasi ülevaatesse" className="text-sm" />
+            <HomeButton />
+          </div>
         </div>
       </div>
     );
@@ -149,7 +153,10 @@ export default function PuttingKingScoring() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-4">
       <div className="max-w-2xl mx-auto pt-4">
-        <BackButton className="mb-6" />
+        <div className="mb-6 flex items-center gap-2">
+          <BackButton />
+          <HomeButton />
+        </div>
 
         {/* Team Cards with Integrated Scoring */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

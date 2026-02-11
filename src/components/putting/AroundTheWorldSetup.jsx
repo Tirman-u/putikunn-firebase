@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 import { toast } from 'sonner';
 import PuttTypeSelector from './PuttTypeSelector';
 
@@ -49,8 +50,9 @@ export default function AroundTheWorldSetup({ isSolo, onBack, onStart, initialPi
 
   return (
     <div className="max-w-md mx-auto px-4 pt-8">
-      <div className="mb-6">
+      <div className="mb-6 flex items-center gap-2">
         <BackButton onClick={onBack} />
+        <HomeButton />
       </div>
 
       <div className="text-center mb-8">

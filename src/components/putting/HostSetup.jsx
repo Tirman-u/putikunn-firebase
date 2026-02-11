@@ -5,6 +5,7 @@ import { createPageUrl } from '@/utils';
 import GameFormatSelector from './GameFormatSelector';
 import FormatRulesPopup from './FormatRulesPopup';
 import BackButton from '@/components/ui/back-button';
+import HomeButton from '@/components/ui/home-button';
 
 export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   const [gameName, setGameName] = useState('');
@@ -76,7 +77,10 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
       <div className="max-w-xl mx-auto pt-6 pb-10">
         <div className="mb-4">
           <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3">
-            <BackButton onClick={onBack} showLabel={false} className="h-9 w-9 justify-center px-0" />
+            <div className="flex items-center gap-2">
+              <BackButton onClick={onBack} showLabel={false} className="h-9 w-9 justify-center px-0" />
+              <HomeButton showLabel={false} className="h-9 w-9 justify-center px-0" />
+            </div>
             <div className="text-center text-sm font-semibold text-slate-800">
               {isSolo ? 'Soolotreening' : 'Hosti mäng'}
             </div>

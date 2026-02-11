@@ -65,6 +65,7 @@ export default function TrainerGroupDashboard() {
   const [selectedMember, setSelectedMember] = React.useState(null);
   const [isAssigningMember, setIsAssigningMember] = React.useState(false);
   const [collapsedSlots, setCollapsedSlots] = React.useState({});
+  const [joiningGameId, setJoiningGameId] = React.useState(null);
   const defaultCollapsed = React.useMemo(() => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth < 768;
@@ -893,6 +894,78 @@ export default function TrainerGroupDashboard() {
       toast.error(error?.message || 'Teate salvestamine ebaõnnestus');
     } finally {
       setIsSavingAnnouncement(false);
+    }
+  };
+
+  const joinTrainingGame = async (game) => {
+    if (!game?.id) return;
+    if (!user?.id) {
+      toast.error('Palun logi sisse');
+      return;
+    }
+    const playerName = user?.display_name || user?.full_name || user?.email || 'Mängija';
+    setJoiningGameId(game.id);
+    try {
+      const currentGame = game;
+      const hasPlayer = currentGame.players?.includes(playerName);
+      const updatedPlayerUids = {
+        ...(currentGame.player_uids || {}),
+        ...(user?.id ? { [playerName]: user.id } : {})
+      };
+      const updatedPlayerEmails = {
+        ...(currentGame.player_emails || {}),
+        ...(user?.email ? { [playerName]: user.email } : {})
+      };
+
+      if (hasPlayer) {
+        await base44.entities.Game.update(currentGame.id, {
+          player_uids: updatedPlayerUids,
+          player_emails: updatedPlayerEmails
+        });
+      } else {
+        const gameType = currentGame.game_type || 'classic';
+        const format = GAME_FORMATS[gameType];
+        const startDistance = format?.startDistance ?? 0;
+        const updatedPlayers = [...(currentGame.players || []), playerName];
+        const updatedDistances = { ...(currentGame.player_distances || {}), [playerName]: startDistance };
+        const updatedPutts = { ...(currentGame.player_putts || {}), [playerName]: [] };
+        const updatedPoints = { ...(currentGame.total_points || {}), [playerName]: 0 };
+        const updateData = {
+          players: updatedPlayers,
+          player_distances: updatedDistances,
+          player_putts: updatedPutts,
+          total_points: updatedPoints,
+          player_uids: updatedPlayerUids,
+          player_emails: updatedPlayerEmails
+        };
+        if (gameType === 'around_the_world') {
+          updateData.atw_state = {
+            ...(currentGame.atw_state || {}),
+            [playerName]: {
+              current_distance_index: 0,
+              direction: 'UP',
+              laps_completed: 0,
+              turns_played: 0,
+              total_makes: 0,
+              total_putts: 0,
+              current_distance_points: 0,
+              current_round_draft: { attempts: [], is_finalized: false },
+              history: [],
+              best_score: 0,
+              best_laps: 0,
+              best_accuracy: 0,
+              attempts_count: 0
+            }
+          };
+        }
+        await base44.entities.Game.update(currentGame.id, updateData);
+      }
+
+      navigate(`${createPageUrl('Home')}?mode=player&gameId=${currentGame.id}&from=training`);
+    } catch (error) {
+      toast.error(error?.message || 'Mänguga liitumine ebaõnnestus');
+    } finally {
+      setJoiningGameId(null);
     }
   };
 
@@ -1767,14 +1840,24 @@ export default function TrainerGroupDashboard() {
                   return (
                     <div
                       key={game.id}
-                      className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 dark:bg-black dark:border-white/10"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-white px-4 py-3 dark:bg-black dark:border-white/10"
                     >
                       <div>
                         <div className="text-sm font-semibold text-slate-800">{game.name}</div>
                         <div className="text-xs text-slate-500">{format.name || game.game_type}</div>
                       </div>
-                      <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                        PIN: {game.pin}
+                      <div className="flex items-center gap-3">
+                        <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                          PIN: {game.pin}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => joinTrainingGame(game)}
+                          disabled={joiningGameId === game.id}
+                          className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-emerald-300"
+                        >
+                          {joiningGameId === game.id ? 'Liitun...' : 'Liitu'}
+                        </button>
                       </div>
                     </div>
                   );

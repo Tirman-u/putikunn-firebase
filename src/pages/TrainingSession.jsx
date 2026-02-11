@@ -193,17 +193,19 @@ export default function TrainingSession() {
   }, [results]);
 
   const createAppEventFromGame = async (game) => {
-    if (!session || !season || !group) return;
-    if (!game?.id) return;
+    if (!session || !season || !group) {
+      return { ok: false, message: 'Treeningu andmed puuduvad' };
+    }
+    if (!game?.id) {
+      return { ok: false, message: 'Mäng puudub' };
+    }
     const existingEvent = events.find((entry) => entry?.source_game_id === game.id);
     if (existingEvent) {
-      toast.error('See mäng on juba lisatud');
-      return;
+      return { ok: false, message: 'See mäng on juba lisatud' };
     }
     const players = getGamePlayers(game);
     if (players.length === 0) {
-      toast.error('Mängijalist tühi');
-      return;
+      return { ok: false, message: 'Mängijalist tühi' };
     }
 
     const metricKey = game.game_type || 'unknown';
@@ -292,6 +294,7 @@ export default function TrainingSession() {
     });
 
     await batch.commit();
+    return { ok: true };
   };
 
   const handleCreateAppEvent = async () => {
@@ -308,7 +311,11 @@ export default function TrainingSession() {
         toast.error('Mängu ei leitud');
         return;
       }
-      await createAppEventFromGame(games[0]);
+      const result = await createAppEventFromGame(games[0]);
+      if (!result?.ok) {
+        toast.error(result?.message || 'Eventi lisamine ebaõnnestus');
+        return;
+      }
       setAppPin('');
       setAppName('');
       setAppLowerIsBetter(false);
@@ -327,7 +334,11 @@ export default function TrainingSession() {
     if (!session || !season || !group) return;
     setIsSavingApp(true);
     try {
-      await createAppEventFromGame(game);
+      const result = await createAppEventFromGame(game);
+      if (!result?.ok) {
+        toast.error(result?.message || 'Eventi lisamine ebaõnnestus');
+        return;
+      }
       setAppName('');
       queryClient.invalidateQueries({ queryKey: ['training-events', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['training-event-results', sessionId] });

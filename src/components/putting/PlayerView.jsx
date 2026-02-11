@@ -192,11 +192,16 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const totalPutts = putts.length;
     const madePutts = putts.filter(p => p.result === 'made').length;
     const totalPoints = state.total_points?.[playerName] || 0;
+    const gameType = state.game_type || 'classic';
+    const potentialMaxScore = gameType === 'streak_challenge'
+      ? Math.max(state.player_highest_streaks?.[playerName] || 0, totalPoints)
+      : putts.reduce((sum, putt) => sum + (putt?.distance || 0), 0);
 
     return {
       total_putts: totalPutts,
       made_putts: madePutts,
       total_points: totalPoints,
+      potential_max_score: potentialMaxScore,
       updated_at: new Date().toISOString()
     };
   }, [playerName]);

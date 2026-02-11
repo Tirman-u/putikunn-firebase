@@ -37,12 +37,6 @@ export default function PuttingRecords() {
     queryFn: () => base44.auth.me()
   });
 
-  const { data: users = [] } = useQuery({
-    queryKey: ['leaderboard-users'],
-    queryFn: () => base44.entities.User.list(),
-    staleTime: 120000
-  });
-
   const currentView = viewTypes.find(v => v.id === selectedView);
   const effectiveView = useMemo(() => {
     if (!currentView) return null;
@@ -90,12 +84,17 @@ export default function PuttingRecords() {
       };
       return fetchLeaderboardRows(filter);
     },
-    refetchInterval: 30000
+    staleTime: 120000,
+    refetchInterval: 120000
   });
 
+  const isATWView = effectiveView?.gameType === 'around_the_world';
+  const needsGameData = Boolean(effectiveView?.hostedOnly || isATWView);
+
   const leaderboardGameIds = useMemo(() => {
+    if (!needsGameData) return [];
     return Array.from(new Set(leaderboardEntries.map(entry => entry.game_id).filter(Boolean)));
-  }, [leaderboardEntries]);
+  }, [leaderboardEntries, needsGameData]);
 
   const { data: gamesById = {}, isLoading: isGamesLoading } = useQuery({
     queryKey: ['leaderboard-games', leaderboardGameIds.join('|')],
@@ -116,8 +115,8 @@ export default function PuttingRecords() {
       }
       return map;
     },
-    enabled: leaderboardGameIds.length > 0,
-    staleTime: 60000
+    enabled: leaderboardGameIds.length > 0 && needsGameData,
+    staleTime: 300000
   });
 
   const userRole = user?.app_role || 'user';
@@ -138,26 +137,6 @@ export default function PuttingRecords() {
       toast.error(error?.message || 'Kustutamine ebaonnestus');
     }
   });
-
-  const usersByUid = useMemo(() => {
-    const map = {};
-    users.forEach((u) => {
-      if (u?.id) {
-        map[u.id] = u;
-      }
-    });
-    return map;
-  }, [users]);
-
-  const usersByEmail = useMemo(() => {
-    const map = {};
-    users.forEach((u) => {
-      if (u?.email) {
-        map[u.email.trim().toLowerCase()] = u;
-      }
-    });
-    return map;
-  }, [users]);
 
   const normalizeText = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
   const currentUserEmail = normalizeText(user?.email);
@@ -182,44 +161,28 @@ export default function PuttingRecords() {
       });
   }, [leaderboardEntries]);
 
-  const resolveEntryUser = (entry) => {
-    const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
-    const mappedUid = entry?.player_uid || (entry?.player_name ? game?.player_uids?.[entry.player_name] : null);
-    if (mappedUid && usersByUid[mappedUid]) {
-      return usersByUid[mappedUid];
-    }
-    const mappedEmail = (entry?.player_email && entry.player_email !== 'unknown')
-      ? entry.player_email
-      : (entry?.player_name ? game?.player_emails?.[entry.player_name] : null);
-    const normalizedEmail = mappedEmail?.trim().toLowerCase();
-    if (normalizedEmail && usersByEmail[normalizedEmail]) {
-      return usersByEmail[normalizedEmail];
-    }
-    return null;
-  };
-
   const getResolvedGender = (entry) => {
-    const profile = resolveEntryUser(entry);
-    return normalizeLeaderboardGender(profile?.gender || entry?.player_gender) || null;
+    return normalizeLeaderboardGender(entry?.player_gender) || null;
   };
 
   const getResolvedPlayerName = (entry) => {
-    const profile = resolveEntryUser(entry);
-    return profile?.full_name || entry?.player_name;
+    if (entry?.player_name) return entry.player_name;
+    if (entry?.player_email && entry.player_email !== 'unknown') return entry.player_email;
+    return 'Mängija';
   };
 
   const isCurrentUserEntry = (entry) => {
     if (!user) return false;
-    const profile = resolveEntryUser(entry);
-    if (currentUserId && profile?.id && profile.id === currentUserId) return true;
-    const entryEmail = normalizeText(profile?.email || entry?.player_email);
+    if (currentUserId && entry?.player_uid && entry.player_uid === currentUserId) return true;
+    const entryEmail = normalizeText(entry?.player_email);
     if (currentUserEmail && entryEmail && currentUserEmail === entryEmail) return true;
-    const entryName = normalizeText(profile?.full_name || entry?.player_name);
+    const entryName = normalizeText(entry?.player_name);
     if (currentUserName && entryName && currentUserName === entryName) return true;
     return false;
   };
 
   const isHostedEntry = (entry) => {
+    if (entry?.is_hosted !== undefined) return Boolean(entry.is_hosted);
     const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
     return Boolean(game?.pin && game.pin !== '0000');
   };
@@ -227,7 +190,6 @@ export default function PuttingRecords() {
   const filteredEntries = leaderboardEntries.filter(entry => {
     if (!effectiveView) return false;
     if (entry.leaderboard_type !== effectiveView.leaderboardType) return false;
-    if (!entry?.game_id || !gamesById?.[entry.game_id]) return false;
     
     if (entry.game_type !== effectiveView.gameType) return false;
     if (effectiveView.hostedOnly && !isHostedEntry(entry)) return false;
@@ -249,7 +211,6 @@ export default function PuttingRecords() {
     return true;
   });
 
-  const isATWView = effectiveView?.gameType === 'around_the_world';
   const getAtwDiscsLabel = (entry) => {
     if (!isATWView) return null;
     const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
@@ -259,18 +220,14 @@ export default function PuttingRecords() {
   };
 
   const getPlayerKey = (entry) => {
-    const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
-    const profile = resolveEntryUser(entry);
-    if (profile?.id) return `uid:${profile.id}`;
+    if (entry?.player_uid) return `uid:${entry.player_uid}`;
 
-    const mappedEmail = entry?.player_name ? game?.player_emails?.[entry.player_name] : null;
-    const hostEmail = game?.host_user;
-    const email = normalizeText(profile?.email || entry?.player_email || mappedEmail);
-    if (email && email !== 'unknown' && email !== normalizeText(hostEmail)) {
+    const email = normalizeText(entry?.player_email);
+    if (email && email !== 'unknown') {
       return `email:${email}`;
     }
 
-    const resolvedName = normalizeText(profile?.full_name || entry?.player_name);
+    const resolvedName = normalizeText(entry?.player_name);
     if (resolvedName) return `name:${resolvedName}`;
 
     return `id:${entry.id}`;

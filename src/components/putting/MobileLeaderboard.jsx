@@ -25,10 +25,12 @@ export default function MobileLeaderboard({ game, onClose }) {
     const madePutts = putts.filter(p => p.result === 'made').length;
     const puttingPercentage = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
     const totalPoints = currentGame.total_points?.[player] || 0;
+    const potentialMaxScore = currentGame.live_stats?.[player]?.potential_max_score;
 
     return {
       name: player,
       totalPoints,
+      potentialMaxScore,
       puttingPercentage,
       totalPutts,
       madePutts
@@ -79,6 +81,7 @@ export default function MobileLeaderboard({ game, onClose }) {
                   <div className="font-bold text-slate-800">{player.name}</div>
                   <div className="text-xs text-slate-500">
                     {player.madePutts}/{player.totalPutts} • {player.puttingPercentage}%
+                    {player.potentialMaxScore !== undefined ? ` • Max ${player.potentialMaxScore}` : ''}
                   </div>
                 </div>
                 <div className={cn(

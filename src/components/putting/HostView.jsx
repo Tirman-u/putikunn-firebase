@@ -266,14 +266,6 @@ export default function HostView({ gameId, onExit }) {
     Boolean(user?.email && game?.host_user && user.email === game.host_user) || canSubmitDiscgolf;
   const scoreLabel = gameType === 'streak_challenge' ? 'Parim seeria' : 'Tulemus';
 
-  useEffect(() => {
-    if (!gameId || !gameType || isATWGame) return undefined;
-    const interval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [gameId, gameType, isATWGame, queryClient]);
-
   if (isLoading || !game) {
     return <LoadingState />;
   }
@@ -304,6 +296,7 @@ export default function HostView({ gameId, onExit }) {
         const totalPutts = liveStats?.total_putts ?? putts.length;
         const madePutts = liveStats?.made_putts ?? putts.filter(p => p.result === 'made').length;
         const totalPoints = liveStats?.total_points ?? game.total_points?.[playerName] ?? 0;
+        const potentialMaxScore = liveStats?.potential_max_score;
         const puttingPercentage = totalPutts > 0
           ? Math.round((madePutts / totalPutts) * 1000) / 10
           : 0;
@@ -311,6 +304,7 @@ export default function HostView({ gameId, onExit }) {
         return {
           name: playerName,
           totalPoints,
+          potentialMaxScore,
           totalPutts,
           madePutts,
           puttingPercentage
@@ -452,6 +446,7 @@ export default function HostView({ gameId, onExit }) {
                     <th className="text-left p-4 font-semibold text-slate-700">Mängija</th>
                     <th className="text-center p-4 font-semibold text-slate-700">{scoreLabel}</th>
                     <th className="text-center p-4 font-semibold text-slate-700">Putid</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">Max</th>
                     <th className="text-center p-4 font-semibold text-slate-700">Täpsus</th>
                   </tr>
                 </thead>
@@ -471,6 +466,9 @@ export default function HostView({ gameId, onExit }) {
                       </td>
                       <td className="p-4 text-center">
                         <div className="text-sm text-slate-500">{player.madePutts}/{player.totalPutts}</div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="text-sm text-slate-500">{player.potentialMaxScore ?? '-'}</div>
                       </td>
                       <td className="p-4 text-center">
                         <div className="text-sm text-slate-500">{player.puttingPercentage}%</div>

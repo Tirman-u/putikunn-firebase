@@ -4,6 +4,7 @@ Reegel: arendus ainult TEST keskkonnas (test.putikunn.ee). Prod jääb puutumata
 
 ## 🟡 Open
 - EST/EN keele tugi (praegu app ainult eesti keeles).
+- Putting King: flow + loogika review, parandused, et mäng tööle saada.
 
 ## ✅ Done (viimati tehtud)
 - Treeneri süsteem päriselt tööle (grupid/PIN/UI/permissions).

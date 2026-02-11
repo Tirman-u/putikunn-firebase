@@ -5,6 +5,7 @@ Reegel: arendus ainult TEST keskkonnas (test.putikunn.ee). Prod jääb puutumata
 ## 🟡 Open
 - EST/EN keele tugi (praegu app ainult eesti keeles).
 - Putting King: flow + loogika review, parandused, et mäng tööle saada.
+- Uus SOLO mäng: 5m start → 10m, 5 järjest sees liigutab +1m, ajapõhine tabel; kettavalik 3/5/7.
 
 ## ✅ Done (viimati tehtud)
 - Treeneri süsteem päriselt tööle (grupid/PIN/UI/permissions).

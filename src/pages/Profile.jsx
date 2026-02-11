@@ -237,7 +237,7 @@ export default function Profile() {
   myGames.forEach(game => {
     const points = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
     totalPoints += points;
-    if (points > bestScore) bestScore = points;
+    if (game.game_type !== 'time_ladder' && points > bestScore) bestScore = points;
   });
   const avgScore = myGames.length > 0 ? Math.round(totalPoints / myGames.length) : 0;
 

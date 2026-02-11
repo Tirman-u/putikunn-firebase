@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Trophy, Plus, Calendar } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -47,13 +47,15 @@ export default function TrainingLeague() {
     queryKey: ['training-seasons', groupId],
     enabled: !!groupId,
     queryFn: async () => {
-      const q = query(
-        collection(db, 'training_seasons'),
-        where('group_id', '==', groupId),
-        orderBy('start_date', 'desc')
-      );
+      const q = query(collection(db, 'training_seasons'), where('group_id', '==', groupId));
       const snap = await getDocs(q);
-      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      return snap.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => {
+          const aTime = a.start_date ? new Date(a.start_date).getTime() : 0;
+          const bTime = b.start_date ? new Date(b.start_date).getTime() : 0;
+          return bTime - aTime;
+        });
     },
     staleTime: 20000
   });
@@ -72,7 +74,18 @@ export default function TrainingLeague() {
   };
 
   const handleCreateSeason = async () => {
-    if (!groupId || !user?.id) return;
+    if (!groupId) {
+      toast.error('Grupi ID puudub');
+      return;
+    }
+    if (!user?.id) {
+      toast.error('Palun logi sisse');
+      return;
+    }
+    if (!canManageTraining) {
+      toast.error('Pole treeneri õigusi');
+      return;
+    }
     if (!startDate || !endDate) {
       toast.error('Vali hooaja algus ja lõpp');
       return;

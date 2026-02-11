@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Calendar, Trophy, Plus } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -56,11 +56,7 @@ export default function TrainingSeason() {
     queryKey: ['training-season-stats', seasonId],
     enabled: !!seasonId,
     queryFn: async () => {
-      const q = query(
-        collection(db, 'training_season_stats'),
-        where('season_id', '==', seasonId),
-        orderBy('points_total', 'desc')
-      );
+      const q = query(collection(db, 'training_season_stats'), where('season_id', '==', seasonId));
       const snap = await getDocs(q);
       return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
     },
@@ -71,13 +67,15 @@ export default function TrainingSeason() {
     queryKey: ['training-sessions', seasonId],
     enabled: !!seasonId,
     queryFn: async () => {
-      const q = query(
-        collection(db, 'training_sessions'),
-        where('season_id', '==', seasonId),
-        orderBy('date', 'desc')
-      );
+      const q = query(collection(db, 'training_sessions'), where('season_id', '==', seasonId));
       const snap = await getDocs(q);
-      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      return snap.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .sort((a, b) => {
+          const aTime = a.date ? new Date(a.date).getTime() : 0;
+          const bTime = b.date ? new Date(b.date).getTime() : 0;
+          return bTime - aTime;
+        });
     },
     staleTime: 10000
   });

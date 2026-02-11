@@ -13,7 +13,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { Calendar, Plus, Trophy, Timer, ClipboardList } from 'lucide-react';
+import { Calendar, Plus, Timer, ClipboardList } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -168,6 +168,16 @@ export default function TrainingSession() {
     return map;
   }, [members]);
 
+  const { data: groupGames = [], isLoading: isLoadingGroupGames } = useQuery({
+    queryKey: ['training-group-games-list', season?.group_id],
+    enabled: Boolean(season?.group_id && canManageTraining),
+    queryFn: async () => {
+      const games = await base44.entities.Game.filter({ training_group_id: season.group_id }, '-date', 20);
+      return games;
+    },
+    staleTime: 15000
+  });
+
   const slot = React.useMemo(() => {
     if (!group?.slots || !session?.slot_id) return null;
     return group.slots.find((item) => item.id === session.slot_id) || null;
@@ -181,6 +191,108 @@ export default function TrainingSession() {
     });
     return map;
   }, [results]);
+
+  const createAppEventFromGame = async (game) => {
+    if (!session || !season || !group) return;
+    if (!game?.id) return;
+    const existingEvent = events.find((entry) => entry?.source_game_id === game.id);
+    if (existingEvent) {
+      toast.error('See mäng on juba lisatud');
+      return;
+    }
+    const players = getGamePlayers(game);
+    if (players.length === 0) {
+      toast.error('Mängijalist tühi');
+      return;
+    }
+
+    const metricKey = game.game_type || 'unknown';
+    const scoreDirection = appLowerIsBetter ? SCORE_DIRECTIONS.LOWER : SCORE_DIRECTIONS.HIGHER;
+    const eventName = appName.trim() || game.name || metricKey;
+
+    const batch = writeBatch(db);
+    const eventRef = doc(collection(db, 'training_events'));
+    batch.set(eventRef, {
+      session_id: session.id,
+      season_id: season.id,
+      group_id: season.group_id,
+      slot_id: session.slot_id,
+      type: 'app',
+      name: eventName,
+      metric_key: metricKey,
+      score_direction: scoreDirection,
+      source_game_id: game.id,
+      created_by_uid: user?.id || null,
+      created_at: serverTimestamp()
+    });
+
+    players.forEach((playerName) => {
+      const stats = getLeaderboardStats(game, playerName);
+      const score = stats?.score ?? 0;
+      const uid = game?.player_uids?.[playerName];
+      const email = game?.player_emails?.[playerName];
+      const memberByUid = uid ? membersByUid[uid] : null;
+      const memberByEmail = email ? membersByEmail[email.trim().toLowerCase()] : null;
+      const displayName = memberByUid?.name || memberByEmail?.name || playerName;
+      const participantId = getParticipantId({ uid, email, name: displayName });
+      const existing = statsByParticipant[participantId];
+      const seasonBest = existing?.best_by_metric?.[metricKey];
+      const { hc, hcBonus, points } = computeHcPoints({
+        score,
+        seasonBest,
+        direction: scoreDirection
+      });
+
+      const shouldUpdateBest = isScoreBetter({
+        score,
+        best: seasonBest,
+        direction: scoreDirection
+      });
+      const nextBestByMetric = {
+        ...(existing?.best_by_metric || {}),
+        ...(shouldUpdateBest ? { [metricKey]: score } : {})
+      };
+
+      const nextPointsBySlot = {
+        ...(existing?.points_by_slot || {}),
+        [session.slot_id]: round1((existing?.points_by_slot?.[session.slot_id] || 0) + points)
+      };
+
+      const nextStats = {
+        season_id: season.id,
+        participant_id: participantId,
+        user_id: uid || memberByEmail?.uid || null,
+        player_name: displayName,
+        points_total: round1((existing?.points_total || 0) + points),
+        attendance_count: (existing?.attendance_count || 0) + 1,
+        points_by_slot: nextPointsBySlot,
+        best_by_metric: nextBestByMetric,
+        updated_at: new Date().toISOString()
+      };
+
+      const resultRef = doc(collection(db, 'training_event_results'));
+      batch.set(resultRef, {
+        event_id: eventRef.id,
+        session_id: session.id,
+        season_id: season.id,
+        group_id: season.group_id,
+        slot_id: session.slot_id,
+        participant_id: participantId,
+        user_id: uid || memberByEmail?.uid || null,
+        player_name: displayName,
+        score,
+        hc,
+        hc_bonus: hcBonus,
+        points,
+        created_at: serverTimestamp()
+      });
+
+      const statsRef = doc(db, 'training_season_stats', `${season.id}_${participantId}`);
+      batch.set(statsRef, nextStats, { merge: true });
+    });
+
+    await batch.commit();
+  };
 
   const handleCreateAppEvent = async () => {
     const cleanedPin = appPin.replace(/\D/g, '').slice(0, 4);
@@ -196,102 +308,27 @@ export default function TrainingSession() {
         toast.error('Mängu ei leitud');
         return;
       }
-      const game = games[0];
-      const players = getGamePlayers(game);
-      if (players.length === 0) {
-        toast.error('Mängijalist tühi');
-        return;
-      }
-
-      const metricKey = game.game_type || 'unknown';
-      const scoreDirection = appLowerIsBetter ? SCORE_DIRECTIONS.LOWER : SCORE_DIRECTIONS.HIGHER;
-      const eventName = appName.trim() || game.name || metricKey;
-
-      const batch = writeBatch(db);
-      const eventRef = doc(collection(db, 'training_events'));
-      batch.set(eventRef, {
-        session_id: session.id,
-        season_id: season.id,
-        group_id: season.group_id,
-        slot_id: session.slot_id,
-        type: 'app',
-        name: eventName,
-        metric_key: metricKey,
-        score_direction: scoreDirection,
-        source_game_id: game.id,
-        created_by_uid: user?.id || null,
-        created_at: serverTimestamp()
-      });
-
-      players.forEach((playerName) => {
-        const stats = getLeaderboardStats(game, playerName);
-        const score = stats?.score ?? 0;
-        const uid = game?.player_uids?.[playerName];
-        const email = game?.player_emails?.[playerName];
-        const memberByUid = uid ? membersByUid[uid] : null;
-        const memberByEmail = email ? membersByEmail[email.trim().toLowerCase()] : null;
-        const displayName = memberByUid?.name || memberByEmail?.name || playerName;
-        const participantId = getParticipantId({ uid, email, name: displayName });
-        const existing = statsByParticipant[participantId];
-        const seasonBest = existing?.best_by_metric?.[metricKey];
-        const { hc, hcBonus, points } = computeHcPoints({
-          score,
-          seasonBest,
-          direction: scoreDirection
-        });
-
-        const shouldUpdateBest = isScoreBetter({
-          score,
-          best: seasonBest,
-          direction: scoreDirection
-        });
-        const nextBestByMetric = {
-          ...(existing?.best_by_metric || {}),
-          ...(shouldUpdateBest ? { [metricKey]: score } : {})
-        };
-
-        const nextPointsBySlot = {
-          ...(existing?.points_by_slot || {}),
-          [session.slot_id]: round1((existing?.points_by_slot?.[session.slot_id] || 0) + points)
-        };
-
-        const nextStats = {
-          season_id: season.id,
-          participant_id: participantId,
-          user_id: uid || memberByEmail?.uid || null,
-          player_name: displayName,
-          points_total: round1((existing?.points_total || 0) + points),
-          attendance_count: (existing?.attendance_count || 0) + 1,
-          points_by_slot: nextPointsBySlot,
-          best_by_metric: nextBestByMetric,
-          updated_at: new Date().toISOString()
-        };
-
-        const resultRef = doc(collection(db, 'training_event_results'));
-        batch.set(resultRef, {
-          event_id: eventRef.id,
-          session_id: session.id,
-          season_id: season.id,
-          group_id: season.group_id,
-          slot_id: session.slot_id,
-          participant_id: participantId,
-          user_id: uid || memberByEmail?.uid || null,
-          player_name: displayName,
-          score,
-          hc,
-          hc_bonus: hcBonus,
-          points,
-          created_at: serverTimestamp()
-        });
-
-        const statsRef = doc(db, 'training_season_stats', `${season.id}_${participantId}`);
-        batch.set(statsRef, nextStats, { merge: true });
-      });
-
-      await batch.commit();
+      await createAppEventFromGame(games[0]);
       setAppPin('');
       setAppName('');
       setAppLowerIsBetter(false);
+      queryClient.invalidateQueries({ queryKey: ['training-events', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-event-results', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
+      toast.success('Event lisatud');
+    } catch (error) {
+      toast.error(error?.message || 'Eventi lisamine ebaõnnestus');
+    } finally {
+      setIsSavingApp(false);
+    }
+  };
+
+  const handleAddGroupGame = async (game) => {
+    if (!session || !season || !group) return;
+    setIsSavingApp(true);
+    try {
+      await createAppEventFromGame(game);
+      setAppName('');
       queryClient.invalidateQueries({ queryKey: ['training-events', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['training-event-results', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
@@ -441,6 +478,39 @@ export default function TrainingSession() {
                   value={appName}
                   onChange={(event) => setAppName(event.target.value)}
                 />
+                <div className="rounded-2xl border border-white/70 bg-white/70 p-3 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
+                  <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Trenni mängud</div>
+                  {isLoadingGroupGames ? (
+                    <div className="text-xs text-slate-400">Laen...</div>
+                  ) : groupGames.length === 0 ? (
+                    <div className="text-xs text-slate-400">Treeneri mänge ei leitud.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {groupGames.map((game) => (
+                        <div
+                          key={game.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-white/80 px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                        >
+                          <div>
+                            <div className="font-semibold">{game.name || game.game_type || 'Mäng'}</div>
+                            <div className="text-[11px] text-slate-500">
+                              {game.pin ? `PIN ${game.pin}` : 'PIN puudub'}
+                              {game.date ? ` • ${format(new Date(game.date), 'MMM d')}` : ''}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleAddGroupGame(game)}
+                            disabled={isSavingApp}
+                            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-emerald-300"
+                          >
+                            Lisa event
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Input
                     placeholder="Mängu PIN"

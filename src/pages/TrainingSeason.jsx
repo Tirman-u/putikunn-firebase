@@ -1,7 +1,18 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  doc,
+  deleteDoc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  where,
+  writeBatch
+} from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Calendar, Trophy, Plus } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -23,6 +34,7 @@ export default function TrainingSeason() {
   const [newSessionDate, setNewSessionDate] = React.useState('');
   const [newSessionSlotId, setNewSessionSlotId] = React.useState('');
   const [isCreatingSession, setIsCreatingSession] = React.useState(false);
+  const [isDeletingSeason, setIsDeletingSeason] = React.useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -130,6 +142,49 @@ export default function TrainingSeason() {
     }
   };
 
+  const deleteByQuery = async (q) => {
+    const snap = await getDocs(q);
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const docSnap of snap.docs) {
+      batch.delete(docSnap.ref);
+      count += 1;
+      if (count >= 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+    if (count > 0) {
+      await batch.commit();
+    }
+  };
+
+  const handleDeleteSeason = async () => {
+    if (!season?.id || !season?.group_id) return;
+    if (!canManageTraining) {
+      toast.error('Pole treeneri õigusi');
+      return;
+    }
+    const confirmed = window.confirm(`Kustuta hooaeg "${season.name}"? See eemaldab ka treeningud ja tulemused.`);
+    if (!confirmed) return;
+    setIsDeletingSeason(true);
+    try {
+      await deleteByQuery(query(collection(db, 'training_event_results'), where('season_id', '==', season.id)));
+      await deleteByQuery(query(collection(db, 'training_events'), where('season_id', '==', season.id)));
+      await deleteByQuery(query(collection(db, 'training_sessions'), where('season_id', '==', season.id)));
+      await deleteByQuery(query(collection(db, 'training_season_stats'), where('season_id', '==', season.id)));
+      await deleteDoc(doc(db, 'training_seasons', season.id));
+      queryClient.invalidateQueries({ queryKey: ['training-seasons', season.group_id] });
+      toast.success('Hooaeg kustutatud');
+      navigate(`${createPageUrl('TrainingLeague')}?groupId=${season.group_id}`);
+    } catch (error) {
+      toast.error(error?.message || 'Hooaja kustutamine ebaõnnestus');
+    } finally {
+      setIsDeletingSeason(false);
+    }
+  };
+
   if (!season) {
     return (
       <div className="min-h-screen bg-black" />
@@ -144,17 +199,29 @@ export default function TrainingSeason() {
           <HomeButton />
         </div>
 
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-emerald-600" />
-            {season.name}
-          </h1>
-          <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
-            <Calendar className="w-3 h-3" />
-            {season.start_date ? format(new Date(season.start_date), 'MMM d') : '-'} –{' '}
-            {season.end_date ? format(new Date(season.end_date), 'MMM d') : '-'}
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-emerald-600" />
+              {season.name}
+            </h1>
+            <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
+              <Calendar className="w-3 h-3" />
+              {season.start_date ? format(new Date(season.start_date), 'MMM d') : '-'} –{' '}
+              {season.end_date ? format(new Date(season.end_date), 'MMM d') : '-'}
+            </div>
+            <div className="text-xs text-emerald-600 mt-1">Trenni jäänud: {remaining.total}</div>
           </div>
-          <div className="text-xs text-emerald-600 mt-1">Trenni jäänud: {remaining.total}</div>
+          {canManageTraining && (
+            <button
+              type="button"
+              onClick={handleDeleteSeason}
+              disabled={isDeletingSeason}
+              className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-100 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-red-300"
+            >
+              {isDeletingSeason ? 'Kustutan...' : 'Kustuta hooaeg'}
+            </button>
+          )}
         </div>
 
         <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-6 dark:bg-black dark:border-white/10">

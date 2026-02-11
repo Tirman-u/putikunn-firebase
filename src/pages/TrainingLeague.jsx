@@ -119,6 +119,7 @@ export default function TrainingLeague() {
     }
   };
 
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),_rgba(255,255,255,1)_55%)] px-4 pb-12 dark:bg-black dark:text-slate-100">
       <div className="max-w-4xl mx-auto pt-6">

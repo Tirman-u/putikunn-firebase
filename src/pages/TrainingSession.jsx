@@ -50,7 +50,12 @@ export default function TrainingSession() {
   const [appName, setAppName] = React.useState('');
   const [appLowerIsBetter, setAppLowerIsBetter] = React.useState(false);
   const [offlineName, setOfflineName] = React.useState('');
+  const [offlineMode, setOfflineMode] = React.useState('points');
   const [offlinePoints, setOfflinePoints] = React.useState({});
+  const [offlineRanks, setOfflineRanks] = React.useState({});
+  const [offlineParticipants, setOfflineParticipants] = React.useState('');
+  const [offlineCutPercent, setOfflineCutPercent] = React.useState(70);
+  const [offlineCutBonus, setOfflineCutBonus] = React.useState(0.25);
   const [isSavingApp, setIsSavingApp] = React.useState(false);
   const [isSavingOffline, setIsSavingOffline] = React.useState(false);
   const [mode, setMode] = React.useState('app');
@@ -168,6 +173,12 @@ export default function TrainingSession() {
     return map;
   }, [members]);
 
+  React.useEffect(() => {
+    if (!members.length) return;
+    if (offlineParticipants) return;
+    setOfflineParticipants(String(members.length));
+  }, [members.length, offlineParticipants]);
+
   const { data: groupGames = [], isLoading: isLoadingGroupGames } = useQuery({
     queryKey: ['training-group-games-list', season?.group_id],
     enabled: Boolean(season?.group_id && canManageTraining),
@@ -191,6 +202,13 @@ export default function TrainingSession() {
     });
     return map;
   }, [results]);
+
+  const offlineParticipantsCount = Number(offlineParticipants) || 0;
+  const offlineCutPercentValue = Math.min(100, Math.max(0, Number(offlineCutPercent) || 0));
+  const offlineCutBonusValue = Math.max(0, Number(offlineCutBonus) || 0);
+  const offlineCutCount = offlineParticipantsCount > 0
+    ? Math.ceil((offlineParticipantsCount * offlineCutPercentValue) / 100)
+    : 0;
 
   const createAppEventFromGame = async (game) => {
     if (!session || !season || !group) {
@@ -356,70 +374,157 @@ export default function TrainingSession() {
     setIsSavingOffline(true);
     try {
       const eventName = offlineName.trim() || 'Offline';
-      const entries = Object.entries(offlinePoints)
-        .map(([uid, value]) => ({ uid, points: Number(value) }))
-        .filter((entry) => Number.isFinite(entry.points));
-      if (entries.length === 0) {
-        toast.error('Sisesta vähemalt üks punktisumma');
-        return;
-      }
+      if (offlineMode === 'rank_hc') {
+        const entries = Object.entries(offlineRanks)
+          .map(([uid, value]) => ({ uid, rank: Number(value) }))
+          .filter((entry) => Number.isFinite(entry.rank) && entry.rank > 0);
+        if (entries.length === 0) {
+          toast.error('Sisesta vähemalt üks koht');
+          return;
+        }
+        if (!Number.isFinite(offlineParticipantsCount) || offlineParticipantsCount < 1) {
+          toast.error('Sisesta osalejate arv');
+          return;
+        }
+        const maxRank = Math.max(...entries.map((entry) => entry.rank));
+        if (maxRank > offlineParticipantsCount) {
+          toast.error('Koht ei saa olla suurem kui osalejate arv');
+          return;
+        }
 
-      const batch = writeBatch(db);
-      const eventRef = doc(collection(db, 'training_events'));
-      batch.set(eventRef, {
-        session_id: session.id,
-        season_id: season.id,
-        group_id: season.group_id,
-        slot_id: session.slot_id,
-        type: 'offline',
-        name: eventName,
-        metric_key: 'offline',
-        score_direction: SCORE_DIRECTIONS.HIGHER,
-        created_by_uid: user?.id || null,
-        created_at: serverTimestamp()
-      });
-
-      entries.forEach(({ uid, points }) => {
-        const member = membersByUid[uid];
-        const displayName = member?.name || member?.email || 'Mängija';
-        const participantId = getParticipantId({ uid, email: member?.email, name: displayName });
-        const existing = statsByParticipant[participantId];
-        const nextPointsBySlot = {
-          ...(existing?.points_by_slot || {}),
-          [session.slot_id]: round1((existing?.points_by_slot?.[session.slot_id] || 0) + points)
-        };
-        const nextStats = {
-          season_id: season.id,
-          participant_id: participantId,
-          user_id: uid,
-          player_name: displayName,
-          points_total: round1((existing?.points_total || 0) + points),
-          attendance_count: (existing?.attendance_count || 0) + 1,
-          points_by_slot: nextPointsBySlot,
-          updated_at: new Date().toISOString()
-        };
-
-        const resultRef = doc(collection(db, 'training_event_results'));
-        batch.set(resultRef, {
-          event_id: eventRef.id,
+        const batch = writeBatch(db);
+        const eventRef = doc(collection(db, 'training_events'));
+        batch.set(eventRef, {
           session_id: session.id,
           season_id: season.id,
           group_id: season.group_id,
           slot_id: session.slot_id,
-          participant_id: participantId,
-          user_id: uid,
-          player_name: displayName,
-          points: round1(points),
+          type: 'offline',
+          name: eventName,
+          metric_key: 'offline',
+          score_direction: SCORE_DIRECTIONS.HIGHER,
+          offline_mode: 'rank_hc',
+          participants_count: offlineParticipantsCount,
+          cut_percent: offlineCutPercentValue,
+          cut_bonus: offlineCutBonusValue,
+          created_by_uid: user?.id || null,
           created_at: serverTimestamp()
         });
 
-        const statsRef = doc(db, 'training_season_stats', `${season.id}_${participantId}`);
-        batch.set(statsRef, nextStats, { merge: true });
-      });
+        entries.forEach(({ uid, rank }) => {
+          const member = membersByUid[uid];
+          const displayName = member?.name || member?.email || 'Mängija';
+          const participantId = getParticipantId({ uid, email: member?.email, name: displayName });
+          const existing = statsByParticipant[participantId];
+          const qualifies = offlineCutCount > 0 && rank <= offlineCutCount;
+          const bonus = qualifies ? offlineCutBonusValue : 0;
+          const points = round1(1 + bonus);
+          const nextPointsBySlot = {
+            ...(existing?.points_by_slot || {}),
+            [session.slot_id]: round1((existing?.points_by_slot?.[session.slot_id] || 0) + points)
+          };
+          const nextStats = {
+            season_id: season.id,
+            participant_id: participantId,
+            user_id: uid,
+            player_name: displayName,
+            points_total: round1((existing?.points_total || 0) + points),
+            attendance_count: (existing?.attendance_count || 0) + 1,
+            points_by_slot: nextPointsBySlot,
+            updated_at: new Date().toISOString()
+          };
 
-      await batch.commit();
-      setOfflineName('');
-      setOfflinePoints({});
+          const resultRef = doc(collection(db, 'training_event_results'));
+          batch.set(resultRef, {
+            event_id: eventRef.id,
+            session_id: session.id,
+            season_id: season.id,
+            group_id: season.group_id,
+            slot_id: session.slot_id,
+            participant_id: participantId,
+            user_id: uid,
+            player_name: displayName,
+            rank,
+            cut_bonus: round1(bonus),
+            points,
+            created_at: serverTimestamp()
+          });
+
+          const statsRef = doc(db, 'training_season_stats', `${season.id}_${participantId}`);
+          batch.set(statsRef, nextStats, { merge: true });
+        });
+
+        await batch.commit();
+        setOfflineName('');
+        setOfflineRanks({});
+      } else {
+        const entries = Object.entries(offlinePoints)
+          .map(([uid, value]) => ({ uid, points: Number(value) }))
+          .filter((entry) => Number.isFinite(entry.points));
+        if (entries.length === 0) {
+          toast.error('Sisesta vähemalt üks punktisumma');
+          return;
+        }
+
+        const batch = writeBatch(db);
+        const eventRef = doc(collection(db, 'training_events'));
+        batch.set(eventRef, {
+          session_id: session.id,
+          season_id: season.id,
+          group_id: season.group_id,
+          slot_id: session.slot_id,
+          type: 'offline',
+          name: eventName,
+          metric_key: 'offline',
+          score_direction: SCORE_DIRECTIONS.HIGHER,
+          offline_mode: 'points',
+          participants_count: entries.length,
+          created_by_uid: user?.id || null,
+          created_at: serverTimestamp()
+        });
+
+        entries.forEach(({ uid, points }) => {
+          const member = membersByUid[uid];
+          const displayName = member?.name || member?.email || 'Mängija';
+          const participantId = getParticipantId({ uid, email: member?.email, name: displayName });
+          const existing = statsByParticipant[participantId];
+          const nextPointsBySlot = {
+            ...(existing?.points_by_slot || {}),
+            [session.slot_id]: round1((existing?.points_by_slot?.[session.slot_id] || 0) + points)
+          };
+          const nextStats = {
+            season_id: season.id,
+            participant_id: participantId,
+            user_id: uid,
+            player_name: displayName,
+            points_total: round1((existing?.points_total || 0) + points),
+            attendance_count: (existing?.attendance_count || 0) + 1,
+            points_by_slot: nextPointsBySlot,
+            updated_at: new Date().toISOString()
+          };
+
+          const resultRef = doc(collection(db, 'training_event_results'));
+          batch.set(resultRef, {
+            event_id: eventRef.id,
+            session_id: session.id,
+            season_id: season.id,
+            group_id: season.group_id,
+            slot_id: session.slot_id,
+            participant_id: participantId,
+            user_id: uid,
+            player_name: displayName,
+            points: round1(points),
+            created_at: serverTimestamp()
+          });
+
+          const statsRef = doc(db, 'training_season_stats', `${season.id}_${participantId}`);
+          batch.set(statsRef, nextStats, { merge: true });
+        });
+
+        await batch.commit();
+        setOfflineName('');
+        setOfflinePoints({});
+      }
       queryClient.invalidateQueries({ queryKey: ['training-events', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['training-event-results', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
@@ -548,6 +653,93 @@ export default function TrainingSession() {
                   value={offlineName}
                   onChange={(event) => setOfflineName(event.target.value)}
                 />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOfflineMode('points')}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold border ${
+                      offlineMode === 'points'
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-200 bg-white text-slate-600'
+                    } dark:bg-black dark:border-white/10 dark:text-emerald-300`}
+                  >
+                    Punktid
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOfflineMode('rank_hc')}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold border ${
+                      offlineMode === 'rank_hc'
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-200 bg-white text-slate-600'
+                    } dark:bg-black dark:border-white/10 dark:text-emerald-300`}
+                  >
+                    Koht + HC
+                  </button>
+                </div>
+                {offlineMode === 'rank_hc' ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        value={offlineParticipants}
+                        onChange={(event) => setOfflineParticipants(event.target.value)}
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                        placeholder="Osalejaid"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="1"
+                        value={offlineCutPercent}
+                        onChange={(event) => setOfflineCutPercent(event.target.value)}
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                        placeholder="Cut %"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.05"
+                        value={offlineCutBonus}
+                        onChange={(event) => setOfflineCutBonus(event.target.value)}
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                        placeholder="HC boonus"
+                      />
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Top {offlineCutPercentValue}% = {offlineCutCount} mängijat saavad +{round1(offlineCutBonusValue).toFixed(1)}p
+                    </div>
+                    <div className="space-y-2">
+                      {members.map((member) => {
+                        const rankValue = Number(offlineRanks[member.uid]) || 0;
+                        const qualifies = rankValue > 0 && offlineCutCount > 0 && rankValue <= offlineCutCount;
+                        const pointsPreview = rankValue > 0
+                          ? round1(1 + (qualifies ? offlineCutBonusValue : 0)).toFixed(1)
+                          : null;
+                        return (
+                          <div key={member.uid} className="flex items-center gap-2">
+                            <div className="text-xs text-slate-600 w-32">{member.name || member.email}</div>
+                            <input
+                              type="number"
+                              min={1}
+                              value={offlineRanks[member.uid] || ''}
+                              onChange={(event) =>
+                                setOfflineRanks((prev) => ({ ...prev, [member.uid]: event.target.value }))
+                              }
+                              className="flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                              placeholder="Koht"
+                            />
+                            {pointsPreview && (
+                              <div className="text-xs font-semibold text-emerald-600 w-12 text-right">{pointsPreview}p</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
                 <div className="space-y-2">
                   {members.map((member) => (
                     <div key={member.uid} className="flex items-center gap-2">
@@ -565,6 +757,7 @@ export default function TrainingSession() {
                     </div>
                   ))}
                 </div>
+                )}
                 <Button onClick={handleCreateOfflineEvent} disabled={isSavingOffline}>
                   {isSavingOffline ? 'Salvestan...' : 'Lisa offline event'}
                 </Button>

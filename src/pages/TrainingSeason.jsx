@@ -24,12 +24,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { countRemainingBySlot, formatSlotLabel, round1 } from '@/lib/training-league';
 import { toast } from 'sonner';
+import { useLanguage } from '@/lib/i18n';
 
 export default function TrainingSeason() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const seasonId = searchParams.get('seasonId');
   const queryClient = useQueryClient();
+  const { lang } = useLanguage();
+  const tr = React.useCallback((et, en) => (lang === 'en' ? en : et), [lang]);
   const [selectedTab, setSelectedTab] = React.useState('overall');
   const [newSessionDate, setNewSessionDate] = React.useState('');
   const [newSessionSlotId, setNewSessionSlotId] = React.useState('');
@@ -119,7 +122,7 @@ export default function TrainingSeason() {
 
   const handleCreateSession = async () => {
     if (!seasonId || !season?.group_id || !newSessionDate || !newSessionSlotId) {
-      toast.error('Vali kuupäev ja trenniaeg');
+      toast.error(tr('Vali kuupäev ja trenniaeg', 'Select date and training time'));
       return;
     }
     setIsCreatingSession(true);
@@ -134,9 +137,9 @@ export default function TrainingSeason() {
       });
       setNewSessionDate('');
       queryClient.invalidateQueries({ queryKey: ['training-sessions', seasonId] });
-      toast.success('Treening lisatud');
+      toast.success(tr('Treening lisatud', 'Training added'));
     } catch (error) {
-      toast.error(error?.message || 'Treeningu lisamine ebaõnnestus');
+      toast.error(error?.message || tr('Treeningu lisamine ebaõnnestus', 'Failed to add training'));
     } finally {
       setIsCreatingSession(false);
     }
@@ -163,10 +166,10 @@ export default function TrainingSeason() {
   const handleDeleteSeason = async () => {
     if (!season?.id || !season?.group_id) return;
     if (!canManageTraining) {
-      toast.error('Pole treeneri õigusi');
+      toast.error(tr('Pole treeneri õigusi', 'No trainer permissions'));
       return;
     }
-    const confirmed = window.confirm(`Kustuta hooaeg "${season.name}"? See eemaldab ka treeningud ja tulemused.`);
+    const confirmed = window.confirm(tr(`Kustuta hooaeg "${season.name}"? See eemaldab ka treeningud ja tulemused.`, `Delete season "${season.name}"? This will also remove trainings and results.`));
     if (!confirmed) return;
     setIsDeletingSeason(true);
     try {
@@ -176,10 +179,10 @@ export default function TrainingSeason() {
       await deleteByQuery(query(collection(db, 'training_season_stats'), where('season_id', '==', season.id)));
       await deleteDoc(doc(db, 'training_seasons', season.id));
       queryClient.invalidateQueries({ queryKey: ['training-seasons', season.group_id] });
-      toast.success('Hooaeg kustutatud');
+      toast.success(tr('Hooaeg kustutatud', 'Season deleted'));
       navigate(`${createPageUrl('TrainingLeague')}?groupId=${season.group_id}`);
     } catch (error) {
-      toast.error(error?.message || 'Hooaja kustutamine ebaõnnestus');
+      toast.error(error?.message || tr('Hooaja kustutamine ebaõnnestus', 'Failed to delete season'));
     } finally {
       setIsDeletingSeason(false);
     }
@@ -195,8 +198,8 @@ export default function TrainingSeason() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.12),_rgba(255,255,255,1)_55%)] px-4 pb-12 dark:bg-black dark:text-slate-100">
       <div className="max-w-5xl mx-auto pt-6">
         <div className="mb-6 flex items-center gap-2">
-          <BackButton fallbackTo={`${createPageUrl('TrainingLeague')}?groupId=${season.group_id}`} forceFallback />
-          <HomeButton />
+          <BackButton fallbackTo={`${createPageUrl('TrainingLeague')}?groupId=${season.group_id}`} forceFallback label={tr('Tagasi', 'Back')} />
+          <HomeButton label={tr('Avaleht', 'Home')} />
         </div>
 
         <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -210,7 +213,7 @@ export default function TrainingSeason() {
               {season.start_date ? format(new Date(season.start_date), 'MMM d') : '-'} –{' '}
               {season.end_date ? format(new Date(season.end_date), 'MMM d') : '-'}
             </div>
-            <div className="text-xs text-emerald-600 mt-1">Trenni jäänud: {remaining.total}</div>
+            <div className="text-xs text-emerald-600 mt-1">{tr('Trenni jäänud', 'Trainings left')}: {remaining.total}</div>
           </div>
           {canManageTraining && (
             <button
@@ -219,7 +222,7 @@ export default function TrainingSeason() {
               disabled={isDeletingSeason}
               className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-100 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-red-300"
             >
-              {isDeletingSeason ? 'Kustutan...' : 'Kustuta hooaeg'}
+              {isDeletingSeason ? tr('Kustutan...', 'Deleting...') : tr('Kustuta hooaeg', 'Delete season')}
             </button>
           )}
         </div>
@@ -235,7 +238,7 @@ export default function TrainingSeason() {
                   : 'border-slate-200 bg-white text-slate-600'
               } dark:bg-black dark:border-white/10 dark:text-emerald-300`}
             >
-              Üld
+              {tr('Üld', 'Overall')}
             </button>
             {seasonSlots.map((slot) => (
               <button
@@ -255,9 +258,9 @@ export default function TrainingSeason() {
         </div>
 
         <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-6 dark:bg-black dark:border-white/10">
-          <div className="text-sm font-semibold text-slate-800 mb-3">Edetabel</div>
+          <div className="text-sm font-semibold text-slate-800 mb-3">{tr('Edetabel', 'Leaderboard')}</div>
           {leaderboard.length === 0 ? (
-            <div className="text-sm text-slate-400">Punkte veel pole.</div>
+            <div className="text-sm text-slate-400">{tr('Punkte veel pole.', 'No points yet.')}</div>
           ) : (
             <div className="space-y-2">
               {leaderboard.map((entry, index) => (
@@ -270,7 +273,7 @@ export default function TrainingSeason() {
                       {index + 1}
                     </div>
                     <div className="font-semibold">
-                      {entry.player_name || entry.participant_id || 'Mängija'}
+                      {entry.player_name || entry.participant_id || tr('Mängija', 'Player')}
                     </div>
                   </div>
                   <div className="font-semibold text-emerald-600">{entry.displayPoints.toFixed(1)}p</div>
@@ -284,7 +287,7 @@ export default function TrainingSeason() {
           <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-6 dark:bg-black dark:border-white/10">
             <div className="flex items-center gap-2 mb-3">
               <Plus className="w-4 h-4 text-emerald-600" />
-              <div className="text-sm font-semibold text-slate-800">Lisa treening</div>
+              <div className="text-sm font-semibold text-slate-800">{tr('Lisa treening', 'Add training')}</div>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <input
@@ -305,16 +308,16 @@ export default function TrainingSeason() {
                 ))}
               </select>
               <Button onClick={handleCreateSession} disabled={isCreatingSession}>
-                {isCreatingSession ? 'Lisan...' : 'Lisa'}
+                {isCreatingSession ? tr('Lisan...', 'Adding...') : tr('Lisa', 'Add')}
               </Button>
             </div>
           </div>
         )}
 
         <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
-          <div className="text-sm font-semibold text-slate-800 mb-3">Treeningud</div>
+          <div className="text-sm font-semibold text-slate-800 mb-3">{tr('Treeningud', 'Trainings')}</div>
           {sessions.length === 0 ? (
-            <div className="text-sm text-slate-400">Treeninguid pole veel.</div>
+            <div className="text-sm text-slate-400">{tr('Treeninguid pole veel.', 'No trainings yet.')}</div>
           ) : (
             <div className="space-y-2">
               {sessions.map((session) => {
@@ -327,7 +330,7 @@ export default function TrainingSeason() {
                     className="w-full text-left rounded-2xl border border-slate-100 bg-white/80 px-4 py-3 text-sm text-slate-700 transition hover:bg-emerald-50 dark:bg-black dark:border-white/10 dark:text-slate-100"
                   >
                     <div className="font-semibold">
-                      {session.date ? format(new Date(session.date), 'MMM d') : 'Treening'}
+                      {session.date ? format(new Date(session.date), 'MMM d') : tr('Treening', 'Training')}
                     </div>
                     <div className="text-xs text-slate-500">{formatSlotLabel(slot)}</div>
                   </button>

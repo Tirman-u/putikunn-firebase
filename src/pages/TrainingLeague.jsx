@@ -13,12 +13,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { countRemainingBySlot, formatSlotLabel } from '@/lib/training-league';
 import { toast } from 'sonner';
+import { useLanguage } from '@/lib/i18n';
 
 export default function TrainingLeague() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const groupId = searchParams.get('groupId');
   const queryClient = useQueryClient();
+  const { lang } = useLanguage();
+  const tr = React.useCallback((et, en) => (lang === 'en' ? en : et), [lang]);
   const [seasonName, setSeasonName] = React.useState('');
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
@@ -75,28 +78,28 @@ export default function TrainingLeague() {
 
   const handleCreateSeason = async () => {
     if (!groupId) {
-      toast.error('Grupi ID puudub');
+      toast.error(tr('Grupi ID puudub', 'Group ID is missing'));
       return;
     }
     if (!user?.id) {
-      toast.error('Palun logi sisse');
+      toast.error(tr('Palun logi sisse', 'Please sign in'));
       return;
     }
     if (!canManageTraining) {
-      toast.error('Pole treeneri õigusi');
+      toast.error(tr('Pole treeneri õigusi', 'No trainer permissions'));
       return;
     }
     if (!startDate || !endDate) {
-      toast.error('Vali hooaja algus ja lõpp');
+      toast.error(tr('Vali hooaja algus ja lõpp', 'Select season start and end'));
       return;
     }
     if (selectedSlots.length === 0) {
-      toast.error('Vali vähemalt üks trenniaeg');
+      toast.error(tr('Vali vähemalt üks trenniaeg', 'Select at least one training time'));
       return;
     }
     setIsCreating(true);
     try {
-      const name = seasonName.trim() || `${group?.name || 'Treening'} hooaeg`;
+      const name = seasonName.trim() || tr(`${group?.name || 'Treening'} hooaeg`, `${group?.name || 'Training'} season`);
       await addDoc(collection(db, 'training_seasons'), {
         group_id: groupId,
         name,
@@ -111,9 +114,9 @@ export default function TrainingLeague() {
       setStartDate('');
       setEndDate('');
       queryClient.invalidateQueries({ queryKey: ['training-seasons', groupId] });
-      toast.success('Hooaeg loodud');
+      toast.success(tr('Hooaeg loodud', 'Season created'));
     } catch (error) {
-      toast.error(error?.message || 'Hooaja loomine ebaõnnestus');
+      toast.error(error?.message || tr('Hooaja loomine ebaõnnestus', 'Failed to create season'));
     } finally {
       setIsCreating(false);
     }
@@ -124,27 +127,27 @@ export default function TrainingLeague() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),_rgba(255,255,255,1)_55%)] px-4 pb-12 dark:bg-black dark:text-slate-100">
       <div className="max-w-4xl mx-auto pt-6">
         <div className="mb-6 flex items-center gap-2">
-          <BackButton fallbackTo={`${createPageUrl('TrainerGroupDashboard')}?id=${groupId}`} forceFallback />
-          <HomeButton />
+          <BackButton fallbackTo={`${createPageUrl('TrainerGroupDashboard')}?id=${groupId}`} forceFallback label={tr('Tagasi', 'Back')} />
+          <HomeButton label={tr('Avaleht', 'Home')} />
         </div>
 
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Trophy className="w-5 h-5 text-emerald-600" />
-            Liiga
+            {tr('Liiga', 'League')}
           </h1>
-          <p className="text-sm text-slate-500">{group?.name || 'Treening'}</p>
+          <p className="text-sm text-slate-500">{group?.name || tr('Treening', 'Training')}</p>
         </div>
 
         {canManageTraining && (
           <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-6 dark:bg-black dark:border-white/10">
             <div className="flex items-center gap-2 mb-4">
               <Plus className="w-4 h-4 text-emerald-600" />
-              <div className="text-sm font-semibold text-slate-800">Loo hooaeg</div>
+              <div className="text-sm font-semibold text-slate-800">{tr('Loo hooaeg', 'Create season')}</div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
               <Input
-                placeholder="Hooaja nimi"
+                placeholder={tr('Hooaja nimi', 'Season name')}
                 value={seasonName}
                 onChange={(event) => setSeasonName(event.target.value)}
               />
@@ -164,7 +167,7 @@ export default function TrainingLeague() {
               </div>
             </div>
             <div className="mb-4">
-              <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Trenni ajad</div>
+              <div className="text-xs font-semibold text-slate-500 uppercase mb-2">{tr('Trenni ajad', 'Training times')}</div>
               <div className="flex flex-wrap gap-2">
                 {slots.map((slot) => (
                   <button
@@ -187,7 +190,7 @@ export default function TrainingLeague() {
               disabled={isCreating}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
-              {isCreating ? 'Loon...' : 'Loo hooaeg'}
+              {isCreating ? tr('Loon...', 'Creating...') : tr('Loo hooaeg', 'Create season')}
             </Button>
           </div>
         )}
@@ -195,7 +198,7 @@ export default function TrainingLeague() {
         <div className="space-y-3">
           {seasons.length === 0 && (
             <div className="rounded-[28px] border border-white/70 bg-white/70 p-6 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm text-center text-slate-500 dark:bg-black dark:border-white/10">
-              Hooaegu veel pole.
+              {tr('Hooaegu veel pole.', 'No seasons yet.')}
             </div>
           )}
           {seasons.map((season) => {
@@ -215,14 +218,14 @@ export default function TrainingLeague() {
                       {season.end_date ? format(new Date(season.end_date), 'MMM d') : '-'}
                     </div>
                     <div className="text-xs text-emerald-600 mt-1">
-                      Trenni jäänud: {remaining.total}
+                      {tr('Trenni jäänud', 'Trainings left')}: {remaining.total}
                     </div>
                   </div>
                   <Button
                     variant="outline"
                     onClick={() => navigate(`${createPageUrl('TrainingSeason')}?seasonId=${season.id}`)}
                   >
-                    Ava
+                    {tr('Ava', 'Open')}
                   </Button>
                 </div>
               </div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Users, UserPlus, Settings, User, Target, Trophy, Crown, Shield, LogOut, GraduationCap, Users2 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { FEATURE_FLAGS } from '@/lib/feature-flags';
 
@@ -31,11 +31,12 @@ export default function Home() {
   const [timeLadderPuttType, setTimeLadderPuttType] = useState(null);
   const [playerReturnTo, setPlayerReturnTo] = useState('home');
   const navigate = useNavigate();
+  const location = useLocation();
 
   const goHome = React.useCallback(() => {
     setMode(null);
-    window.history.replaceState({}, '', createPageUrl('Home'));
-  }, []);
+    navigate(createPageUrl('Home'), { replace: true });
+  }, [navigate]);
 
   const handleLogout = React.useCallback(async () => {
     await base44.auth.logout(true);
@@ -43,12 +44,12 @@ export default function Home() {
 
   const setSimpleMode = React.useCallback((nextMode) => {
     setMode(nextMode);
-    window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=${nextMode}`);
-  }, []);
+    navigate(`${createPageUrl('Home')}?mode=${nextMode}`, { replace: true });
+  }, [navigate]);
 
   // Check URL params for ATW mode and continuing games
   React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     const urlMode = params.get('mode');
     const isSolo = params.get('solo') === '1';
     const urlGameId = params.get('gameId');
@@ -115,8 +116,10 @@ export default function Home() {
         setPlayerName(playerName);
         setMode('player');
       });
+    } else if (!urlMode) {
+      setMode(null);
     }
-  }, []);
+  }, [location.search, t]);
 
   const { data: user } = useQuery({
     queryKey: ['user'],

@@ -8,6 +8,7 @@ import LoadingState from '@/components/ui/loading-state';
 import { createPageUrl } from '@/utils';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
+import { useLanguage } from '@/lib/i18n';
 
 const TOP_N = 10;
 
@@ -32,6 +33,8 @@ const buildPlayerStats = (game) => {
 export default function GroupProjector() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { lang, t } = useLanguage();
+  const tr = React.useCallback((et, en) => (lang === 'en' ? en : et), [lang]);
   const groupId = searchParams.get('id');
   const [group, setGroup] = React.useState(null);
   const [gamesById, setGamesById] = React.useState({});
@@ -84,21 +87,21 @@ export default function GroupProjector() {
       <div className="max-w-7xl mx-auto pt-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <BackButton />
-            <HomeButton />
+            <BackButton label={tr('Tagasi', 'Back')} />
+            <HomeButton label={tr('Avaleht', 'Home')} />
           </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-slate-800">{group.name}</h1>
-            <p className="text-xs text-slate-500">Projektorivaade</p>
+            <p className="text-xs text-slate-500">{tr('Projektorivaade', 'Projector view')}</p>
           </div>
           <div className="text-xs text-slate-400 min-w-[120px] text-right">
-            {lastUpdate ? `Uuendatud ${lastUpdate.toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' })}` : ''}
+            {lastUpdate ? `${tr('Uuendatud', 'Updated')} ${lastUpdate.toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' })}` : ''}
           </div>
         </div>
 
         {games.length === 0 ? (
           <div className="rounded-3xl border border-white/70 bg-white/70 p-10 text-center text-slate-500 shadow-sm backdrop-blur-sm">
-            Grupi mänge pole.
+            {tr('Grupi mänge pole.', 'No group games.')}
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -113,7 +116,9 @@ export default function GroupProjector() {
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <div className="text-base font-bold text-slate-800">{game.name}</div>
-                      <div className="text-xs text-slate-500">{format.name || game.game_type}</div>
+                      <div className="text-xs text-slate-500">
+                        {t(`format.${game.game_type}.name`, format.name || game.game_type)}
+                      </div>
                     </div>
                     <div className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                       <Trophy className="w-3 h-3" />
@@ -123,7 +128,7 @@ export default function GroupProjector() {
 
                   <div className="space-y-2">
                     {stats.length === 0 ? (
-                      <div className="text-sm text-slate-500">Tulemusi pole</div>
+                      <div className="text-sm text-slate-500">{tr('Tulemusi pole', 'No results')}</div>
                     ) : (
                       stats.map((player, idx) => (
                         <div
@@ -136,7 +141,7 @@ export default function GroupProjector() {
                             </div>
                             <div>
                               <div className="text-sm font-semibold text-slate-800">{player.name}</div>
-                              <div className="text-xs text-slate-500">{player.accuracy}% sees</div>
+                              <div className="text-xs text-slate-500">{player.accuracy}% {tr('sees', 'made')}</div>
                             </div>
                           </div>
                           <div className="text-lg font-bold text-emerald-600">{player.score}</div>

@@ -10,6 +10,26 @@ const DAY_INDEX = {
   sat: 6
 };
 
+const DAY_FULL_EN = {
+  mon: 'Monday',
+  tue: 'Tuesday',
+  wed: 'Wednesday',
+  thu: 'Thursday',
+  fri: 'Friday',
+  sat: 'Saturday',
+  sun: 'Sunday'
+};
+
+const getLang = () => {
+  if (typeof window === 'undefined') return 'et';
+  return window.localStorage.getItem('putikunn:lang') || 'et';
+};
+
+const getDayLabel = (value) => {
+  if (getLang() !== 'en') return getDayFullLabel(value);
+  return DAY_FULL_EN[value] || getDayFullLabel(value);
+};
+
 export const SCORE_DIRECTIONS = {
   HIGHER: 'higher',
   LOWER: 'lower'
@@ -19,7 +39,7 @@ export const round1 = (value) => Math.round((Number(value) || 0) * 10) / 10;
 
 export const formatSlotLabel = (slot) => {
   if (!slot) return '';
-  const dayLabel = getDayFullLabel(slot.day);
+  const dayLabel = getDayLabel(slot.day);
   const timeLabel = slot.time || '';
   return `${dayLabel} ${timeLabel}`.trim();
 };

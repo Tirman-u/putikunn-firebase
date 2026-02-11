@@ -9,6 +9,7 @@ import { createPageUrl } from '@/utils';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
+import { useLanguage } from '@/lib/i18n';
 import {
   collection,
   query,
@@ -29,6 +30,8 @@ const generatePin = () => Math.floor(1000 + Math.random() * 9000).toString();
 
 export default function TrainerGroups() {
   const navigate = useNavigate();
+  const { lang, t } = useLanguage();
+  const tr = React.useCallback((et, en) => (lang === 'en' ? en : et), [lang]);
   const [newGroupName, setNewGroupName] = React.useState('');
   const [isCreating, setIsCreating] = React.useState(false);
   const [gamePinsByGroup, setGamePinsByGroup] = React.useState({});
@@ -123,7 +126,7 @@ export default function TrainerGroups() {
       );
       if (snap.empty) return pin;
     }
-    throw new Error('PINi loomine ebaõnnestus. Proovi uuesti.');
+    throw new Error(tr('PINi loomine ebaõnnestus. Proovi uuesti.', 'PIN creation failed. Please try again.'));
   };
 
   const handleCreateGroup = async () => {
@@ -131,8 +134,8 @@ export default function TrainerGroups() {
     setIsCreating(true);
     try {
       const pin = await ensureUniquePin();
-      const displayName = user?.display_name || user?.full_name || 'Treener';
-      const name = newGroupName.trim() || `${displayName} trenn`;
+      const displayName = user?.display_name || user?.full_name || tr('Treener', 'Coach');
+      const name = newGroupName.trim() || tr(`${displayName} trenn`, `${displayName} training`);
 
       await addDoc(collection(db, 'training_groups'), {
         name,
@@ -149,10 +152,10 @@ export default function TrainerGroups() {
       });
 
       setNewGroupName('');
-      toast.success('Grupp loodud');
+      toast.success(tr('Grupp loodud', 'Group created'));
       refetch();
     } catch (error) {
-      toast.error(error?.message || 'Grupi loomine ebaõnnestus');
+      toast.error(error?.message || tr('Grupi loomine ebaõnnestus', 'Failed to create group'));
     } finally {
       setIsCreating(false);
     }
@@ -162,7 +165,7 @@ export default function TrainerGroups() {
     const rawPin = gamePinsByGroup[group.id] || '';
     const cleanedPin = rawPin.replace(/\D/g, '').slice(0, 4);
     if (cleanedPin.length !== 4) {
-      toast.error('Sisesta 4-kohaline mängu PIN');
+      toast.error(tr('Sisesta 4-kohaline mängu PIN', 'Enter a 4-digit game PIN'));
       return;
     }
 
@@ -170,16 +173,16 @@ export default function TrainerGroups() {
     try {
       const games = await base44.entities.Game.filter({ pin: cleanedPin }, '-date', 1);
       if (!games?.length) {
-        toast.error('Mängu ei leitud');
+        toast.error(tr('Mängu ei leitud', 'Game not found'));
         return;
       }
       const game = games[0];
       await base44.entities.Game.update(game.id, { training_group_id: group.id });
-      toast.success(`Mäng lisatud gruppi "${group.name || 'Treening'}"`);
+      toast.success(tr(`Mäng lisatud gruppi "${group.name || 'Treening'}"`, `Game added to group "${group.name || 'Training'}"`));
       setGamePinsByGroup((prev) => ({ ...prev, [group.id]: '' }));
       refetchTrainingGames();
     } catch (error) {
-      toast.error(error?.message || 'Mängu lisamine ebaõnnestus');
+      toast.error(error?.message || tr('Mängu lisamine ebaõnnestus', 'Failed to add game'));
     } finally {
       setIsAddingGameByGroup((prev) => ({ ...prev, [group.id]: false }));
     }
@@ -198,7 +201,7 @@ export default function TrainerGroups() {
   const handleRenameGroup = async (group) => {
     const nextName = editingGroupName.trim();
     if (!nextName) {
-      toast.error('Sisesta grupi nimi');
+      toast.error(tr('Sisesta grupi nimi', 'Enter a group name'));
       return;
     }
     setIsSavingGroup((prev) => ({ ...prev, [group.id]: true }));
@@ -220,18 +223,18 @@ export default function TrainerGroups() {
         );
       }
 
-      toast.success('Grupi nimi uuendatud');
+      toast.success(tr('Grupi nimi uuendatud', 'Group name updated'));
       cancelEditingGroup();
       refetch();
     } catch (error) {
-      toast.error(error?.message || 'Nime uuendamine ebaõnnestus');
+      toast.error(error?.message || tr('Nime uuendamine ebaõnnestus', 'Failed to update name'));
     } finally {
       setIsSavingGroup((prev) => ({ ...prev, [group.id]: false }));
     }
   };
 
   const handleDeleteGroup = async (group) => {
-    if (!confirm(`Kustuta grupp "${group.name || 'Treening'}"? Seda ei saa tagasi võtta.`)) {
+    if (!confirm(tr(`Kustuta grupp "${group.name || 'Treening'}"? Seda ei saa tagasi võtta.`, `Delete group "${group.name || 'Training'}"? This cannot be undone.`))) {
       return;
     }
     setIsDeletingGroup((prev) => ({ ...prev, [group.id]: true }));
@@ -268,11 +271,11 @@ export default function TrainerGroups() {
       }
 
       await deleteDoc(doc(db, 'training_groups', group.id));
-      toast.success('Grupp kustutatud');
+      toast.success(tr('Grupp kustutatud', 'Group deleted'));
       refetch();
       refetchTrainingGames();
     } catch (error) {
-      toast.error(error?.message || 'Grupi kustutamine ebaõnnestus');
+      toast.error(error?.message || tr('Grupi kustutamine ebaõnnestus', 'Failed to delete group'));
     } finally {
       setIsDeletingGroup((prev) => ({ ...prev, [group.id]: false }));
     }
@@ -281,9 +284,9 @@ export default function TrainerGroups() {
   const handleCopyPin = async (pin) => {
     try {
       await navigator.clipboard.writeText(pin);
-      toast.success('PIN kopeeritud');
+      toast.success(tr('PIN kopeeritud', 'PIN copied'));
     } catch {
-      toast.error('PIN kopeerimine ebaõnnestus');
+      toast.error(tr('PIN kopeerimine ebaõnnestus', 'Failed to copy PIN'));
     }
   };
 
@@ -296,10 +299,10 @@ export default function TrainerGroups() {
       await updateDoc(doc(db, 'users', memberUid), {
         [`training_groups.${groupId}`]: deleteField()
       });
-      toast.success('Liige eemaldatud');
+      toast.success(tr('Liige eemaldatud', 'Member removed'));
       refetch();
     } catch (error) {
-      toast.error(error?.message || 'Eemaldamine ebaõnnestus');
+      toast.error(error?.message || tr('Eemaldamine ebaõnnestus', 'Removal failed'));
     }
   };
 
@@ -311,20 +314,20 @@ export default function TrainerGroups() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
       <div className="max-w-4xl mx-auto pt-6 pb-16">
         <div className="mb-6 flex items-center gap-2">
-          <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
-          <HomeButton />
+          <BackButton fallbackTo={createPageUrl('Home')} forceFallback label={tr('Tagasi', 'Back')} />
+          <HomeButton label={tr('Avaleht', 'Home')} />
         </div>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-800">Treener</h1>
-          <p className="text-slate-500">Halda gruppe, mänge ja projektori vaadet.</p>
+          <h1 className="text-2xl font-bold text-slate-800">{tr('Treener', 'Coach')}</h1>
+          <p className="text-slate-500">{tr('Halda gruppe, mänge ja projektori vaadet.', 'Manage groups, games, and the projector view.')}</p>
         </div>
 
         <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-6 dark:bg-black dark:border-white/10">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold text-slate-800">Treeneri projektor</div>
-              <div className="text-xs text-slate-500">3 PIN-iga live edetabelid ühel ekraanil.</div>
+              <div className="text-sm font-semibold text-slate-800">{tr('Treeneri projektor', 'Coach projector')}</div>
+              <div className="text-xs text-slate-500">{tr('3 PIN-iga live edetabelid ühel ekraanil.', 'Up to 3 live leaderboards by PIN on one screen.')}</div>
             </div>
             <button
               type="button"
@@ -332,18 +335,18 @@ export default function TrainerGroups() {
               className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700"
             >
               <MonitorPlay className="w-4 h-4" />
-              Ava projektor
+              {tr('Ava projektor', 'Open projector')}
             </button>
           </div>
         </div>
 
         <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-8 dark:bg-black dark:border-white/10">
-          <div className="text-xs font-semibold text-slate-500 uppercase mb-3">Uus grupp</div>
+          <div className="text-xs font-semibold text-slate-500 uppercase mb-3">{tr('Uus grupp', 'New group')}</div>
           <div className="flex flex-col sm:flex-row gap-3">
             <input
               value={newGroupName}
               onChange={(e) => setNewGroupName(e.target.value)}
-              placeholder="Grupi nimi (valikuline)"
+              placeholder={tr('Grupi nimi (valikuline)', 'Group name (optional)')}
               className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-200 dark:bg-black dark:border-white/10 dark:text-slate-100"
             />
             <button
@@ -352,16 +355,16 @@ export default function TrainerGroups() {
               disabled={isCreating}
               className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
             >
-              {isCreating ? 'Loon...' : 'Loo grupp'}
+              {isCreating ? tr('Loon...', 'Creating...') : tr('Loo grupp', 'Create group')}
             </button>
           </div>
         </div>
 
         {isLoading ? (
-          <div className="text-center text-slate-500">Laen gruppe...</div>
+          <div className="text-center text-slate-500">{tr('Laen gruppe...', 'Loading groups...')}</div>
         ) : groups.length === 0 ? (
           <div className="rounded-3xl border border-white/70 bg-white/70 p-10 text-center text-slate-500 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
-            Grupe pole veel loodud.
+            {tr('Grupe pole veel loodud.', 'No groups created yet.')}
           </div>
         ) : (
           <div className="space-y-6">
@@ -386,7 +389,7 @@ export default function TrainerGroups() {
                               onClick={() => handleRenameGroup(group)}
                               disabled={isSavingGroup[group.id]}
                               className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
-                              title="Salvesta"
+                              title={tr('Salvesta', 'Save')}
                             >
                               <Check className="w-4 h-4" />
                             </button>
@@ -394,7 +397,7 @@ export default function TrainerGroups() {
                               type="button"
                               onClick={cancelEditingGroup}
                               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/70 bg-white/70 text-slate-600 shadow-sm hover:bg-white dark:bg-black dark:border-white/10 dark:text-slate-200"
-                              title="Tühista"
+                              title={tr('Tühista', 'Cancel')}
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -406,7 +409,7 @@ export default function TrainerGroups() {
                               type="button"
                               onClick={() => startEditingGroup(group)}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-white/70 text-slate-600 shadow-sm hover:bg-white dark:bg-black dark:border-white/10 dark:text-slate-200"
-                              title="Muuda nime"
+                              title={tr('Muuda nime', 'Rename')}
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
@@ -415,10 +418,10 @@ export default function TrainerGroups() {
                       </div>
                       <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
                         <Users className="w-4 h-4" />
-                        {memberEntries.length} liiget
+                        {tr(`${memberEntries.length} liiget`, `${memberEntries.length} members`)}
                       </div>
                       {isAdmin && group.created_by && (
-                        <div className="text-xs text-slate-400">Treener: {group.created_by}</div>
+                        <div className="text-xs text-slate-400">{tr('Treener', 'Coach')}: {group.created_by}</div>
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -427,16 +430,16 @@ export default function TrainerGroups() {
                         onClick={() => navigate(`${createPageUrl('TrainerGroupDashboard')}?id=${group.id}`)}
                         className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
                       >
-                        Ava trenn
+                        {tr('Ava trenn', 'Open training')}
                       </button>
                       <div className="rounded-2xl bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 dark:bg-black dark:text-emerald-300 dark:border dark:border-white/10">
-                        PIN: {group.pin}
+                        {tr('PIN', 'PIN')}: {group.pin}
                       </div>
                       <button
                         type="button"
                         onClick={() => handleCopyPin(group.pin)}
                         className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/70 bg-white/70 text-slate-600 shadow-sm hover:bg-white dark:bg-black dark:border-white/10 dark:text-slate-200"
-                        title="Kopeeri PIN"
+                        title={tr('Kopeeri PIN', 'Copy PIN')}
                       >
                         <Copy className="w-4 h-4" />
                       </button>
@@ -445,7 +448,7 @@ export default function TrainerGroups() {
                         onClick={() => handleDeleteGroup(group)}
                         disabled={isDeletingGroup[group.id]}
                         className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/70 bg-white/70 text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-60 dark:bg-black dark:border-white/10"
-                        title="Kustuta grupp"
+                        title={tr('Kustuta grupp', 'Delete group')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -453,7 +456,7 @@ export default function TrainerGroups() {
                   </div>
 
                   <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 mb-4 dark:bg-black dark:border-white/10">
-                    <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Lisa mäng PIN-iga</div>
+                    <div className="text-xs font-semibold text-slate-500 uppercase mb-2">{tr('Lisa mäng PIN-iga', 'Add game by PIN')}</div>
                     <div className="flex flex-col sm:flex-row gap-3">
                       <input
                         value={gamePinsByGroup[group.id] || ''}
@@ -470,15 +473,15 @@ export default function TrainerGroups() {
                         className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
                       >
                         <Gamepad2 className="w-4 h-4" />
-                        {isAddingGameByGroup[group.id] ? 'Lisan...' : 'Lisa mäng'}
+                        {isAddingGameByGroup[group.id] ? tr('Lisan...', 'Adding...') : tr('Lisa mäng', 'Add game')}
                       </button>
                     </div>
                   </div>
 
                   <div className="mb-4">
-                    <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Aktiivsed trennimängud</div>
+                    <div className="text-xs font-semibold text-slate-500 uppercase mb-2">{tr('Aktiivsed trennimängud', 'Active training games')}</div>
                     {groupGames.length === 0 ? (
-                      <div className="text-sm text-slate-500">Aktiivseid mänge pole.</div>
+                      <div className="text-sm text-slate-500">{tr('Aktiivseid mänge pole.', 'No active games.')}</div>
                     ) : (
                       <div className="space-y-2">
                         {groupGames.map((game) => {
@@ -488,10 +491,12 @@ export default function TrainerGroups() {
                               key={game.id}
                               className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-white px-4 py-3 dark:bg-black dark:border-white/10"
                             >
-                              <div>
-                                <div className="text-sm font-semibold text-slate-800">{game.name}</div>
-                                <div className="text-xs text-slate-500">{format.name || game.game_type}</div>
-                              </div>
+                                <div>
+                                  <div className="text-sm font-semibold text-slate-800">{game.name}</div>
+                                  <div className="text-xs text-slate-500">
+                                    {t(`format.${game.game_type}.name`, format.name || game.game_type)}
+                                  </div>
+                                </div>
                               <div className="flex items-center gap-2">
                                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-black dark:text-slate-300 dark:border dark:border-white/10">
                                   PIN: {game.pin}

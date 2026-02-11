@@ -10,6 +10,7 @@ import { GAME_FORMATS } from '@/components/putting/gameRules';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
 import { toast } from 'sonner';
+import { useLanguage } from '@/lib/i18n';
 import {
   TRAINING_DAYS,
   getDayFullLabel,
@@ -40,11 +41,33 @@ const buildTopPlayers = (games) => {
     .slice(0, 10);
 };
 
+const DAY_FULL_EN = {
+  mon: 'Monday',
+  tue: 'Tuesday',
+  wed: 'Wednesday',
+  thu: 'Thursday',
+  fri: 'Friday',
+  sat: 'Saturday',
+  sun: 'Sunday'
+};
+
+const DAY_SHORT_EN = {
+  mon: 'M',
+  tue: 'T',
+  wed: 'W',
+  thu: 'T',
+  fri: 'F',
+  sat: 'S',
+  sun: 'S'
+};
+
 
 export default function TrainerGroupDashboard() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { lang, t } = useLanguage();
+  const tr = React.useCallback((et, en) => (lang === 'en' ? en : et), [lang]);
   const groupId = searchParams.get('id');
   const weekKey = React.useMemo(() => getWeekKey(), []);
   const [announcementDraft, setAnnouncementDraft] = React.useState('');
@@ -70,6 +93,17 @@ export default function TrainerGroupDashboard() {
     if (typeof window === 'undefined') return false;
     return window.innerWidth < 768;
   }, []);
+  const dayOptions = React.useMemo(() => {
+    return TRAINING_DAYS.map((day) => ({
+      ...day,
+      full: lang === 'en' ? (DAY_FULL_EN[day.value] || day.full) : day.full,
+      label: lang === 'en' ? (DAY_SHORT_EN[day.value] || day.label) : day.label
+    }));
+  }, [lang]);
+  const getDayLabel = React.useCallback((value) => {
+    if (lang !== 'en') return getDayFullLabel(value);
+    return DAY_FULL_EN[value] || getDayFullLabel(value);
+  }, [lang]);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -332,7 +366,7 @@ export default function TrainerGroupDashboard() {
   };
 
   const handleDeleteSlot = async (slotId) => {
-    if (!confirm('Kustuta see trenniaeg?')) return;
+    if (!confirm(tr('Kustuta see trenniaeg?', 'Delete this training time?'))) return;
     const nextSlots = slots.filter((slot) => slot.id !== slotId);
     await updateGroupSlots(nextSlots);
   };
@@ -351,7 +385,7 @@ export default function TrainerGroupDashboard() {
       await runTransaction(db, async (transaction) => {
         const groupRef = doc(db, 'training_groups', groupId);
         const snap = await transaction.get(groupRef);
-        if (!snap.exists()) throw new Error('Gruppi ei leitud');
+        if (!snap.exists()) throw new Error(tr('Gruppi ei leitud', 'Group not found'));
         const data = snap.data();
         const currentWeek = getWeekKey();
         const weekData = data.attendance?.[currentWeek] || {};
@@ -364,7 +398,7 @@ export default function TrainerGroupDashboard() {
       });
       queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
     } catch (error) {
-      toast.error(error?.message || 'Uuendus ebaõnnestus');
+      toast.error(error?.message || tr('Uuendus ebaõnnestus', 'Update failed'));
     } finally {
       setIsUpdatingAttendance((prev) => ({ ...prev, [slotId]: false }));
     }
@@ -377,7 +411,7 @@ export default function TrainerGroupDashboard() {
       await runTransaction(db, async (transaction) => {
         const groupRef = doc(db, 'training_groups', groupId);
         const snap = await transaction.get(groupRef);
-        if (!snap.exists()) throw new Error('Gruppi ei leitud');
+        if (!snap.exists()) throw new Error(tr('Gruppi ei leitud', 'Group not found'));
         const data = snap.data();
         const currentWeek = getWeekKey();
         const weekData = { ...(data.attendance?.[currentWeek] || {}) };
@@ -388,7 +422,7 @@ export default function TrainerGroupDashboard() {
       });
       queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
     } catch (error) {
-      toast.error(error?.message || 'Uuendus ebaõnnestus');
+      toast.error(error?.message || tr('Uuendus ebaõnnestus', 'Update failed'));
     } finally {
       setIsUpdatingAttendance((prev) => ({ ...prev, global: false }));
     }
@@ -431,7 +465,7 @@ export default function TrainerGroupDashboard() {
   const handleRequestSpot = async (slotId, requestType = 'claim') => {
     const userId = user?.id;
     if (!userId) return;
-    const userName = user?.display_name || user?.full_name || user?.email || 'Trenniline';
+    const userName = user?.display_name || user?.full_name || user?.email || tr('Trenniline', 'Trainee');
     const userEmail = user?.email || '';
     await updateAttendance(slotId, (slotData) => {
       const requests = new Set(slotData.request_uids || []);
@@ -473,7 +507,7 @@ export default function TrainerGroupDashboard() {
   const handleJoinWaitlist = async (slotId) => {
     const userId = user?.id;
     if (!userId) return;
-    const userName = user?.display_name || user?.full_name || user?.email || 'Trenniline';
+    const userName = user?.display_name || user?.full_name || user?.email || tr('Trenniline', 'Trainee');
     const userEmail = user?.email || '';
     await updateAttendance(slotId, (slotData) => {
       const waitlist = new Set(slotData.waitlist_uids || []);
@@ -500,7 +534,7 @@ export default function TrainerGroupDashboard() {
       const slot = (groupData.slots || []).find((s) => s.id === slotId);
       const availability = getSlotAvailability(slot, groupData, currentWeek);
       if (availability.available <= 0) {
-        throw new Error('Vabu kohti pole');
+        throw new Error(tr('Vabu kohti pole', 'No free spots'));
       }
       const waitlist = (slotData.waitlist_uids || []).filter((uid) => uid !== targetUid);
       const waitlistMeta = { ...(slotData.waitlist_meta || {}) };
@@ -512,7 +546,7 @@ export default function TrainerGroupDashboard() {
         const maxSpots = Number(slot?.max_spots || 0);
         const rosterCount = Array.isArray(slot?.roster_uids) ? slot.roster_uids.length : 0;
         if (rosterCount >= maxSpots) {
-          throw new Error('Püsikohti pole');
+          throw new Error(tr('Püsikohti pole', 'No reserved spots left'));
         }
         return {
           ...slotData,
@@ -550,7 +584,7 @@ export default function TrainerGroupDashboard() {
       const slot = (groupData.slots || []).find((s) => s.id === slotId);
       const availability = getSlotAvailability(slot, groupData, currentWeek);
       if (availability.available <= 0) {
-        throw new Error('Vabu kohti pole');
+        throw new Error(tr('Vabu kohti pole', 'No free spots'));
       }
       const requests = (slotData.request_uids || []).filter((uid) => uid !== targetUid);
       const requestMeta = { ...(slotData.request_meta || {}) };
@@ -561,7 +595,7 @@ export default function TrainerGroupDashboard() {
         const maxSpots = Number(slot?.max_spots || 0);
         const rosterCount = Array.isArray(slot?.roster_uids) ? slot.roster_uids.length : 0;
         if (rosterCount >= maxSpots) {
-          throw new Error('Püsikohti pole');
+          throw new Error(tr('Püsikohti pole', 'No reserved spots left'));
         }
         return {
           ...slotData,
@@ -644,7 +678,7 @@ export default function TrainerGroupDashboard() {
         [`training_groups.${groupId}`]: group?.name || 'Treening'
       });
     } catch (error) {
-      toast.error(error?.message || 'Liikme lisamine ebaõnnestus');
+      toast.error(error?.message || tr('Liikme lisamine ebaõnnestus', 'Failed to add member'));
     }
   };
 
@@ -657,7 +691,7 @@ export default function TrainerGroupDashboard() {
     try {
       const displayName = entry.display_name || entry.full_name || entry.email || entry.id;
       await addUserToGroupMembers(entry.id, { name: displayName, email: entry.email || '' });
-      toast.success('Trenniline lisatud');
+      toast.success(tr('Trenniline lisatud', 'Trainee added'));
       queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
     } finally {
       setAddingMemberId(null);
@@ -670,7 +704,7 @@ export default function TrainerGroupDashboard() {
       await runTransaction(db, async (transaction) => {
         const groupRef = doc(db, 'training_groups', groupId);
         const snap = await transaction.get(groupRef);
-        if (!snap.exists()) throw new Error('Gruppi ei leitud');
+        if (!snap.exists()) throw new Error(tr('Gruppi ei leitud', 'Group not found'));
         const data = snap.data();
         const currentSlots = Array.isArray(data.slots) ? data.slots : [];
         const nextSlots = currentSlots.map((slot) => {
@@ -679,7 +713,7 @@ export default function TrainerGroupDashboard() {
           if (roster.includes(uid)) return slot;
           const maxSpots = Number(slot.max_spots || 0);
           if (roster.length >= maxSpots) {
-            throw new Error('Püsikohad täis');
+            throw new Error(tr('Püsikohad täis', 'Reserved spots full'));
           }
           return { ...slot, roster_uids: [...roster, uid] };
         });
@@ -687,7 +721,7 @@ export default function TrainerGroupDashboard() {
       });
       queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
     } catch (error) {
-      toast.error(error?.message || 'Püsikoha kinnitamine ebaõnnestus');
+      toast.error(error?.message || tr('Püsikoha kinnitamine ebaõnnestus', 'Failed to confirm reserved spot'));
     }
   };
 
@@ -698,15 +732,15 @@ export default function TrainerGroupDashboard() {
       await runTransaction(db, async (transaction) => {
         const groupRef = doc(db, 'training_groups', groupId);
         const snap = await transaction.get(groupRef);
-        if (!snap.exists()) throw new Error('Gruppi ei leitud');
+        if (!snap.exists()) throw new Error(tr('Gruppi ei leitud', 'Group not found'));
         const data = snap.data();
         const currentSlots = Array.isArray(data.slots) ? data.slots : [];
         const targetSlot = currentSlots.find((slot) => slot.id === targetSlotId);
-        if (!targetSlot) throw new Error('Trenni ei leitud');
+        if (!targetSlot) throw new Error(tr('Trenni ei leitud', 'Training not found'));
         const targetRoster = Array.isArray(targetSlot.roster_uids) ? targetSlot.roster_uids : [];
         const targetMax = Number(targetSlot.max_spots || 0);
         if (targetMax > 0 && targetRoster.length >= targetMax) {
-          throw new Error('Püsikohad täis');
+          throw new Error(tr('Püsikohad täis', 'Reserved spots full'));
         }
         const nextSlots = currentSlots.map((slot) => {
           if (slot.id === sourceSlotId) {
@@ -728,7 +762,7 @@ export default function TrainerGroupDashboard() {
       });
       queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
     } catch (error) {
-      toast.error(error?.message || 'Liigutamine ebaõnnestus');
+      toast.error(error?.message || tr('Liigutamine ebaõnnestus', 'Move failed'));
     }
   };
 
@@ -755,7 +789,7 @@ export default function TrainerGroupDashboard() {
     const maxSpots = Number(slot.max_spots || 0);
     if (roster.includes(entry.id)) return;
     if (roster.length >= maxSpots) {
-      toast.error('Püsikohad täis');
+      toast.error(tr('Püsikohad täis', 'Reserved spots full'));
       return;
     }
     setAddingRoster((prev) => ({ ...prev, [slotId]: entry.id }));
@@ -764,7 +798,7 @@ export default function TrainerGroupDashboard() {
       await addUserToGroupMembers(entry.id, { name: displayName, email: entry.email || '' });
       await addUserToRoster(slotId, entry.id);
       setSlotSearch((prev) => ({ ...prev, [slotId]: '' }));
-      toast.success('Trenniline lisatud');
+      toast.success(tr('Trenniline lisatud', 'Trainee added'));
     } finally {
       setAddingRoster((prev) => ({ ...prev, [slotId]: null }));
     }
@@ -773,7 +807,7 @@ export default function TrainerGroupDashboard() {
   const handleSwapClaim = async (targetSlotId) => {
     const userId = user?.id;
     if (!userId) return;
-    const userName = user?.display_name || user?.full_name || user?.email || 'Trenniline';
+    const userName = user?.display_name || user?.full_name || user?.email || tr('Trenniline', 'Trainee');
     const userEmail = user?.email || '';
     await updateAttendanceMulti((weekData, groupData, currentWeek) => {
       const slotsList = Array.isArray(groupData.slots) ? groupData.slots : [];
@@ -781,14 +815,14 @@ export default function TrainerGroupDashboard() {
       if (!targetSlot) return weekData;
       const availability = getSlotAvailability(targetSlot, groupData, currentWeek);
       if (availability.available <= 0) {
-        throw new Error('Vabu kohti pole');
+        throw new Error(tr('Vabu kohti pole', 'No free spots'));
       }
 
       const rosterSlotIds = slotsList
         .filter((slot) => Array.isArray(slot.roster_uids) && slot.roster_uids.includes(userId))
         .map((slot) => slot.id);
       if (rosterSlotIds.length === 0) {
-        throw new Error('Sul pole püsikohta');
+        throw new Error(tr('Sul pole püsikohta', 'You do not have a reserved spot'));
       }
 
       Object.keys(weekData).forEach((slotId) => {
@@ -864,7 +898,7 @@ export default function TrainerGroupDashboard() {
   };
 
   const handleRemoveRosterMember = async (slotId, targetUid) => {
-    if (!confirm('Eemalda püsikohalt?')) return;
+    if (!confirm(tr('Eemalda püsikohalt?', 'Remove from reserved spot?'))) return;
     const nextSlots = slots.map((slot) => {
       if (slot.id !== slotId) return slot;
       const roster = Array.isArray(slot.roster_uids) ? slot.roster_uids : [];
@@ -920,9 +954,9 @@ export default function TrainerGroupDashboard() {
         announcement_updated_at: serverTimestamp()
       });
       queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
-      toast.success('Teade salvestatud');
+      toast.success(tr('Teade salvestatud', 'Announcement saved'));
     } catch (error) {
-      toast.error(error?.message || 'Teate salvestamine ebaõnnestus');
+      toast.error(error?.message || tr('Teate salvestamine ebaõnnestus', 'Failed to save announcement'));
     } finally {
       setIsSavingAnnouncement(false);
     }
@@ -931,10 +965,10 @@ export default function TrainerGroupDashboard() {
   const joinTrainingGame = async (game) => {
     if (!game?.id) return;
     if (!user?.id) {
-      toast.error('Palun logi sisse');
+      toast.error(tr('Palun logi sisse', 'Please sign in'));
       return;
     }
-    const playerName = user?.display_name || user?.full_name || user?.email || 'Mängija';
+    const playerName = user?.display_name || user?.full_name || user?.email || tr('Mängija', 'Player');
     setJoiningGameId(game.id);
     try {
       const currentGame = game;
@@ -994,7 +1028,7 @@ export default function TrainerGroupDashboard() {
 
       navigate(`${createPageUrl('Home')}?mode=player&gameId=${currentGame.id}&from=training`);
     } catch (error) {
-      toast.error(error?.message || 'Mänguga liitumine ebaõnnestus');
+      toast.error(error?.message || tr('Mänguga liitumine ebaõnnestus', 'Failed to join game'));
     } finally {
       setJoiningGameId(null);
     }
@@ -1007,15 +1041,16 @@ export default function TrainerGroupDashboard() {
           <BackButton
             fallbackTo={createPageUrl(canManageTraining ? 'TrainerGroups' : 'JoinTraining')}
             forceFallback
+            label={tr('Tagasi', 'Back')}
           />
-          <HomeButton />
+          <HomeButton label={tr('Avaleht', 'Home')} />
         </div>
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">{group?.name || 'Treening'}</h1>
+            <h1 className="text-2xl font-bold text-slate-800">{group?.name || tr('Treening', 'Training')}</h1>
             <p className="text-sm text-slate-500">
-              {canManageTraining ? 'Treeneri dashboard' : 'Treeningu vaade'}
+              {canManageTraining ? tr('Treeneri dashboard', 'Coach dashboard') : tr('Treeningu vaade', 'Training view')}
             </p>
           </div>
           <button
@@ -1024,7 +1059,7 @@ export default function TrainerGroupDashboard() {
             className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 dark:bg-black dark:border-white/10 dark:text-emerald-300"
           >
             <Trophy className="w-4 h-4" />
-            LIIGA
+            {tr('LIIGA', 'LEAGUE')}
           </button>
         </div>
 
@@ -1032,7 +1067,7 @@ export default function TrainerGroupDashboard() {
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-slate-800 flex items-center gap-2">
               <Megaphone className="w-4 h-4 text-emerald-500" />
-              Teadete tahvel
+              {tr('Teadete tahvel', 'Announcements')}
             </div>
             {canManageTraining && (
               <button
@@ -1041,7 +1076,7 @@ export default function TrainerGroupDashboard() {
                 disabled={isSavingAnnouncement}
                 className="rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
               >
-                {isSavingAnnouncement ? 'Salvestan...' : 'Salvesta'}
+                {isSavingAnnouncement ? tr('Salvestan...', 'Saving...') : tr('Salvesta', 'Save')}
               </button>
             )}
           </div>
@@ -1049,40 +1084,40 @@ export default function TrainerGroupDashboard() {
             <textarea
               value={announcementDraft}
               onChange={(event) => setAnnouncementDraft(event.target.value)}
-              placeholder="Lisa trennilistele info..."
+              placeholder={tr('Lisa trennilistele info...', 'Add an announcement for trainees...')}
               className="w-full min-h-[88px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 dark:bg-black dark:border-white/10 dark:text-slate-100"
             />
           ) : (
             <div className="text-sm text-slate-600 dark:text-slate-200">
-              {group?.announcement?.trim() || 'Teateid pole hetkel.'}
+              {group?.announcement?.trim() || tr('Teateid pole hetkel.', 'No announcements right now.')}
             </div>
           )}
         </div>
 
         {!canManageTraining && !hasConfirmedSpot && (
           <div className="rounded-[24px] border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800 mb-6">
-            Ootab kinnitust – treener peab koha kinnitama, enne kui trenn avaneb.
+            {tr('Ootab kinnitust – treener peab koha kinnitama, enne kui trenn avaneb.', 'Waiting for confirmation – the coach must confirm your spot before training opens.')}
           </div>
         )}
 
         {(canManageTraining || hasConfirmedSpot) && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <div className="rounded-[24px] border border-white/70 bg-white/70 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
-              <div className="text-xs text-slate-500 uppercase mb-2">Aktiivsed mängud</div>
+              <div className="text-xs text-slate-500 uppercase mb-2">{tr('Aktiivsed mängud', 'Active games')}</div>
               <div className="flex items-center gap-2 text-2xl font-bold text-slate-800">
                 <Activity className="w-5 h-5 text-emerald-500" />
                 {activeGames.length}
               </div>
             </div>
             <div className="rounded-[24px] border border-white/70 bg-white/70 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
-              <div className="text-xs text-slate-500 uppercase mb-2">Kõik mängud</div>
+              <div className="text-xs text-slate-500 uppercase mb-2">{tr('Kõik mängud', 'All games')}</div>
               <div className="flex items-center gap-2 text-2xl font-bold text-slate-800">
                 <BarChart3 className="w-5 h-5 text-emerald-500" />
                 {games.length}
               </div>
             </div>
             <div className="rounded-[24px] border border-white/70 bg-white/70 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
-              <div className="text-xs text-slate-500 uppercase mb-2">Mängijaid kokku</div>
+              <div className="text-xs text-slate-500 uppercase mb-2">{tr('Mängijaid kokku', 'Total players')}</div>
               <div className="flex items-center gap-2 text-2xl font-bold text-slate-800">
                 <Users className="w-5 h-5 text-emerald-500" />
                 {uniquePlayers || membersCount}
@@ -1094,27 +1129,27 @@ export default function TrainerGroupDashboard() {
         <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-8 dark:bg-black dark:border-white/10">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
-              <div className="text-sm font-semibold text-slate-800">Treeningu ajad</div>
+              <div className="text-sm font-semibold text-slate-800">{tr('Treeningu ajad', 'Training times')}</div>
               <div className="text-xs text-slate-500">
-                Kestvus vaikimisi 1.5h • Nädal {weekKey}
+                {tr('Kestvus vaikimisi 1.5h', 'Default duration 1.5h')} • {tr('Nädal', 'Week')} {weekKey}
               </div>
             </div>
             {canManageTraining && (
               <div className="inline-flex items-center gap-2 text-xs text-slate-500">
-                Kuuluta vaba koht, et see ilmuks “Vabad trennid” nimekirjas.
+                {tr('Kuuluta vaba koht, et see ilmuks “Vabad trennid” nimekirjas.', 'Announce a free spot to show it in the “Free trainings” list.')}
               </div>
             )}
           </div>
 
           {slots.length === 0 && (
-            <div className="text-sm text-slate-500">Aegu pole veel lisatud.</div>
+            <div className="text-sm text-slate-500">{tr('Aegu pole veel lisatud.', 'No times added yet.')}</div>
           )}
 
           {canManageTraining ? (
             <div className="space-y-3">
               {unassignedMembers.length > 0 && (
                 <div className="rounded-[20px] border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10">
-                  <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Sortimata liikmed</div>
+                  <div className="text-xs font-semibold text-slate-500 uppercase mb-2">{tr('Sortimata liikmed', 'Unassigned members')}</div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
                     {unassignedMembers.map((member) => {
                       const isSelected =
@@ -1130,11 +1165,11 @@ export default function TrainerGroupDashboard() {
                               : 'border-slate-200'
                           }`}
                         >
-                          <div className="text-[10px] uppercase text-slate-400">Sortimata</div>
+                          <div className="text-[10px] uppercase text-slate-400">{tr('Sortimata', 'Unassigned')}</div>
                           <div className="text-sm font-semibold text-slate-800 truncate">
                             {getMemberLabel(member.uid)}
                           </div>
-                          <div className="text-[10px] text-slate-400 mt-1">Vali trenn</div>
+                          <div className="text-[10px] text-slate-400 mt-1">{tr('Vali trenn', 'Choose training')}</div>
                         </button>
                       );
                     })}
@@ -1144,9 +1179,9 @@ export default function TrainerGroupDashboard() {
 
               {selectedMember && (
                 <div className="rounded-[20px] border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10">
-                  <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Määra trenn</div>
+                  <div className="text-xs font-semibold text-slate-500 uppercase mb-2">{tr('Määra trenn', 'Assign training')}</div>
                   <div className="text-[11px] text-slate-500 mb-3">
-                    Valitud: {getMemberLabel(selectedMember.uid)}
+                    {tr('Valitud', 'Selected')}: {getMemberLabel(selectedMember.uid)}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {slots.map((slot) => {
@@ -1169,16 +1204,16 @@ export default function TrainerGroupDashboard() {
                           }`}
                         >
                           <div className="text-sm font-semibold">
-                            {getDayFullLabel(slot.day)} • {slot.time}
+                            {getDayLabel(slot.day)} • {slot.time}
                           </div>
                           <div className="text-[10px] text-slate-500 mt-1">
-                            Püsikohti: {rosterCount}/{maxSpots || '-'}
+                            {tr('Püsikohti', 'Reserved')}: {rosterCount}/{maxSpots || '-'}
                           </div>
                           {isCurrent && (
-                            <div className="text-[10px] text-slate-400 mt-1">Praegune</div>
+                            <div className="text-[10px] text-slate-400 mt-1">{tr('Praegune', 'Current')}</div>
                           )}
                           {isFull && !isCurrent && (
-                            <div className="text-[10px] text-amber-600 mt-1">Täis</div>
+                            <div className="text-[10px] text-amber-600 mt-1">{tr('Täis', 'Full')}</div>
                           )}
                         </button>
                       );
@@ -1190,7 +1225,7 @@ export default function TrainerGroupDashboard() {
                       onClick={() => setSelectedMember(null)}
                       className="text-xs font-semibold text-slate-500 hover:text-slate-700"
                     >
-                      Tühista
+                      {tr('Tühista', 'Cancel')}
                     </button>
                   </div>
                 </div>
@@ -1270,23 +1305,23 @@ export default function TrainerGroupDashboard() {
                       </span>
                       <div>
                         <div className="text-sm font-semibold text-slate-800">
-                          {getDayFullLabel(slot.day)} • {slot.time}
+                          {getDayLabel(slot.day)} • {slot.time}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {slot.duration_minutes || 90} min • Max {slot.max_spots} kohta
+                          {slot.duration_minutes || 90} min • {tr('Max', 'Max')} {slot.max_spots} {tr('kohta', 'spots')}
                         </div>
                       </div>
                     </button>
                     <div className="flex flex-wrap items-center gap-2 text-[11px]">
                       <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700 font-semibold">
-                        Vabu: {availability.available}
+                        {tr('Vabu', 'Free')}: {availability.available}
                       </span>
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 font-semibold">
-                        Püsikohti: {availability.roster.length}/{maxSpots}
+                        {tr('Püsikohti', 'Reserved')}: {availability.roster.length}/{maxSpots}
                       </span>
                       {slot.is_public && (
                         <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700 font-semibold">
-                          Avalik
+                          {tr('Avalik', 'Public')}
                         </span>
                       )}
                     </div>
@@ -1319,7 +1354,7 @@ export default function TrainerGroupDashboard() {
                         value={editingSlot.max_spots}
                         onChange={(event) => setEditingSlot((prev) => ({ ...prev, max_spots: event.target.value }))}
                         className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
-                        placeholder="Kohti"
+                        placeholder={tr('Kohti', 'Spots')}
                       />
                       <div className="flex items-center gap-2">
                         <button
@@ -1328,14 +1363,14 @@ export default function TrainerGroupDashboard() {
                           disabled={isSavingSlot}
                           className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-2 text-[11px] font-semibold text-white"
                         >
-                          <Check className="w-3 h-3" /> Salvesta
+                          <Check className="w-3 h-3" /> {tr('Salvesta', 'Save')}
                         </button>
                         <button
                           type="button"
                           onClick={cancelEditingSlot}
                           className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-700"
                         >
-                          <X className="w-3 h-3" /> Tühista
+                          <X className="w-3 h-3" /> {tr('Tühista', 'Cancel')}
                         </button>
                       </div>
                     </div>
@@ -1349,7 +1384,7 @@ export default function TrainerGroupDashboard() {
                               onClick={() => handleTogglePublicSlot(slot.id)}
                               className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
                             >
-                              Eemalda kuulutus
+                              {tr('Eemalda kuulutus', 'Remove announcement')}
                             </button>
                           ) : (
                             <button
@@ -1358,7 +1393,7 @@ export default function TrainerGroupDashboard() {
                               disabled={!canAnnounce}
                               className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
                             >
-                              Kuuluta vaba koht
+                              {tr('Kuuluta vaba koht', 'Announce free spot')}
                             </button>
                           )}
                           <button
@@ -1367,7 +1402,7 @@ export default function TrainerGroupDashboard() {
                             className="rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
                           >
                             <Pencil className="w-3 h-3 inline-block mr-1" />
-                            Muuda
+                            {tr('Muuda', 'Edit')}
                           </button>
                           <button
                             type="button"
@@ -1375,7 +1410,7 @@ export default function TrainerGroupDashboard() {
                             className="rounded-full border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-600 hover:bg-red-100"
                           >
                             <Trash2 className="w-3 h-3 inline-block mr-1" />
-                            Kustuta
+                            {tr('Kustuta', 'Delete')}
                           </button>
                         </>
                       ) : (
@@ -1387,7 +1422,9 @@ export default function TrainerGroupDashboard() {
                               onClick={() => handleToggleRelease(slot.id)}
                               className="rounded-full border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700"
                             >
-                              {isReleased ? 'Tulen siiski' : 'Täna trenni ei jõua'}
+                              {isReleased
+                                ? tr('Tulen siiski', 'I can make it')
+                                : tr('Täna trenni ei jõua', 'Cannot make training today')}
                             </button>
                           )}
                         </>
@@ -1412,7 +1449,7 @@ export default function TrainerGroupDashboard() {
                                     : 'border-slate-200 bg-slate-50'
                                 }`}
                               >
-                                <div className="text-[10px] uppercase text-slate-400">Püsikoht</div>
+                                <div className="text-[10px] uppercase text-slate-400">{tr('Püsikoht', 'Reserved')}</div>
                                 <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
                                 <div className="mt-2 flex items-center gap-2">
                                   <button
@@ -1420,14 +1457,14 @@ export default function TrainerGroupDashboard() {
                                     onClick={() => handleSelectMember(seat.uid, slot.id)}
                                     className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
                                   >
-                                    {isSelected ? 'Valitud' : 'Vali'}
+                                    {isSelected ? tr('Valitud', 'Selected') : tr('Vali', 'Select')}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveRosterMember(slot.id, seat.uid)}
                                     className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600"
                                   >
-                                    Eemalda
+                                    {tr('Eemalda', 'Remove')}
                                   </button>
                                 </div>
                               </div>
@@ -1448,7 +1485,7 @@ export default function TrainerGroupDashboard() {
                                   onClick={() => handleRemoveClaimedMember(slot.id, seat.uid)}
                                   className="mt-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
                                 >
-                                  Eemalda
+                                  {tr('Eemalda', 'Remove')}
                                 </button>
                               </div>
                             );
@@ -1460,10 +1497,10 @@ export default function TrainerGroupDashboard() {
                               key={`${slot.id}-free-${seatIndex}`}
                               className="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-3 text-xs text-slate-400"
                             >
-                              <div className="text-[10px] uppercase text-slate-400">Vaba</div>
+                              <div className="text-[10px] uppercase text-slate-400">{tr('Vaba', 'Free')}</div>
                               {releasedLabel && (
                                 <div className="text-[10px] text-slate-400 mt-1 truncate">
-                                  püsikoht: {releasedLabel}
+                                  {tr('püsikoht', 'reserved')}: {releasedLabel}
                                 </div>
                               )}
                             </div>
@@ -1480,7 +1517,7 @@ export default function TrainerGroupDashboard() {
                                 key={`${slot.id}-roster-${seat.uid}`}
                                 className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700 shadow-sm"
                               >
-                                <div className="text-[10px] uppercase text-slate-400">Püsikoht</div>
+                                <div className="text-[10px] uppercase text-slate-400">{tr('Püsikoht', 'Reserved')}</div>
                                 <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
                               </div>
                             );
@@ -1506,10 +1543,10 @@ export default function TrainerGroupDashboard() {
                               key={`${slot.id}-free-${seatIndex}`}
                               className="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-3 text-xs text-slate-400 flex flex-col gap-2"
                             >
-                              <div className="text-[10px] uppercase text-slate-400">Vaba</div>
+                              <div className="text-[10px] uppercase text-slate-400">{tr('Vaba', 'Free')}</div>
                               {releasedLabel && (
                                 <div className="text-[10px] text-slate-400 truncate">
-                                  püsikoht: {releasedLabel}
+                                  {tr('püsikoht', 'reserved')}: {releasedLabel}
                                 </div>
                               )}
                               {canClaimSeat && (
@@ -1518,7 +1555,7 @@ export default function TrainerGroupDashboard() {
                                   onClick={() => handleSwapClaim(slot.id)}
                                   className="rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-semibold text-white"
                                 >
-                                  Asendan koha
+                                  {tr('Asendan koha', 'Claim spot')}
                                 </button>
                               )}
                             </div>
@@ -1530,27 +1567,27 @@ export default function TrainerGroupDashboard() {
                     {canManageTraining && (
                       <div className="mt-3 border-t border-slate-100 pt-3">
                         <div className="text-[11px] font-semibold text-slate-500 mb-2">
-                          Lisa trenniline siia trenni
+                          {tr('Lisa trenniline siia trenni', 'Add trainee to this training')}
                         </div>
                         <input
                           value={slotSearchValue}
                           onChange={(event) =>
                             setSlotSearch((prev) => ({ ...prev, [slot.id]: event.target.value }))
                           }
-                          placeholder="Otsi nime või e-posti"
+                          placeholder={tr('Otsi nime või e-posti', 'Search name or email')}
                           className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 dark:bg-black dark:border-white/10 dark:text-slate-100"
                         />
                         <div className="mt-2 space-y-2">
                           {normalizedSlotSearch.length > 0 && normalizedSlotSearch.length < 2 && (
                             <div className="text-[11px] text-slate-500">
-                              Sisesta vähemalt 2 tähte.
+                              {tr('Sisesta vähemalt 2 tähte.', 'Enter at least 2 characters.')}
                             </div>
                           )}
                           {normalizedSlotSearch.length >= 2 && isLoadingUsers && (
-                            <div className="text-[11px] text-slate-500">Laen kasutajaid...</div>
+                            <div className="text-[11px] text-slate-500">{tr('Laen kasutajaid...', 'Loading users...')}</div>
                           )}
                           {normalizedSlotSearch.length >= 2 && !isLoadingUsers && slotSearchResults.length === 0 && (
-                            <div className="text-[11px] text-slate-500">Sobivaid kasutajaid ei leitud.</div>
+                            <div className="text-[11px] text-slate-500">{tr('Sobivaid kasutajaid ei leitud.', 'No matching users found.')}</div>
                           )}
                           {normalizedSlotSearch.length >= 2 &&
                             slotSearchResults.map((entry) => {
@@ -1568,7 +1605,7 @@ export default function TrainerGroupDashboard() {
                                   </div>
                                   {alreadyInRoster ? (
                                     <span className="rounded-full border border-emerald-200 px-3 py-1 text-[10px] font-semibold text-emerald-700">
-                                      Juba slotis
+                                      {tr('Juba slotis', 'Already in slot')}
                                     </span>
                                   ) : (
                                     <button
@@ -1577,7 +1614,7 @@ export default function TrainerGroupDashboard() {
                                       onClick={() => handleAddRosterMember(slot.id, entry)}
                                       className="rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
                                     >
-                                      {isAdding ? 'Lisan...' : 'Lisa'}
+                                      {isAdding ? tr('Lisan...', 'Adding...') : tr('Lisa', 'Add')}
                                     </button>
                                   )}
                                 </div>
@@ -1590,7 +1627,7 @@ export default function TrainerGroupDashboard() {
                     {canManageTraining && pendingEntries.length > 0 && (
                       <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 dark:bg-black dark:border-white/10">
                         <div className="text-xs font-semibold text-slate-500 mb-2">
-                          Ootelist ({pendingEntries.length})
+                          {tr('Ootelist', 'Pending')} ({pendingEntries.length})
                         </div>
                         <div className="space-y-2">
                           {pendingEntries.map((entry) => (
@@ -1603,7 +1640,7 @@ export default function TrainerGroupDashboard() {
                                 <div className="text-[11px] text-slate-400">{entry.email || ''}</div>
                                 {entry.type === 'roster' && (
                                   <div className="text-[10px] text-emerald-600 font-semibold mt-1">
-                                    Püsikoha taotlus
+                                    {tr('Püsikoha taotlus', 'Reserved spot request')}
                                   </div>
                                 )}
                               </div>
@@ -1618,7 +1655,7 @@ export default function TrainerGroupDashboard() {
                                   }
                                   className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white disabled:opacity-60"
                                 >
-                                  Kinnita
+                                  {tr('Kinnita', 'Approve')}
                                 </button>
                                 <button
                                   type="button"
@@ -1629,7 +1666,7 @@ export default function TrainerGroupDashboard() {
                                   }
                                   className="rounded-full border border-red-200 px-3 py-1 text-[11px] font-semibold text-red-600"
                                 >
-                                  {entry.kind === 'request' ? 'Keeldu' : 'Eemalda'}
+                                  {entry.kind === 'request' ? tr('Keeldu', 'Decline') : tr('Eemalda', 'Remove')}
                                 </button>
                               </div>
                             </div>
@@ -1708,7 +1745,7 @@ export default function TrainerGroupDashboard() {
                         </span>
                         <div>
                           <div className="text-sm font-semibold text-slate-800">
-                            {getDayFullLabel(slot.day)} • {slot.time}
+                            {getDayLabel(slot.day)} • {slot.time}
                           </div>
                           <div className="text-xs text-slate-500">
                             {slot.duration_minutes || 90} min • Max {slot.max_spots} kohta
@@ -1717,14 +1754,14 @@ export default function TrainerGroupDashboard() {
                       </button>
                       <div className="flex flex-wrap items-center gap-2 text-[11px]">
                         <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700 font-semibold">
-                          Vabu: {availability.available}
+                          {tr('Vabu', 'Free')}: {availability.available}
                         </span>
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 font-semibold">
-                          Püsikohti: {availability.roster.length}/{maxSpots}
+                          {tr('Püsikohti', 'Reserved')}: {availability.roster.length}/{maxSpots}
                         </span>
                         {slot.is_public && (
                           <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700 font-semibold">
-                            Avalik
+                            {tr('Avalik', 'Public')}
                           </span>
                         )}
                       </div>
@@ -1740,7 +1777,9 @@ export default function TrainerGroupDashboard() {
                               onClick={() => handleToggleRelease(slot.id)}
                               className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700"
                             >
-                              {isReleased ? 'Tulen siiski' : 'Täna trenni ei jõua'}
+                              {isReleased
+                                ? tr('Tulen siiski', 'I can make it')
+                                : tr('Täna trenni ei jõua', 'Cannot make training today')}
                             </button>
                           )}
                         </div>
@@ -1754,7 +1793,7 @@ export default function TrainerGroupDashboard() {
                                   key={`${slot.id}-roster-${seat.uid}`}
                                   className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 shadow-sm"
                                 >
-                                  <div className="text-[10px] uppercase text-slate-400">Püsikoht</div>
+                                  <div className="text-[10px] uppercase text-slate-400">{tr('Püsikoht', 'Reserved')}</div>
                                   <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
                                 </div>
                               );
@@ -1778,12 +1817,12 @@ export default function TrainerGroupDashboard() {
                             return (
                               <div
                                 key={`${slot.id}-free-${seatIndex}`}
-                                className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-xs text-slate-400 flex flex-col gap-2"
-                              >
-                                <div className="text-[10px] uppercase text-slate-400">Vaba</div>
+                              className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-xs text-slate-400 flex flex-col gap-2"
+                            >
+                                <div className="text-[10px] uppercase text-slate-400">{tr('Vaba', 'Free')}</div>
                                 {releasedLabel && (
                                   <div className="text-[10px] text-slate-400 truncate">
-                                    püsikoht: {releasedLabel}
+                                    {tr('püsikoht', 'reserved')}: {releasedLabel}
                                   </div>
                                 )}
                                 {canClaimSeat && (
@@ -1792,7 +1831,7 @@ export default function TrainerGroupDashboard() {
                                     onClick={() => handleSwapClaim(slot.id)}
                                     className="rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-semibold text-white"
                                   >
-                                    Asendan koha
+                                    {tr('Asendan koha', 'Claim spot')}
                                   </button>
                                 )}
                               </div>
@@ -1802,7 +1841,7 @@ export default function TrainerGroupDashboard() {
 
                         {pendingEntries.length > 0 && (
                           <div className="mt-3 text-[11px] text-slate-500">
-                            Ootelist: {pendingEntries.length}
+                            {tr('Ootelist', 'Pending')}: {pendingEntries.length}
                           </div>
                         )}
                       </>
@@ -1819,11 +1858,11 @@ export default function TrainerGroupDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
             <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-semibold text-slate-800">Aktiivsed trennimängud</div>
-              <span className="text-xs text-slate-400">{activeGames.length} mängu</span>
+              <div className="text-sm font-semibold text-slate-800">{tr('Aktiivsed trennimängud', 'Active training games')}</div>
+              <span className="text-xs text-slate-400">{tr(`${activeGames.length} mängu`, `${activeGames.length} games`)}</span>
             </div>
             {activeGames.length === 0 ? (
-              <div className="text-sm text-slate-500">Aktiivseid mänge pole.</div>
+              <div className="text-sm text-slate-500">{tr('Aktiivseid mänge pole.', 'No active games.')}</div>
             ) : (
               <div className="space-y-2">
                 {activeGames.map((game) => {
@@ -1835,7 +1874,9 @@ export default function TrainerGroupDashboard() {
                     >
                       <div>
                         <div className="text-sm font-semibold text-slate-800">{game.name}</div>
-                        <div className="text-xs text-slate-500">{format.name || game.game_type}</div>
+                        <div className="text-xs text-slate-500">
+                          {t(`format.${game.game_type}.name`, format.name || game.game_type)}
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -1847,7 +1888,7 @@ export default function TrainerGroupDashboard() {
                           disabled={joiningGameId === game.id}
                           className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-emerald-300"
                         >
-                          {joiningGameId === game.id ? 'Liitun...' : 'Liitu'}
+                          {joiningGameId === game.id ? tr('Liitun...', 'Joining...') : tr('Liitu', 'Join')}
                         </button>
                       </div>
                     </div>
@@ -1859,11 +1900,11 @@ export default function TrainerGroupDashboard() {
 
           <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
             <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-semibold text-slate-800">Top mängijad</div>
+              <div className="text-sm font-semibold text-slate-800">{tr('Top mängijad', 'Top players')}</div>
               <Trophy className="w-4 h-4 text-amber-500" />
             </div>
             {topPlayers.length === 0 ? (
-              <div className="text-sm text-slate-500">Tulemusi pole veel.</div>
+              <div className="text-sm text-slate-500">{tr('Tulemusi pole veel.', 'No results yet.')}</div>
             ) : (
               <div className="space-y-2">
                 {topPlayers.map((player, idx) => (
@@ -1886,11 +1927,11 @@ export default function TrainerGroupDashboard() {
 
           <div className="lg:col-span-2 rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
             <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-semibold text-slate-800">Viimased mängud</div>
-              <span className="text-xs text-slate-400">{games.length} kokku</span>
+              <div className="text-sm font-semibold text-slate-800">{tr('Viimased mängud', 'Recent games')}</div>
+              <span className="text-xs text-slate-400">{tr(`${games.length} kokku`, `${games.length} total`)}</span>
             </div>
             {recentGames.length === 0 ? (
-              <div className="text-sm text-slate-500">Mänge pole veel.</div>
+              <div className="text-sm text-slate-500">{tr('Mänge pole veel.', 'No games yet.')}</div>
             ) : (
               <div className="space-y-2">
                 {recentGames.map((game) => {
@@ -1902,7 +1943,9 @@ export default function TrainerGroupDashboard() {
                     >
                       <div>
                         <div className="text-sm font-semibold text-slate-800">{game.name}</div>
-                        <div className="text-xs text-slate-500">{format.name || game.game_type}</div>
+                        <div className="text-xs text-slate-500">
+                          {t(`format.${game.game_type}.name`, format.name || game.game_type)}
+                        </div>
                       </div>
                       <div className="text-xs text-slate-500">
                         {game.date ? new Date(game.date).toLocaleDateString('et-EE') : ''}
@@ -1918,14 +1961,14 @@ export default function TrainerGroupDashboard() {
 
         {canManageTraining && (
           <div className="mt-6 rounded-[22px] border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10">
-            <div className="text-xs font-semibold text-slate-500 mb-3">Lisa uus aeg</div>
+            <div className="text-xs font-semibold text-slate-500 mb-3">{tr('Lisa uus aeg', 'Add new time')}</div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <select
                 value={newSlot.day}
                 onChange={(event) => setNewSlot((prev) => ({ ...prev, day: event.target.value }))}
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
               >
-                {TRAINING_DAYS.map((day) => (
+                {dayOptions.map((day) => (
                   <option key={day.value} value={day.value}>
                     {day.full}
                   </option>
@@ -1943,7 +1986,7 @@ export default function TrainerGroupDashboard() {
                 value={newSlot.maxSpots}
                 onChange={(event) => setNewSlot((prev) => ({ ...prev, maxSpots: event.target.value }))}
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
-                placeholder="Kohti"
+                placeholder={tr('Kohti', 'Spots')}
               />
               <button
                 type="button"
@@ -1951,7 +1994,7 @@ export default function TrainerGroupDashboard() {
                 disabled={isSavingSlot}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
               >
-                <Plus className="w-3 h-3" /> Lisa
+                <Plus className="w-3 h-3" /> {tr('Lisa', 'Add')}
               </button>
             </div>
           </div>

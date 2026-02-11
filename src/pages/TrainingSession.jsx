@@ -60,6 +60,7 @@ export default function TrainingSession() {
   const [offlineCutBonus, setOfflineCutBonus] = React.useState(0.25);
   const [isSavingApp, setIsSavingApp] = React.useState(false);
   const [isSavingOffline, setIsSavingOffline] = React.useState(false);
+  const [isDeletingEvent, setIsDeletingEvent] = React.useState({});
   const [mode, setMode] = React.useState('app');
 
   const { data: user } = useQuery({
@@ -562,6 +563,67 @@ export default function TrainingSession() {
     }
   };
 
+  const handleDeleteEvent = async (event) => {
+    if (!event?.id || !season?.id) return;
+    if (!canManageTraining) {
+      toast.error('Pole treeneri õigusi');
+      return;
+    }
+    const confirmed = window.confirm(`Kustuta event "${event.name}"?`);
+    if (!confirmed) return;
+    setIsDeletingEvent((prev) => ({ ...prev, [event.id]: true }));
+    try {
+      const eventResults = resultsByEvent[event.id] || [];
+      if (eventResults.length > 0) {
+        const statsUpdates = {};
+        eventResults.forEach((entry) => {
+          const participantId = entry.participant_id;
+          if (!participantId) return;
+          const existing = statsByParticipant[participantId];
+          if (!existing) return;
+          const deduction = Number(entry.points || 0);
+          const currentSlotPoints = Number(existing.points_by_slot?.[session?.slot_id] || 0);
+          const nextSlotPoints = round1(Math.max(0, currentSlotPoints - deduction));
+          const nextTotal = round1(Math.max(0, Number(existing.points_total || 0) - deduction));
+          const nextAttendance = Math.max(0, (existing.attendance_count || 0) - 1);
+          statsUpdates[participantId] = {
+            points_total: nextTotal,
+            attendance_count: nextAttendance,
+            points_by_slot: {
+              ...(existing.points_by_slot || {}),
+              [session?.slot_id]: nextSlotPoints
+            },
+            updated_at: new Date().toISOString()
+          };
+        });
+
+        const batch = writeBatch(db);
+        eventResults.forEach((entry) => {
+          batch.delete(doc(db, 'training_event_results', entry.id));
+        });
+        Object.entries(statsUpdates).forEach(([participantId, payload]) => {
+          const statsRef = doc(db, 'training_season_stats', `${season.id}_${participantId}`);
+          batch.set(statsRef, payload, { merge: true });
+        });
+        batch.delete(doc(db, 'training_events', event.id));
+        await batch.commit();
+      } else {
+        await writeBatch(db)
+          .delete(doc(db, 'training_events', event.id))
+          .commit();
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['training-events', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-event-results', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
+      toast.success('Event kustutatud');
+    } catch (error) {
+      toast.error(error?.message || 'Eventi kustutamine ebaõnnestus');
+    } finally {
+      setIsDeletingEvent((prev) => ({ ...prev, [event.id]: false }));
+    }
+  };
+
   if (!session || !season || !group) {
     return <div className="min-h-screen bg-black" />;
   }
@@ -820,7 +882,19 @@ export default function TrainingSession() {
                         <div className="text-sm font-semibold text-slate-800">{event.name}</div>
                         <div className="text-xs text-slate-500">{event.type === 'app' ? 'App event' : 'Offline'}</div>
                       </div>
-                      <div className="text-xs text-slate-400">{eventResults.length} osalejat</div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-xs text-slate-400">{eventResults.length} osalejat</div>
+                        {canManageTraining && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEvent(event)}
+                            disabled={Boolean(isDeletingEvent[event.id])}
+                            className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-600 shadow-sm transition hover:bg-red-100 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-red-300"
+                          >
+                            {isDeletingEvent[event.id] ? 'Kustutan...' : 'Kustuta'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {eventResults.length > 0 && (
                       <div className="mt-3 space-y-1">

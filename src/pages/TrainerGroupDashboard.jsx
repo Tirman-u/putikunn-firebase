@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BarChart3, Trophy, Users, Activity, Pencil, Trash2, Check, X, Plus, Megaphone } from 'lucide-react';
+import { BarChart3, Trophy, Users, Activity, Pencil, Trash2, Check, X, Plus, Megaphone, ChevronDown } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, runTransaction, serverTimestamp, arrayUnion } from 'firebase/firestore';
@@ -63,6 +63,11 @@ export default function TrainerGroupDashboard() {
   const [addingRoster, setAddingRoster] = React.useState({});
   const [selectedMember, setSelectedMember] = React.useState(null);
   const [isAssigningMember, setIsAssigningMember] = React.useState(false);
+  const [collapsedSlots, setCollapsedSlots] = React.useState({});
+  const defaultCollapsed = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 768;
+  }, []);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -149,6 +154,26 @@ export default function TrainerGroupDashboard() {
   }
 
   const slots = Array.isArray(group?.slots) ? group.slots : [];
+
+  React.useEffect(() => {
+    if (!slots.length) return;
+    setCollapsedSlots((prev) => {
+      const next = { ...prev };
+      slots.forEach((slot) => {
+        if (next[slot.id] === undefined) {
+          next[slot.id] = defaultCollapsed;
+        }
+      });
+      return next;
+    });
+  }, [slots, defaultCollapsed]);
+
+  const toggleSlotCollapse = React.useCallback((slotId) => {
+    setCollapsedSlots((prev) => ({
+      ...prev,
+      [slotId]: !prev[slotId]
+    }));
+  }, []);
   const attendanceBySlot = (slot) => getSlotAvailability(slot, group, weekKey);
   const normalizeSlotData = (slotData = {}) => ({
     ...slotData,
@@ -1107,37 +1132,53 @@ export default function TrainerGroupDashboard() {
               const canAnnounce = availability.available > 0;
               const isOwnSlot = memberRosterSlotIds.includes(slot.id);
               const canMemberSwap = !canManageTraining && memberRosterSlots.length > 0 && !hasActiveSwap;
+              const isCollapsed = collapsedSlots[slot.id] ?? false;
+              const isExpanded = !isCollapsed || editingSlotId === slot.id;
 
               return (
                 <div
                   key={slot.id}
-                  className="rounded-[22px] border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10"
+                  className="rounded-2xl border border-slate-100 bg-white px-3 py-3 dark:bg-black dark:border-white/10"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800">
-                        {getDayFullLabel(slot.day)} • {slot.time}
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleSlotCollapse(slot.id)}
+                      aria-expanded={isExpanded}
+                      className="flex items-center gap-3 text-left"
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-600">
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                        />
+                      </span>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800">
+                          {getDayFullLabel(slot.day)} • {slot.time}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {slot.duration_minutes || 90} min • Max {slot.max_spots} kohta
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-500">
-                        {slot.duration_minutes || 90} min • Max {slot.max_spots} kohta
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 font-semibold">
+                    </button>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700 font-semibold">
                         Vabu: {availability.available}
                       </span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600 font-semibold">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 font-semibold">
                         Püsikohti: {availability.roster.length}/{maxSpots}
                       </span>
                       {slot.is_public && (
-                        <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700 font-semibold">
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700 font-semibold">
                           Avalik
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {editingSlotId === slot.id && canManageTraining && editingSlot ? (
+                  {isExpanded && (
+                    <>
+                      {editingSlotId === slot.id && canManageTraining && editingSlot ? (
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
                       <select
                         value={editingSlot.day}
@@ -1169,14 +1210,14 @@ export default function TrainerGroupDashboard() {
                           type="button"
                           onClick={handleSaveSlot}
                           disabled={isSavingSlot}
-                          className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
+                          className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-2 text-[11px] font-semibold text-white"
                         >
                           <Check className="w-3 h-3" /> Salvesta
                         </button>
                         <button
                           type="button"
                           onClick={cancelEditingSlot}
-                          className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"
+                          className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-700"
                         >
                           <X className="w-3 h-3" /> Tühista
                         </button>
@@ -1190,7 +1231,7 @@ export default function TrainerGroupDashboard() {
                             <button
                               type="button"
                               onClick={() => handleTogglePublicSlot(slot.id)}
-                              className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700"
+                              className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
                             >
                               Eemalda kuulutus
                             </button>
@@ -1199,7 +1240,7 @@ export default function TrainerGroupDashboard() {
                               type="button"
                               onClick={() => handleTogglePublicSlot(slot.id)}
                               disabled={!canAnnounce}
-                              className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700 disabled:opacity-50"
+                              className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
                             >
                               Kuuluta vaba koht
                             </button>
@@ -1207,7 +1248,7 @@ export default function TrainerGroupDashboard() {
                           <button
                             type="button"
                             onClick={() => startEditingSlot(slot)}
-                            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600"
+                            className="rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
                           >
                             <Pencil className="w-3 h-3 inline-block mr-1" />
                             Muuda
@@ -1215,7 +1256,7 @@ export default function TrainerGroupDashboard() {
                           <button
                             type="button"
                             onClick={() => handleDeleteSlot(slot.id)}
-                            className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-600"
+                            className="rounded-full border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-600 hover:bg-red-100"
                           >
                             <Trash2 className="w-3 h-3 inline-block mr-1" />
                             Kustuta
@@ -1236,7 +1277,7 @@ export default function TrainerGroupDashboard() {
                         </>
                       )}
                     </div>
-                  )}
+                      )}
 
                   <div className="mt-4">
                     {canManageTraining ? (
@@ -1261,14 +1302,14 @@ export default function TrainerGroupDashboard() {
                                   <button
                                     type="button"
                                     onClick={() => handleSelectMember(seat.uid, slot.id)}
-                                    className="text-[10px] font-semibold text-emerald-700"
+                                    className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
                                   >
                                     {isSelected ? 'Valitud' : 'Vali'}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveRosterMember(slot.id, seat.uid)}
-                                    className="text-[10px] font-semibold text-red-500"
+                                    className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600"
                                   >
                                     Eemalda
                                   </button>
@@ -1289,7 +1330,7 @@ export default function TrainerGroupDashboard() {
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveClaimedMember(slot.id, seat.uid)}
-                                  className="mt-2 text-[10px] font-semibold text-emerald-700"
+                                  className="mt-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
                                 >
                                   Eemalda
                                 </button>
@@ -1481,11 +1522,13 @@ export default function TrainerGroupDashboard() {
                       </div>
                     )}
                   </div>
+                    </>
+                  )}
                 </div>
                   );
                 })}
               </div>
-          ) : (
+           ) : (
             <div className="space-y-3">
               {slots.map((slot) => {
                 const availability = attendanceBySlot(slot);
@@ -1525,111 +1568,128 @@ export default function TrainerGroupDashboard() {
                     releasedBy: releasedRosterIds[i] || null
                   });
                 }
-                const canAnnounce = availability.available > 0;
                 const isOwnSlot = memberRosterSlotIds.includes(slot.id);
                 const canMemberSwap = memberRosterSlots.length > 0 && !hasActiveSwap;
+                const isCollapsed = collapsedSlots[slot.id] ?? false;
+                const isExpanded = !isCollapsed;
 
                 return (
                   <div
                     key={slot.id}
-                    className="rounded-[22px] border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10"
+                    className="rounded-2xl border border-slate-100 bg-white px-3 py-3 dark:bg-black dark:border-white/10"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-800">
-                          {getDayFullLabel(slot.day)} • {slot.time}
+                    <div className="flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleSlotCollapse(slot.id)}
+                        aria-expanded={isExpanded}
+                        className="flex items-center gap-3 text-left"
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-600">
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                          />
+                        </span>
+                        <div>
+                          <div className="text-sm font-semibold text-slate-800">
+                            {getDayFullLabel(slot.day)} • {slot.time}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {slot.duration_minutes || 90} min • Max {slot.max_spots} kohta
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {slot.duration_minutes || 90} min • Max {slot.max_spots} kohta
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 font-semibold">
+                      </button>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700 font-semibold">
                           Vabu: {availability.available}
                         </span>
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600 font-semibold">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 font-semibold">
                           Püsikohti: {availability.roster.length}/{maxSpots}
                         </span>
                         {slot.is_public && (
-                          <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700 font-semibold">
+                          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700 font-semibold">
                             Avalik
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      {isRosterMember && (
-                        <button
-                          type="button"
-                          disabled={isUpdatingAttendance[slot.id]}
-                          onClick={() => handleToggleRelease(slot.id)}
-                          className="rounded-full border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700"
-                        >
-                          {isReleased ? 'Tulen siiski' : 'Täna trenni ei jõua'}
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-                      {seatAssignments.map((seat, seatIndex) => {
-                        if (seat.type === 'roster') {
-                          const label = getMemberLabel(seat.uid);
-                          return (
-                            <div
-                              key={`${slot.id}-roster-${seat.uid}`}
-                              className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700 shadow-sm"
+                    {isExpanded && (
+                      <>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          {isRosterMember && (
+                            <button
+                              type="button"
+                              disabled={isUpdatingAttendance[slot.id]}
+                              onClick={() => handleToggleRelease(slot.id)}
+                              className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700"
                             >
-                              <div className="text-[10px] uppercase text-slate-400">Püsikoht</div>
-                              <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
-                            </div>
-                          );
-                        }
+                              {isReleased ? 'Tulen siiski' : 'Täna trenni ei jõua'}
+                            </button>
+                          )}
+                        </div>
 
-                        if (seat.type === 'claim') {
-                          const label = getMemberLabel(seat.uid, seat.meta);
-                          return (
-                            <div
-                              key={`${slot.id}-claim-${seat.uid}-${seatIndex}`}
-                              className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs text-emerald-700 shadow-sm"
-                            >
-                              <div className="text-[10px] uppercase text-emerald-500">1x</div>
-                              <div className="text-sm font-semibold text-emerald-900 truncate">{label}</div>
-                            </div>
-                          );
-                        }
+                        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                          {seatAssignments.map((seat, seatIndex) => {
+                            if (seat.type === 'roster') {
+                              const label = getMemberLabel(seat.uid);
+                              return (
+                                <div
+                                  key={`${slot.id}-roster-${seat.uid}`}
+                                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 shadow-sm"
+                                >
+                                  <div className="text-[10px] uppercase text-slate-400">Püsikoht</div>
+                                  <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
+                                </div>
+                              );
+                            }
 
-                        const releasedLabel = seat.releasedBy ? getMemberLabel(seat.releasedBy) : null;
-                        const canClaimSeat = canMemberSwap && !isOwnSlot;
-                        return (
-                          <div
-                            key={`${slot.id}-free-${seatIndex}`}
-                            className="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-3 text-xs text-slate-400 flex flex-col gap-2"
-                          >
-                            <div className="text-[10px] uppercase text-slate-400">Vaba</div>
-                            {releasedLabel && (
-                              <div className="text-[10px] text-slate-400 truncate">
-                                püsikoht: {releasedLabel}
-                              </div>
-                            )}
-                            {canClaimSeat && (
-                              <button
-                                type="button"
-                                onClick={() => handleSwapClaim(slot.id)}
-                                className="rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-semibold text-white"
+                            if (seat.type === 'claim') {
+                              const label = getMemberLabel(seat.uid, seat.meta);
+                              return (
+                                <div
+                                  key={`${slot.id}-claim-${seat.uid}-${seatIndex}`}
+                                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 shadow-sm"
+                                >
+                                  <div className="text-[10px] uppercase text-emerald-500">1x</div>
+                                  <div className="text-sm font-semibold text-emerald-900 truncate">{label}</div>
+                                </div>
+                              );
+                            }
+
+                            const releasedLabel = seat.releasedBy ? getMemberLabel(seat.releasedBy) : null;
+                            const canClaimSeat = canMemberSwap && !isOwnSlot;
+                            return (
+                              <div
+                                key={`${slot.id}-free-${seatIndex}`}
+                                className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-xs text-slate-400 flex flex-col gap-2"
                               >
-                                Asendan koha
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                                <div className="text-[10px] uppercase text-slate-400">Vaba</div>
+                                {releasedLabel && (
+                                  <div className="text-[10px] text-slate-400 truncate">
+                                    püsikoht: {releasedLabel}
+                                  </div>
+                                )}
+                                {canClaimSeat && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSwapClaim(slot.id)}
+                                    className="rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-semibold text-white"
+                                  >
+                                    Asendan koha
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
 
-                    {pendingEntries.length > 0 && (
-                      <div className="mt-4 text-xs text-slate-500">
-                        Ootelist: {pendingEntries.length}
-                      </div>
+                        {pendingEntries.length > 0 && (
+                          <div className="mt-3 text-[11px] text-slate-500">
+                            Ootelist: {pendingEntries.length}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 );

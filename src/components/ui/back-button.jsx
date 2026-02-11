@@ -32,7 +32,7 @@ export default function BackButton({
     if (fallbackTo) {
       navigate(fallbackTo);
     }
-  }, [fallbackTo, navigate, onClick]);
+  }, [fallbackTo, navigate, onClick, forceFallback]);
 
   return (
     <button type="button" onClick={handleClick} className={`${baseClasses} ${className}`}>

@@ -3,13 +3,12 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import BackButton from '@/components/ui/back-button';
-import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 import DuelPlayerView from '@/components/putting/DuelPlayerView';
 import { addPlayerToState, createEmptyDuelState } from '@/lib/duel-utils';
 import { toast } from 'sonner';
 
 export default function DuelJoin() {
-  const navigate = useNavigate();
   const [pin, setPin] = React.useState('');
   const [displayName, setDisplayName] = React.useState('');
   const [joining, setJoining] = React.useState(false);
@@ -90,7 +89,7 @@ export default function DuelJoin() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
         <div className="max-w-xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
-            <BackButton onClick={() => navigate(-1)} />
+            <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
             <div className="text-sm font-semibold text-slate-700">Sõbraduell</div>
             <div className="w-12" />
           </div>
@@ -105,7 +104,7 @@ export default function DuelJoin() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
       <div className="max-w-lg mx-auto pt-6 pb-12">
         <div className="flex items-center justify-between mb-6">
-          <BackButton onClick={() => navigate(-1)} />
+          <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
           <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">Sõbraduell (Liitu)</div>
           <div className="w-12" />
         </div>

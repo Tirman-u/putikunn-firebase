@@ -1045,10 +1045,10 @@ export default function Profile() {
                                  <ExternalLink className="w-4 h-4" />
                                </Link>
                              ) : (
-                               <Link
-                                 to={`${createPageUrl('GameResult')}?id=${game.id}`}
-                                 className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
-                               >
+                              <Link
+                                to={`${createPageUrl('GameResult')}?id=${game.id}&from=profile`}
+                                className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
+                              >
                                  <ExternalLink className="w-4 h-4" />
                                </Link>
                              )}

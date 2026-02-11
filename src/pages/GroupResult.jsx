@@ -159,7 +159,7 @@ export default function GroupResult() {
                   {gamesWithStats.map(game => (
                     <Link
                       key={game.id}
-                      to={`${createPageUrl('GameResult')}?id=${game.id}`}
+                      to={`${createPageUrl('GameResult')}?id=${game.id}&from=group&groupId=${groupId}`}
                       className="block bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-emerald-300 hover:shadow-md transition-all"
                     >
                       <div className="flex items-center justify-between">

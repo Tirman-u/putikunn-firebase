@@ -620,7 +620,7 @@ export default function ManageGames() {
                       className="mt-1 w-5 h-5 rounded"
                     />
                     <Link
-                      to={`${createPageUrl('GameResult')}?id=${game.id}`}
+                      to={`${createPageUrl('GameResult')}?id=${game.id}&from=manage`}
                       className="flex-1 min-w-0"
                     >
                       <div className="font-bold text-slate-800 group-hover:text-emerald-600 transition-colors truncate">
@@ -744,7 +744,7 @@ export default function ManageGames() {
                         />
                       </td>
                       <td className="py-3 px-4">
-                        <Link to={`${createPageUrl('GameResult')}?id=${game.id}`} className="text-emerald-600 hover:text-emerald-700 font-medium">
+                        <Link to={`${createPageUrl('GameResult')}?id=${game.id}&from=manage`} className="text-emerald-600 hover:text-emerald-700 font-medium">
                           {game.name}
                         </Link>
                       </td>

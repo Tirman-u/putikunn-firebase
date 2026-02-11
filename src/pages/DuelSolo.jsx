@@ -127,7 +127,7 @@ export default function DuelSolo() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
         <div className="max-w-xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
-            <BackButton />
+            <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
             <div className="text-sm font-semibold text-slate-700">Sõbraduell (SOLO)</div>
             <div className="w-12" />
           </div>
@@ -165,7 +165,7 @@ export default function DuelSolo() {
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
       <div className="max-w-lg mx-auto px-4 pb-10">
         <div className="flex items-center justify-between pt-6 pb-4">
-          <BackButton />
+          <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
           <div className="text-sm font-semibold text-slate-700">Sõbraduell (SOLO)</div>
           <div className="w-12" />
         </div>

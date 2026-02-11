@@ -489,7 +489,7 @@ export default function JoinTraining() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
       <div className="max-w-xl mx-auto pt-6 pb-12">
         <div className="mb-6">
-          <BackButton />
+          <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
         </div>
 
         <div className="mb-6">

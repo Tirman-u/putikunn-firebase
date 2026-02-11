@@ -413,7 +413,7 @@ export default function PuttingRecords() {
                           className={`border-b border-slate-100 ${rowBase} ${rowHover} ${rowHighlight} cursor-pointer transition-colors`}
                         >
                           <td className="py-3 px-2">
-                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
                                 absoluteRank === 1 ? 'bg-yellow-400 text-yellow-900' :
                                 absoluteRank === 2 ? 'bg-slate-300 text-slate-700' :
@@ -425,7 +425,7 @@ export default function PuttingRecords() {
                             </Link>
                           </td>
                           <td className="py-3 px-2 font-medium text-slate-700">
-                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span>{getResolvedPlayerName(entry)}</span>
                                 {isHostedEntry(entry) && (
@@ -443,13 +443,13 @@ export default function PuttingRecords() {
                             </Link>
                           </td>
                           <td className="py-3 px-2 text-center">
-                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                               <span className="text-lg font-bold text-emerald-600">{entry.score}</span>
                             </Link>
                           </td>
                           {!isATWView && (
                             <td className="py-3 px-2 text-center text-slate-700">
-                              <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                              <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                                 {effectiveView?.gameType === 'streak_challenge' 
                                   ? `${entry.streak_distance || 0}m` 
                                   : (entry.accuracy ? `${entry.accuracy.toFixed(1)}%` : '-')
@@ -459,13 +459,13 @@ export default function PuttingRecords() {
                           )}
                           {!isATWView && (
                             <td className="py-3 px-2 text-center text-slate-600">
-                              <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                              <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                                 {entry.made_putts}/{entry.total_putts}
                               </Link>
                             </td>
                           )}
                           <td className="py-3 px-2 text-right text-slate-500 text-xs">
-                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}`} className="block">
+                            <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                               {entry.date ? format(new Date(entry.date), 'MMM d, yyyy') : '-'}
                             </Link>
                           </td>

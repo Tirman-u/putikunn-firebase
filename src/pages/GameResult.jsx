@@ -28,7 +28,25 @@ export default function GameResult() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const gameId = searchParams.get('id');
+  const from = searchParams.get('from');
+  const fromGroupId = searchParams.get('groupId');
   const queryClient = useQueryClient();
+
+  const backTarget = React.useMemo(() => {
+    if (from === 'leaderboard') {
+      return createPageUrl('PuttingRecordsPage');
+    }
+    if (from === 'profile') {
+      return createPageUrl('Profile');
+    }
+    if (from === 'manage') {
+      return createPageUrl('ManageGames');
+    }
+    if (from === 'group' && fromGroupId) {
+      return `${createPageUrl('GroupResult')}?id=${fromGroupId}`;
+    }
+    return createPageUrl('Home');
+  }, [from, fromGroupId]);
 
 
   const { data: user } = useQuery({
@@ -297,7 +315,7 @@ export default function GameResult() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center p-4">
         <div className="text-center">
           <div className="text-slate-400 mb-4">Mängu ei leitud</div>
-          <BackButton />
+          <BackButton fallbackTo={backTarget} forceFallback />
         </div>
       </div>
     );
@@ -408,7 +426,7 @@ export default function GameResult() {
       <div className="max-w-4xl mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-4">
-            <BackButton />
+          <BackButton fallbackTo={backTarget} forceFallback />
           <h1 className="text-2xl font-bold text-slate-800">{game.name}</h1>
           <div className="w-16" />
         </div>

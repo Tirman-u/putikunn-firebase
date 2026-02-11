@@ -176,35 +176,31 @@ export default function JoinGame({ onJoin, onBack }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-3 sm:p-4">
-      <div className="max-w-lg mx-auto pt-3 sm:pt-4">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
+      <div className="max-w-lg mx-auto pt-6 pb-12">
         {/* Back Button */}
         <div className="mb-6">
           <BackButton onClick={onBack} />
         </div>
 
-        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 space-y-3 sm:space-y-4 dark:bg-black dark:border-white/10">
+        <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm space-y-4 dark:bg-black dark:border-white/10">
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2 dark:text-slate-200">
-              Sinu nimi
-            </label>
+            <label className="text-xs font-semibold text-slate-500 uppercase">Sinu nimi</label>
             <Input
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
               placeholder="Sisesta nimi"
-              className="h-12 sm:h-14 rounded-xl border-slate-200 text-base sm:text-lg dark:border-white/10 dark:bg-black dark:text-slate-100"
+              className="mt-2 h-12 rounded-2xl border border-slate-200 bg-white px-4 text-base font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-200 dark:bg-black dark:border-white/10 dark:text-slate-100"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2 dark:text-slate-200">
-              Mängu PIN
-            </label>
+            <label className="text-xs font-semibold text-slate-500 uppercase">Mängu PIN</label>
             <Input
               value={pin}
               onChange={(e) => setPin(e.target.value.toUpperCase())}
               placeholder="Sisesta 4-kohaline PIN"
-              className="h-12 sm:h-14 rounded-xl border-slate-200 text-center text-xl sm:text-2xl tracking-widest font-bold dark:border-white/10 dark:bg-black dark:text-slate-100"
+              className="mt-2 h-12 rounded-2xl border border-slate-200 bg-white px-4 text-center text-xl font-bold tracking-widest text-slate-800 focus:ring-2 focus:ring-emerald-200 dark:bg-black dark:border-white/10 dark:text-slate-100"
               maxLength={4}
             />
           </div>
@@ -218,9 +214,9 @@ export default function JoinGame({ onJoin, onBack }) {
           <Button
             onClick={handleJoin}
             disabled={loading || !pin.trim() || !playerName.trim()}
-            className="w-full h-12 sm:h-16 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-base sm:text-xl font-bold rounded-2xl shadow-lg sm:shadow-xl shadow-emerald-200 dark:from-emerald-400 dark:to-emerald-500 dark:shadow-emerald-500/30"
+            className="w-full h-12 rounded-2xl bg-emerald-600 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
           >
-            <LogIn className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
+            <LogIn className="w-5 h-5 mr-2" />
             Liitu mänguga
           </Button>
         </div>
@@ -228,7 +224,7 @@ export default function JoinGame({ onJoin, onBack }) {
         {/* Recent Games */}
         {recentGames.length > 0 && (
           <div className="mt-8">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2 dark:text-slate-200">
+            <h3 className="text-xs font-semibold text-slate-500 uppercase mb-3 flex items-center gap-2 dark:text-slate-200">
               <Clock className="w-4 h-4" />
               Aktiivsed mängud
             </h3>
@@ -242,12 +238,12 @@ export default function JoinGame({ onJoin, onBack }) {
                       setPin(game.pin);
                       setPlayerName(user?.full_name || '');
                     }}
-                    className="w-full bg-white rounded-xl p-3 border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all text-left dark:bg-black dark:border-white/10 dark:hover:border-emerald-500/40 dark:hover:bg-black"
+                    className="w-full rounded-2xl border border-white/70 bg-white/70 p-3 text-left shadow-sm backdrop-blur-sm transition hover:bg-emerald-50/80 dark:bg-black dark:border-white/10 dark:hover:bg-black"
                   >
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="font-semibold text-slate-800 text-sm dark:text-slate-100">{game.name}</div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded dark:bg-emerald-500/10 dark:text-emerald-300">
                             {getGameTypeName(game.game_type)}
                           </span>
@@ -260,7 +256,7 @@ export default function JoinGame({ onJoin, onBack }) {
                           </span>
                         </div>
                       </div>
-                      <div className="text-xs px-2 py-1 bg-slate-100 rounded font-mono">
+                      <div className="text-xs px-2 py-1 bg-white/70 rounded font-mono text-slate-700 dark:bg-black dark:text-slate-200">
                         {game.pin}
                       </div>
                     </div>

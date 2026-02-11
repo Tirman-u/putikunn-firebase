@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Undo } from 'lucide-react';
+import { useLanguage } from '@/lib/i18n';
 
 const DISTANCE_COLORS = {
   3: 'from-red-300 to-red-400',
@@ -29,6 +30,7 @@ export default function ClassicScoreInput({
   puttType = 'regular',
   totalFrames = 20
 }) {
+  const { t } = useLanguage();
   const handleScoreClick = (made) => {
     onSubmit(made);
   };
@@ -91,26 +93,28 @@ export default function ClassicScoreInput({
       <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-100">
         <div className="text-center">
           <div className="text-4xl sm:text-5xl font-bold text-slate-800 mb-1 sm:mb-2">{currentDistance}m</div>
-          <div className="text-[11px] sm:text-xs text-slate-500">Puti stiil</div>
+          <div className="text-[11px] sm:text-xs text-slate-500">
+            {t('host.putt_style', 'Puti stiil')}
+          </div>
           <div className="text-sm font-semibold text-slate-800">
             {puttType === 'regular'
-              ? 'Tavaline'
+              ? t('putt.regular', 'Tavaline')
               : puttType === 'straddle'
-              ? 'Straddle'
+              ? t('putt.straddle', 'Straddle')
               : puttType === 'turbo'
-              ? 'Turbo'
+              ? t('putt.turbo', 'Turbo')
               : puttType === 'kneeling'
-              ? 'Põlvelt'
+              ? t('putt.kneeling', 'Põlvelt')
               : puttType === 'marksman'
-              ? 'Marksman'
-              : 'Tavaline'}
+              ? t('putt.marksman', 'Marksman')
+              : t('putt.regular', 'Tavaline')}
           </div>
         </div>
       </div>
 
       {/* Instructions */}
       <div className="text-center text-xs sm:text-sm text-slate-500">
-        Vali mitu putti läks sisse (5-st)
+        {t('player.select_made', 'Vali mitu putti läks sisse (5-st)')}
       </div>
 
       {/* One-Click Score Buttons */}
@@ -130,7 +134,7 @@ export default function ClassicScoreInput({
             >
               <div className="text-2xl sm:text-3xl font-bold text-slate-800 mb-1">{num}</div>
               <div className="text-[10px] sm:text-xs font-medium text-slate-500 mb-0.5">
-                {potentialPoints} p
+                {potentialPoints} {t('player.points_abbr', 'p')}
               </div>
               <div className="text-[9px] sm:text-[10px] text-slate-400">
                 → {nextDistance ? `${nextDistance}m` : '?m'}
@@ -148,7 +152,7 @@ export default function ClassicScoreInput({
           className="w-full h-12 sm:h-14 rounded-xl text-sm sm:text-base"
         >
           <Undo className="w-5 h-5 mr-2" />
-          Võta viimane ring tagasi
+          {t('player.undo_last', 'Võta viimane ring tagasi')}
         </Button>
       )}
     </div>

@@ -15,8 +15,11 @@ import AroundTheWorldGameView from '@/components/putting/AroundTheWorldGameView'
 import TimeLadderSetup from '@/components/putting/TimeLadderSetup';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import ThemeToggle from '@/components/ui/theme-toggle';
+import LanguageToggle from '@/components/ui/language-toggle';
+import { useLanguage } from '@/lib/i18n';
 
 export default function Home() {
+  const { t } = useLanguage();
   const [mode, setMode] = useState(null); // null, 'host-setup', 'join', 'solo', 'host', 'player', 'atw-setup', 'atw-game', 'atw-host', 'time-ladder-setup'
   const [gameId, setGameId] = useState(null);
   const [playerName, setPlayerName] = useState(null);
@@ -98,7 +101,7 @@ export default function Home() {
         if (!game) return;
         setIsSoloATW(game.pin === '0000');
         base44.auth.me().then(user => {
-          const playerName = user?.display_name || user?.full_name || user?.email || 'Mängija';
+          const playerName = user?.display_name || user?.full_name || user?.email || t('home.guest', 'Mängija');
           setPlayerName(playerName);
           setMode('atw-game');
         });
@@ -108,7 +111,7 @@ export default function Home() {
       setGameId(urlGameId);
       setPlayerReturnTo(urlFrom === 'training' ? 'training' : 'home');
       base44.auth.me().then(user => {
-        const playerName = user?.display_name || user?.full_name || user?.email || 'Mängija';
+        const playerName = user?.display_name || user?.full_name || user?.email || t('home.guest', 'Mängija');
         setPlayerName(playerName);
         setMode('player');
       });
@@ -133,8 +136,8 @@ export default function Home() {
   }, [user]);
   const trainingLabel = trainingGroups.length
     ? (trainingGroups.length === 1 ? trainingGroups[0] : `${trainingGroups[0]} +${trainingGroups.length - 1}`)
-    : 'Liitu trenniga';
-  const trainingSub = trainingGroups.length ? 'Trenn' : 'Sisesta PIN';
+    : t('home.join_training', 'Liitu trenniga');
+  const trainingSub = trainingGroups.length ? t('home.training', 'Trenn') : t('home.join_sub', 'Sisesta PIN');
 
   const tileThemes = {
     emerald: { bg: 'bg-emerald-100 dark:bg-black', icon: 'text-emerald-600', ring: 'ring-emerald-200 dark:ring-emerald-500/40', glow: 'shadow-emerald-100/60 dark:shadow-emerald-500/10' },
@@ -149,8 +152,8 @@ export default function Home() {
   const homeTiles = [
     {
       key: 'host',
-      label: 'Hosti mäng',
-      sub: 'Loo sessioon',
+      label: t('home.host', 'Hosti mäng'),
+      sub: t('home.host_sub', 'Loo sessioon'),
       icon: Users,
       color: 'emerald',
       onClick: () => setSimpleMode('host-setup'),
@@ -158,8 +161,8 @@ export default function Home() {
     },
     {
       key: 'join',
-      label: 'Liitu mänguga',
-      sub: 'Sisesta PIN',
+      label: t('home.join', 'Liitu mänguga'),
+      sub: t('home.join_sub', 'Sisesta PIN'),
       icon: UserPlus,
       color: 'sky',
       onClick: () => setSimpleMode('join'),
@@ -176,8 +179,8 @@ export default function Home() {
     },
     {
       key: 'solo',
-      label: 'Soolotreening',
-      sub: 'Harjuta üksi',
+      label: t('home.solo', 'Soolotreening'),
+      sub: t('home.solo_sub', 'Harjuta üksi'),
       icon: Target,
       color: 'emerald',
       onClick: () => setSimpleMode('solo'),
@@ -185,8 +188,8 @@ export default function Home() {
     },
     {
       key: 'records',
-      label: 'Rekordid',
-      sub: 'Edetabelid',
+      label: t('home.records', 'Rekordid'),
+      sub: t('home.records_sub', 'Edetabelid'),
       icon: Trophy,
       color: 'amber',
       href: createPageUrl('PuttingRecordsPage'),
@@ -194,8 +197,8 @@ export default function Home() {
     },
     {
       key: 'king',
-      label: 'Kuningas',
-      sub: 'Turniirid',
+      label: t('home.king', 'Kuningas'),
+      sub: t('home.king_sub', 'Turniirid'),
       icon: Crown,
       color: 'purple',
       href: createPageUrl('PuttingKing'),
@@ -203,8 +206,8 @@ export default function Home() {
     },
     {
       key: 'profile',
-      label: 'Minu profiil',
-      sub: 'Statistika',
+      label: t('home.profile', 'Minu profiil'),
+      sub: t('home.profile_sub', 'Statistika'),
       icon: User,
       color: 'slate',
       to: createPageUrl('Profile'),
@@ -212,8 +215,8 @@ export default function Home() {
     },
     {
       key: 'manage',
-      label: 'Halda mänge',
-      sub: 'Admin',
+      label: t('home.manage', 'Halda mänge'),
+      sub: t('home.manage_sub', 'Admin'),
       icon: Settings,
       color: 'blue',
       to: createPageUrl('ManageGames'),
@@ -221,8 +224,8 @@ export default function Home() {
     },
     {
       key: 'trainer',
-      label: 'Treener',
-      sub: 'Grupid & projektor',
+      label: t('home.trainer', 'Treener'),
+      sub: t('home.trainer_sub', 'Grupid & projektor'),
       icon: Users2,
       color: 'amber',
       to: createPageUrl('TrainerGroups'),
@@ -230,8 +233,8 @@ export default function Home() {
     },
     {
       key: 'admin',
-      label: 'Kasutajad',
-      sub: 'Superadmin',
+      label: t('home.admin', 'Kasutajad'),
+      sub: t('home.admin_sub', 'Superadmin'),
       icon: Shield,
       color: 'red',
       to: createPageUrl('AdminUsers'),
@@ -329,6 +332,7 @@ export default function Home() {
       <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
         <div className="max-w-2xl mx-auto pt-10 pb-12">
           <div className="flex justify-end mb-4 gap-2">
+            <LanguageToggle />
             <ThemeToggle />
             <button
               type="button"
@@ -336,14 +340,16 @@ export default function Home() {
               className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition hover:bg-white"
             >
               <LogOut className="w-4 h-4" />
-              Logi välja
+              {t('home.logout', 'Logi välja')}
             </button>
           </div>
           <div className="text-center mb-8">
             <h1 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-2">
-              Tere tulemast, {user?.display_name || user?.full_name || 'Külaline'}!
+              {t('home.welcome', 'Tere tulemast, {name}!', {
+                name: user?.display_name || user?.full_name || t('home.guest', 'Külaline')
+              })}
             </h1>
-            <p className="text-slate-600 text-base sm:text-lg">Valmis puttama?</p>
+            <p className="text-slate-600 text-base sm:text-lg">{t('home.ready', 'Valmis puttama?')}</p>
           </div>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-5">
@@ -364,7 +370,7 @@ export default function Home() {
     return <HostSetup onStartGame={async (gameData) => {
       const user = await base44.auth.me();
       const game = await base44.entities.Game.create({
-        name: gameData.name || 'Soolotreening',
+        name: gameData.name || t('home.solo', 'Soolotreening'),
         pin: '0000',
         game_type: gameData.gameType || 'classic',
         putt_type: gameData.puttType || 'regular',
@@ -424,7 +430,7 @@ export default function Home() {
         }}
         onStart={async (setupData) => {
           const user = await base44.auth.me();
-          const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
+          const playerName = user?.display_name || user?.full_name || user?.email || t('home.guest', 'Player');
 
           const game = await base44.entities.Game.create({
             name: setupData.name,
@@ -488,7 +494,7 @@ export default function Home() {
         }}
         onStart={async (setupData) => {
           const user = await base44.auth.me();
-          const playerName = user?.display_name || user?.full_name || user?.email || 'Player';
+          const playerName = user?.display_name || user?.full_name || user?.email || t('home.guest', 'Player');
 
           const game = await base44.entities.Game.create({
             name: setupData.name,

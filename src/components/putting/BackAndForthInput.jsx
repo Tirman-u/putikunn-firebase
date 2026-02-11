@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Undo, Target, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/lib/i18n';
 
 const DISTANCE_COLORS = {
   5: 'from-red-400 to-red-500',
@@ -22,6 +23,7 @@ export default function BackAndForthInput({
   showStreak = false,
   currentStreak = 0
 }) {
+  const { t } = useLanguage();
   const nextMade = Math.min(currentDistance + 1, 10);
   const nextMissed = Math.max(currentDistance - 1, 5);
 
@@ -41,7 +43,7 @@ export default function BackAndForthInput({
         </div>
         {showStreak && (
           <div className="mt-3">
-            <div className="text-xs sm:text-sm text-slate-500">Praegune seeria</div>
+            <div className="text-xs sm:text-sm text-slate-500">{t('player.current_streak', 'Praegune seeria')}</div>
             <div className="text-2xl sm:text-3xl font-bold text-red-600">🔥 {currentStreak}</div>
           </div>
         )}
@@ -49,7 +51,7 @@ export default function BackAndForthInput({
 
       {/* Instructions */}
       <div className="text-center text-xs sm:text-sm text-slate-500 mb-3 sm:mb-4">
-        Kas putt läks sisse?
+        {t('player.was_made', 'Kas putt läks sisse?')}
       </div>
 
       {/* Made/Missed Buttons */}
@@ -62,8 +64,8 @@ export default function BackAndForthInput({
           className="py-8 sm:py-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 [@media(hover:hover)]:hover:from-emerald-600 [@media(hover:hover)]:hover:to-emerald-700 active:scale-95 transition-all shadow-lg text-white focus:outline-none"
         >
           <CheckCircle2 className="w-9 h-9 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3" />
-          <div className="text-xl sm:text-2xl font-bold">Sees</div>
-          <div className="text-xs sm:text-sm opacity-90 mt-1">+{currentDistance} p</div>
+          <div className="text-xl sm:text-2xl font-bold">{t('player.sees', 'Sees')}</div>
+          <div className="text-xs sm:text-sm opacity-90 mt-1">+{currentDistance} {t('player.points_abbr', 'p')}</div>
           <div className="text-[11px] sm:text-xs opacity-75 mt-1">→ {nextMade}m</div>
         </button>
 
@@ -75,8 +77,8 @@ export default function BackAndForthInput({
           className="py-8 sm:py-12 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 [@media(hover:hover)]:hover:from-red-600 [@media(hover:hover)]:hover:to-red-700 active:scale-95 transition-all shadow-lg text-white focus:outline-none"
         >
           <XCircle className="w-9 h-9 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3" />
-          <div className="text-xl sm:text-2xl font-bold">Mööda</div>
-          <div className="text-xs sm:text-sm opacity-90 mt-1">0 p</div>
+          <div className="text-xl sm:text-2xl font-bold">{t('player.miss', 'Mööda')}</div>
+          <div className="text-xs sm:text-sm opacity-90 mt-1">0 {t('player.points_abbr', 'p')}</div>
           <div className="text-[11px] sm:text-xs opacity-75 mt-1">→ {nextMissed}m</div>
         </button>
       </div>
@@ -89,7 +91,7 @@ export default function BackAndForthInput({
           className="w-full h-11 sm:h-12 rounded-xl border-2 text-sm sm:text-base"
         >
           <Undo className="w-4 h-4 mr-2" />
-          Võta viimane tagasi
+          {t('player.undo_last', 'Võta viimane tagasi')}
         </Button>
       )}
     </div>

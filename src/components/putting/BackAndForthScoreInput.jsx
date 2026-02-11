@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle, Undo2 } from 'lucide-react';
+import { useLanguage } from '@/lib/i18n';
 
 export default function BackAndForthScoreInput({ 
   player, 
@@ -14,6 +15,7 @@ export default function BackAndForthScoreInput({
   totalPoints = 0,
   hideScore = false
 }) {
+  const { t } = useLanguage();
   // Group putts into frames of 20
   const totalFrames = 20;
   const puttsPerFrame = 5;
@@ -114,7 +116,7 @@ export default function BackAndForthScoreInput({
             variant="ghost"
           >
             <XCircle className="w-6 h-6 sm:w-7 sm:h-7 mr-2" />
-            Mööda
+            {t('player.miss', 'Mööda')}
           </Button>
           <Button
             onClick={(event) => {
@@ -125,7 +127,7 @@ export default function BackAndForthScoreInput({
             variant="ghost"
           >
             <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7 mr-2" />
-            Sees
+            {t('player.sees', 'Sees')}
           </Button>
         </div>
       )}
@@ -137,7 +139,7 @@ export default function BackAndForthScoreInput({
           className="w-full h-12 sm:h-14 rounded-xl text-sm sm:text-base"
         >
           <Undo2 className="w-5 h-5 mr-2" />
-          Võta viimane tagasi
+          {t('player.undo_last', 'Võta viimane tagasi')}
         </Button>
       )}
     </div>

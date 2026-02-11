@@ -4,6 +4,7 @@ import App from '@/App.jsx'
 import '@/index.css'
 import { initTheme } from '@/lib/theme'
 import { isTestEnv } from '@/lib/env'
+import { LanguageProvider } from '@/lib/i18n'
 
 initTheme();
 if (typeof document !== 'undefined') {
@@ -11,5 +12,7 @@ if (typeof document !== 'undefined') {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <App />
+  <LanguageProvider>
+    <App />
+  </LanguageProvider>
 )

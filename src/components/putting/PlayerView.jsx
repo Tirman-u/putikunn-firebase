@@ -32,6 +32,7 @@ import {
 } from './gameRules';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
+import { useLanguage } from '@/lib/i18n';
 
 const PLAYER_STATE_KEYS = [
   'player_putts',
@@ -44,6 +45,7 @@ const PLAYER_STATE_KEYS = [
 ];
 
 export default function PlayerView({ gameId, playerName, onExit }) {
+  const { t } = useLanguage();
   const [showLeaderboard, setShowLeaderboard] = React.useState(false);
   const [hasSubmitted, setHasSubmitted] = React.useState(false);
   const [streakDistanceSelected, setStreakDistanceSelected] = React.useState(false);
@@ -430,7 +432,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     } else {
       if (!game?.id) return;
       if (game?.status === 'closed' || game?.join_closed === true) {
-        toast.error('Mäng on suletud');
+        toast.error(t('game.closed', 'Mäng on suletud'));
         return;
       }
       // For multiplayer games, update local cache immediately and debounce DB writes
@@ -578,7 +580,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     },
     onSuccess: () => {
       setHasSubmitted(true);
-      toast.success('Tulemus edetabelisse saadetud!');
+      toast.success(t('player.submit_success', 'Tulemus edetabelisse saadetud!'));
     }
   });
 
@@ -908,8 +910,11 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const canAdminSubmit = ['trainer', 'admin', 'super_admin'].includes(userRole);
   const isHost = Boolean(user?.email && currentState?.host_user && user.email === currentState.host_user);
   const canSubmitHosted = isHost || canAdminSubmit;
+  const formatName = t(`format.${gameType}.name`, format.name || 'Classic');
 
-  const timeDiscLabel = timeConfig?.discs_per_turn ? `${timeConfig.discs_per_turn} ketast` : null;
+  const timeDiscLabel = timeConfig?.discs_per_turn
+    ? t('player.discs_count', '{count} ketast', { count: timeConfig.discs_per_turn })
+    : null;
   const timeRangeLabel = `${timeStartDistance}-${timeEndDistance}m`;
   const timeInfoLabel = isTimeLadder
     ? [timeRangeLabel, timeDiscLabel].filter(Boolean).join(' • ')
@@ -993,12 +998,16 @@ export default function PlayerView({ gameId, playerName, onExit }) {
             <div className="w-32 h-32 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-amber-300">
               <Trophy className="w-16 h-16 text-white" />
             </div>
-            <h1 className="text-4xl font-bold text-slate-800 mb-4">🎉 Lõpetatud!</h1>
+            <h1 className="text-4xl font-bold text-slate-800 mb-4">
+              {t('player.completed', '🎉 Lõpetatud!')}
+            </h1>
             <p className="text-xl text-slate-600 mb-2">
-              {isTimeLadder ? 'Lõpetasid väljakutse' : 'Lõpetasid kõik ringid'}
+              {isTimeLadder
+                ? t('player.completed_sub', 'Lõpetasid väljakutse')
+                : t('player.completed_all', 'Lõpetasid kõik ringid')}
             </p>
             <p className="text-4xl font-bold text-emerald-600">
-              {isTimeLadder ? timeLabel : `${currentScore} punkti`}
+              {isTimeLadder ? timeLabel : t('player.points_value', '{score} punkti', { score: currentScore })}
             </p>
             </motion.div>
 
@@ -1013,7 +1022,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
                 className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 rounded-xl"
               >
                 <Upload className="w-5 h-5 mr-2" />
-                Saada edetabelisse
+                {t('player.submit_leaderboard', 'Saada edetabelisse')}
               </Button>
             )}
             <Button
@@ -1021,14 +1030,14 @@ export default function PlayerView({ gameId, playerName, onExit }) {
               className="w-full h-14 bg-slate-600 hover:bg-slate-700 rounded-xl"
             >
               <Trophy className="w-5 h-5 mr-2" />
-              Vaata edetabelit
+              {t('player.view_leaderboard', 'Vaata edetabelit')}
             </Button>
             <Button
               onClick={handleExit}
               variant="outline"
               className="w-full h-14 rounded-xl"
             >
-              Välju mängust
+              {t('player.exit', 'Välju mängust')}
             </Button>
           </div>
         </div>
@@ -1059,7 +1068,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           <div className="text-center">
             <h2 className="text-lg font-bold text-slate-800">{currentState.name || game.name}</h2>
             <p className="text-sm text-slate-500">
-              {format.name} • {isTimeLadder ? timeRangeLabel : `Ring ${currentRound}/${totalRounds}`}
+              {formatName} • {isTimeLadder ? timeRangeLabel : t('player.round_of', 'Ring {current}/{total}', { current: currentRound, total: totalRounds })}
               {isTimeLadder && timeDiscLabel ? ` • ${timeDiscLabel}` : ''}
             </p>
           </div>
@@ -1076,14 +1085,18 @@ export default function PlayerView({ gameId, playerName, onExit }) {
           <div className="bg-white rounded-xl p-2 sm:p-3 shadow-sm border border-slate-100 mb-3 sm:mb-4">
             <div className="flex items-center justify-around text-center">
               <div>
-                <div className="text-[11px] sm:text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Parim seeria' : 'Punktid'}</div>
+                <div className="text-[11px] sm:text-xs text-slate-500">
+                  {gameType === 'streak_challenge' ? t('player.best_streak', 'Parim seeria') : t('player.points', 'Punktid')}
+                </div>
                 <div className="text-xl sm:text-2xl font-bold text-emerald-600">
                   {hideScore ? '***' : currentScore}
                 </div>
               </div>
               <div className="h-8 sm:h-10 w-px bg-slate-200" />
               <div>
-                <div className="text-[11px] sm:text-xs text-slate-500">{gameType === 'streak_challenge' ? 'Putid' : 'Ring'}</div>
+                <div className="text-[11px] sm:text-xs text-slate-500">
+                  {gameType === 'streak_challenge' ? t('player.putts', 'Putid') : t('player.round', 'Ring')}
+                </div>
                 <div className="text-xl sm:text-2xl font-bold text-slate-600">
                   {gameType === 'streak_challenge' ? playerPutts.length : `${currentRound}/${totalRounds}`}
                 </div>
@@ -1099,7 +1112,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
                   <Eye className="w-5 h-5 text-slate-400" />
                 )}
                 <div className="text-[11px] sm:text-xs text-slate-400 mt-1">
-                  {hideScore ? 'Näita' : 'Peida'}
+                  {hideScore ? t('player.show', 'Näita') : t('player.hide', 'Peida')}
                 </div>
               </button>
             </div>

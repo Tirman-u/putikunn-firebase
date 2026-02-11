@@ -6,8 +6,10 @@ import GameFormatSelector from './GameFormatSelector';
 import FormatRulesPopup from './FormatRulesPopup';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
+import { useLanguage } from '@/lib/i18n';
 
 export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
+  const { t } = useLanguage();
   const [gameName, setGameName] = useState('');
   const [gameType, setGameType] = useState('classic');
   const [puttType, setPuttType] = useState('regular');
@@ -21,11 +23,11 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   );
 
   const puttOptions = [
-    { id: 'regular', label: 'Tavaline', icon: '🎯' },
-    { id: 'straddle', label: 'Straddle', icon: '🦵' },
-    { id: 'turbo', label: 'Turbo', icon: '⚡' },
-    { id: 'kneeling', label: 'Põlvelt', icon: '🧎' },
-    { id: 'marksman', label: 'Marksman', icon: '🏹' }
+    { id: 'regular', label: t('putt.regular', 'Tavaline'), icon: '🎯' },
+    { id: 'straddle', label: t('putt.straddle', 'Straddle'), icon: '🦵' },
+    { id: 'turbo', label: t('putt.turbo', 'Turbo'), icon: '⚡' },
+    { id: 'kneeling', label: t('putt.kneeling', 'Põlvelt'), icon: '🧎' },
+    { id: 'marksman', label: t('putt.marksman', 'Marksman'), icon: '🏹' }
   ];
 
   const handleStart = () => {
@@ -56,7 +58,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
       return;
     }
     onStartGame({
-      name: gameName || `Mäng ${new Date().toLocaleDateString()}`,
+      name: gameName || t('host.default_name', 'Mäng {date}', { date: new Date().toLocaleDateString() }),
       pin: isSolo ? null : pin,
       gameType,
       puttType
@@ -89,7 +91,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
               <HomeButton showLabel={false} className="h-9 w-9 justify-center px-0" />
             </div>
             <div className="text-center text-sm font-semibold text-slate-800">
-              {isSolo ? 'Soolotreening' : 'Hosti mäng'}
+              {isSolo ? t('host.solo_title', 'Soolotreening') : t('host.title', 'Hosti mäng')}
             </div>
             <button
               type="button"
@@ -97,7 +99,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
               className="flex h-9 items-center gap-2 rounded-2xl bg-emerald-600/90 px-4 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,185,129,0.25)] hover:bg-emerald-700"
             >
               <Play className="h-4 w-4" />
-              Alusta
+              {t('host.start', 'Alusta')}
             </button>
           </div>
         </div>
@@ -105,12 +107,12 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
         <div className="space-y-4">
           <div className="bg-white/80 rounded-[22px] p-4 shadow-[0_10px_26px_rgba(15,23,42,0.08)] border border-white/80 backdrop-blur">
             <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-              Sessiooni nimi (valikuline)
+              {t('host.session_name', 'Sessiooni nimi (valikuline)')}
             </label>
             <Input
               value={gameName}
               onChange={(e) => setGameName(e.target.value)}
-              placeholder="nt Neljapäevane treening"
+              placeholder={t('host.session_placeholder', 'nt Neljapäevane treening')}
               className="h-11 rounded-2xl border-slate-200/70 bg-white/80"
             />
           </div>
@@ -120,14 +122,16 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
               <div className="rounded-[22px] border border-emerald-200/60 bg-white/80 p-3 shadow-[0_8px_18px_rgba(16,185,129,0.18)] backdrop-blur">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700/80">PIN</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700/80">
+                      {t('host.pin_label', 'PIN')}
+                    </div>
                     <div className="text-2xl font-bold tracking-widest text-emerald-700">{pin}</div>
                   </div>
                   <button
                     type="button"
                     onClick={copyPin}
                     className="flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-600/90 text-white shadow-sm hover:bg-emerald-700"
-                    aria-label="Kopeeri PIN"
+                    aria-label={t('host.copy', 'Kopeeri PIN')}
                   >
                     {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </button>
@@ -136,7 +140,9 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
             )}
 
             <div className="rounded-[22px] border border-slate-200/70 bg-white/80 p-3 shadow-[0_8px_18px_rgba(15,23,42,0.08)] backdrop-blur">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Puti stiil</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                {t('host.putt_style', 'Puti stiil')}
+              </div>
               <div className="flex flex-wrap gap-2">
                 {puttOptions.map((option) => (
                   <button
@@ -179,7 +185,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
           <div className="bg-white/80 rounded-[22px] p-4 shadow-[0_10px_26px_rgba(15,23,42,0.08)] border border-white/80 backdrop-blur">
             <div className="flex items-center justify-between mb-3">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Mängu formaat
+                {t('host.format', 'Mängu formaat')}
               </label>
               <FormatRulesPopup format={gameType} />
             </div>

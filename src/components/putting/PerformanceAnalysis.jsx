@@ -1,7 +1,9 @@
 import React from 'react';
 import { Target } from 'lucide-react';
+import { useLanguage } from '@/lib/i18n';
 
 export default function PerformanceAnalysis({ playerPutts }) {
+  const { t } = useLanguage();
   // Calculate statistics by distance
   const statsByDistance = {};
   
@@ -44,35 +46,39 @@ export default function PerformanceAnalysis({ playerPutts }) {
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
       <div className="flex items-center gap-2 mb-6">
         <Target className="w-5 h-5 text-slate-700" />
-        <h2 className="text-lg font-bold text-slate-800">Soorituse analüüs</h2>
+        <h2 className="text-lg font-bold text-slate-800">{t('performance.title', 'Soorituse analüüs')}</h2>
       </div>
 
       {/* Sweet Spot & Challenge Area */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         {sweetSpot && (
           <div className="bg-emerald-50 rounded-xl p-4">
-            <div className="text-sm text-emerald-700 font-semibold mb-1">Parim tsoon</div>
+            <div className="text-sm text-emerald-700 font-semibold mb-1">{t('performance.best_zone', 'Parim tsoon')}</div>
             <div className="text-3xl font-bold text-emerald-600 mb-1">
               {sweetSpot.distance}m • {sweetSpot.percentage.toFixed(1)}%
             </div>
-            <div className="text-xs text-emerald-600">{sweetSpot.total} katset</div>
+            <div className="text-xs text-emerald-600">
+              {t('performance.attempts', '{count} katset', { count: sweetSpot.total })}
+            </div>
           </div>
         )}
         
         {challengeArea && (
           <div className="bg-amber-50 rounded-xl p-4">
-            <div className="text-sm text-amber-700 font-semibold mb-1">Väljakutse tsoon</div>
+            <div className="text-sm text-amber-700 font-semibold mb-1">{t('performance.challenge_zone', 'Väljakutse tsoon')}</div>
             <div className="text-3xl font-bold text-amber-600 mb-1">
               {challengeArea.distance}m • {challengeArea.percentage.toFixed(1)}%
             </div>
-            <div className="text-xs text-amber-600">{challengeArea.total} katset</div>
+            <div className="text-xs text-amber-600">
+              {t('performance.attempts', '{count} katset', { count: challengeArea.total })}
+            </div>
           </div>
         )}
       </div>
 
       {/* Distance Performance Bars */}
       <div>
-        <h3 className="text-sm font-semibold text-slate-700 mb-3">Distantstulemused</h3>
+        <h3 className="text-sm font-semibold text-slate-700 mb-3">{t('performance.distance_results', 'Distantstulemused')}</h3>
         <div className="space-y-3">
           {distancePerformance.map(({ distance, percentage, made, total }) => (
             <div key={distance}>
@@ -86,7 +92,9 @@ export default function PerformanceAnalysis({ playerPutts }) {
                   style={{ width: `${percentage}%` }}
                 />
               </div>
-              <div className="text-xs text-slate-500 mt-0.5">{made}/{total} sees</div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                {t('performance.made_ratio', '{made}/{total} sees', { made, total })}
+              </div>
             </div>
           ))}
         </div>

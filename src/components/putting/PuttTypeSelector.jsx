@@ -1,13 +1,15 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/lib/i18n';
 
 export default function PuttTypeSelector({ selectedType, onSelect, compact = false }) {
+  const { t } = useLanguage();
   const puttTypes = [
-    { id: 'regular', label: 'Tavaline', icon: '🎯', color: 'emerald' },
-    { id: 'straddle', label: 'Straddle', icon: '🦵', color: 'blue' },
-    { id: 'turbo', label: 'Turbo', icon: '⚡', color: 'amber' },
-    { id: 'kneeling', label: 'Põlvelt', icon: '🧎', color: 'teal' },
-    { id: 'marksman', label: 'Marksman', icon: '🏹', color: 'purple' }
+    { id: 'regular', label: t('putt.regular', 'Tavaline'), icon: '🎯', color: 'emerald' },
+    { id: 'straddle', label: t('putt.straddle', 'Straddle'), icon: '🦵', color: 'blue' },
+    { id: 'turbo', label: t('putt.turbo', 'Turbo'), icon: '⚡', color: 'amber' },
+    { id: 'kneeling', label: t('putt.kneeling', 'Põlvelt'), icon: '🧎', color: 'teal' },
+    { id: 'marksman', label: t('putt.marksman', 'Marksman'), icon: '🏹', color: 'purple' }
   ];
 
   const COLOR_STYLES = {
@@ -20,7 +22,9 @@ export default function PuttTypeSelector({ selectedType, onSelect, compact = fal
 
   return (
     <div>
-      <div className="text-xs font-semibold text-slate-500 mb-2">Puti stiil</div>
+      <div className="text-xs font-semibold text-slate-500 mb-2">
+        {t('host.putt_style', 'Puti stiil')}
+      </div>
       <div className={cn("grid", compact ? "grid-cols-3 gap-2" : "grid-cols-3 gap-3")}>
         {puttTypes.map((type) => {
           const style = COLOR_STYLES[type.color] || COLOR_STYLES.emerald;

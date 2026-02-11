@@ -17,8 +17,10 @@ import {
 } from '@/lib/leaderboard-utils';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
+import { useLanguage } from '@/lib/i18n';
 
 export default function HostView({ gameId, onExit }) {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
   const queryClient = useQueryClient();
   const baseGameRef = React.useRef(null);
@@ -105,7 +107,7 @@ export default function HostView({ gameId, onExit }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['game', gameId] });
-      toast.success('Mäng lõpetatud!');
+      toast.success(t('host.completed_toast', 'Mäng lõpetatud!'));
     }
   });
 
@@ -117,7 +119,7 @@ export default function HostView({ gameId, onExit }) {
       });
     },
     onSuccess: () => {
-      toast.success('Mäng suletud');
+      toast.success(t('host.closed_toast', 'Mäng suletud'));
       onExit?.();
     }
   });
@@ -227,9 +229,9 @@ export default function HostView({ gameId, onExit }) {
       const created = results.filter(r => r.action === 'created').length;
       const skipped = results.filter(r => r.action === 'skipped').length;
       
-      let message = 'Edetabelisse saadetud';
+      let message = t('host.leaderboard_sent', 'Edetabelisse saadetud');
       if (updated > 0 || skipped > 0) {
-        message += ` (${created} uusi, ${updated} uuendatud, ${skipped} vahele jäetud)`;
+        message += ` ${t('result.discgolf_summary', '({created} uusi, {updated} uuendatud, {skipped} vahele jäetud)', { created, updated, skipped })}`;
       }
       toast.success(message);
     }
@@ -242,9 +244,9 @@ export default function HostView({ gameId, onExit }) {
       const created = results.filter(r => r.action === 'created').length;
       const skipped = results.filter(r => r.action === 'skipped').length;
       
-      let message = 'Discgolf.ee-sse saadetud';
+      let message = t('host.discgolf_sent', 'Discgolf.ee-sse saadetud');
       if (updated > 0 || skipped > 0) {
-        message += ` (${created} uusi, ${updated} uuendatud, ${skipped} vahele jäetud)`;
+        message += ` ${t('result.discgolf_summary', '({created} uusi, {updated} uuendatud, {skipped} vahele jäetud)', { created, updated, skipped })}`;
       }
       toast.success(message);
     }
@@ -264,7 +266,9 @@ export default function HostView({ gameId, onExit }) {
   const canSubmitDiscgolfForGame = canSubmitDiscgolf && isHostedClassicGame(game);
   const canSubmitGeneralForGame =
     Boolean(user?.email && game?.host_user && user.email === game.host_user) || canSubmitDiscgolf;
-  const scoreLabel = gameType === 'streak_challenge' ? 'Parim seeria' : 'Tulemus';
+  const scoreLabel = gameType === 'streak_challenge'
+    ? t('player.best_streak', 'Parim seeria')
+    : t('host.score_label', 'Tulemus');
 
   if (isLoading || !game) {
     return <LoadingState />;
@@ -322,7 +326,7 @@ export default function HostView({ gameId, onExit }) {
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-4">
           <div className="flex items-center gap-2">
-            <BackButton onClick={onExit} label="Välju" />
+            <BackButton onClick={onExit} label={t('host.exit', 'Välju')} />
             <HomeButton />
           </div>
           <h2 className="text-xl font-bold text-slate-800">{game.name}</h2>
@@ -333,7 +337,7 @@ export default function HostView({ gameId, onExit }) {
         <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 shadow-lg mb-6 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-semibold mb-1 opacity-90">Mängu PIN</div>
+              <div className="text-sm font-semibold mb-1 opacity-90">{t('host.game_pin', 'Mängu PIN')}</div>
               <div className="text-4xl font-bold tracking-widest">{game.pin}</div>
             </div>
             <div className="flex flex-col gap-2">
@@ -343,11 +347,11 @@ export default function HostView({ gameId, onExit }) {
                 className="bg-white/20 hover:bg-white/30 text-white border-white/30"
               >
                 {copied ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
-                {copied ? 'Kopeeritud' : 'Kopeeri'}
+                {copied ? t('host.copied', 'Kopeeritud') : t('host.copy', 'Kopeeri')}
               </Button>
               <div className="flex items-center gap-2 text-sm opacity-90">
                 <Users className="w-4 h-4" />
-                <span>{game.players.length} mängijat</span>
+                <span>{t('host.players_count', '{count} mängijat', { count: game.players.length })}</span>
               </div>
             </div>
           </div>
@@ -359,20 +363,20 @@ export default function HostView({ gameId, onExit }) {
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Trophy className="w-5 h-5 text-amber-500" />
-                <div className="text-sm text-slate-600">Parim tulemus</div>
+                <div className="text-sm text-slate-600">{t('host.best_score', 'Parim tulemus')}</div>
               </div>
               <div className="text-3xl font-bold text-emerald-600">{bestPlayer.bestScore}</div>
               <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
-              <div className="text-sm text-slate-600 mb-2">Enim ringe</div>
+              <div className="text-sm text-slate-600 mb-2">{t('host.most_laps', 'Enim ringe')}</div>
               <div className="text-3xl font-bold text-blue-600">{bestPlayer.bestLaps}</div>
               <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Target className="w-5 h-5 text-purple-500" />
-                <div className="text-sm text-slate-600">Katseid</div>
+                <div className="text-sm text-slate-600">{t('host.attempts', 'Katseid')}</div>
               </div>
               <div className="text-3xl font-bold text-purple-600">{mostAttempts}</div>
               <div className="text-xs text-slate-500 mt-1">{mostAttemptsPlayer?.name}</div>
@@ -388,11 +392,11 @@ export default function HostView({ gameId, onExit }) {
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50">
                     <th className="text-left p-4 font-semibold text-slate-700">#</th>
-                    <th className="text-left p-4 font-semibold text-slate-700">Mängija</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Parim tulemus</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Praegu</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Ringid</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Katseid</th>
+                    <th className="text-left p-4 font-semibold text-slate-700">{t('result.player', 'Mängija')}</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">{t('host.best_score', 'Parim tulemus')}</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">{t('host.current', 'Praegu')}</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">{t('host.laps', 'Ringid')}</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">{t('host.attempts', 'Katseid')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -434,20 +438,20 @@ export default function HostView({ gameId, onExit }) {
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2 text-slate-800 font-semibold">
                 <Trophy className="w-4 h-4 text-amber-500" />
-                Live tulemused
+                {t('host.live_results', 'Live tulemused')}
               </div>
-              <div className="text-xs text-slate-500">Uueneb automaatselt</div>
+              <div className="text-xs text-slate-500">{t('host.auto_update', 'Uueneb automaatselt')}</div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50">
                     <th className="text-left p-4 font-semibold text-slate-700">#</th>
-                    <th className="text-left p-4 font-semibold text-slate-700">Mängija</th>
+                    <th className="text-left p-4 font-semibold text-slate-700">{t('result.player', 'Mängija')}</th>
                     <th className="text-center p-4 font-semibold text-slate-700">{scoreLabel}</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Putid</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Max</th>
-                    <th className="text-center p-4 font-semibold text-slate-700">Täpsus</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">{t('player.putts', 'Putid')}</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">{t('host.max', 'Max')}</th>
+                    <th className="text-center p-4 font-semibold text-slate-700">{t('host.accuracy', 'Täpsus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -485,15 +489,15 @@ export default function HostView({ gameId, onExit }) {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <div className="flex flex-col gap-3">
             {!isATWGame && (
-              <Button
-                onClick={() => closeGameMutation.mutate()}
-                disabled={closeGameMutation.isPending || game.join_closed === true}
-                variant="outline"
-                className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-              >
-                <XCircle className="w-4 h-4 mr-2" />
-                {game.join_closed === true ? 'Mäng suletud' : 'Sulge mäng'}
-              </Button>
+                <Button
+                  onClick={() => closeGameMutation.mutate()}
+                  disabled={closeGameMutation.isPending || game.join_closed === true}
+                  variant="outline"
+                  className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  {game.join_closed === true ? t('host.game_closed', 'Mäng suletud') : t('host.close_game', 'Sulge mäng')}
+                </Button>
             )}
 
             {!isCompleted && isATWGame && (
@@ -503,7 +507,7 @@ export default function HostView({ gameId, onExit }) {
                 className="w-full bg-amber-600 hover:bg-amber-700"
               >
                 <Trophy className="w-4 h-4 mr-2" />
-                Lõpeta mäng
+                {t('host.end_game', 'Lõpeta mäng')}
               </Button>
             )}
             
@@ -516,7 +520,7 @@ export default function HostView({ gameId, onExit }) {
                     className="w-full bg-emerald-600 hover:bg-emerald-700"
                   >
                     <Upload className="w-4 h-4 mr-2" />
-                    Saada edetabelisse
+                    {t('host.submit_leaderboard', 'Saada edetabelisse')}
                   </Button>
                 )}
                 {canSubmitDiscgolfForGame && (
@@ -526,7 +530,7 @@ export default function HostView({ gameId, onExit }) {
                     className="w-full bg-blue-600 hover:bg-blue-700"
                   >
                     <Upload className="w-4 h-4 mr-2" />
-                    Saada Discgolf.ee-sse
+                    {t('host.submit_discgolf', 'Saada Discgolf.ee-sse')}
                   </Button>
                 )}
               </>
@@ -534,7 +538,7 @@ export default function HostView({ gameId, onExit }) {
             
             <Link to={`${createPageUrl('GameResult')}?id=${game.id}`}>
               <Button variant="outline" className="w-full">
-                Vaata kõiki tulemusi
+                {t('host.view_results', 'Vaata kõiki tulemusi')}
               </Button>
             </Link>
           </div>
@@ -543,8 +547,8 @@ export default function HostView({ gameId, onExit }) {
         {game.players.length === 0 && (
           <div className="bg-white rounded-2xl p-12 text-center text-slate-400 shadow-sm border border-slate-100">
             <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>Ootame mängijate liitumist...</p>
-            <p className="text-sm mt-2">Jaga PIN-i: <span className="font-bold text-emerald-600">{game.pin}</span></p>
+            <p>{t('host.waiting_players', 'Ootame mängijate liitumist...')}</p>
+            <p className="text-sm mt-2">{t('host.share_pin', 'Jaga PIN-i:')} <span className="font-bold text-emerald-600">{game.pin}</span></p>
           </div>
         )}
       </div>

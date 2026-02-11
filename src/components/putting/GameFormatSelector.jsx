@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check, Target, Medal, Swords, ArrowLeftRight, ArrowDownRight, ArrowUpRight, Flame, Shuffle, Globe, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/lib/i18n';
 
 const GAME_FORMATS = [
   {
@@ -141,6 +142,7 @@ const COLOR_STYLES = {
 };
 
 export default function GameFormatSelector({ selected, onSelect, excludeFormats = [], size = 'regular' }) {
+  const { t } = useLanguage();
   const filteredFormats = GAME_FORMATS.filter(f => !excludeFormats.includes(f.id));
   const isCompact = size === 'compact';
   
@@ -182,10 +184,14 @@ export default function GameFormatSelector({ selected, onSelect, excludeFormats 
           )}>
             {format.icon && <format.icon className={cn(COLOR_STYLES[format.color]?.icon, isCompact ? "h-5 w-5" : "h-6 w-6")} />}
           </div>
-          <div className={cn("font-semibold text-slate-800 mb-0.5", isCompact ? "text-xs" : "text-sm")}>{format.name}</div>
+          <div className={cn("font-semibold text-slate-800 mb-0.5", isCompact ? "text-xs" : "text-sm")}>
+            {t(`format.${format.id}.name`, format.name)}
+          </div>
           <div className={cn("text-slate-500", isCompact ? "text-[10px]" : "text-[11px]")}>{format.distance}</div>
           {!isCompact && (
-            <div className="mt-1 text-[10px] leading-snug text-slate-400">{format.description}</div>
+            <div className="mt-1 text-[10px] leading-snug text-slate-400">
+              {t(`format.${format.id}.desc`, format.description)}
+            </div>
           )}
         </button>
       ))}

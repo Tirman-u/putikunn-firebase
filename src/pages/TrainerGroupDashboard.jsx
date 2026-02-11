@@ -2,7 +2,6 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart3, Trophy, Users, Activity, Pencil, Trash2, Check, X, Plus, Megaphone } from 'lucide-react';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { base44 } from '@/api/base44Client';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, runTransaction, serverTimestamp, arrayUnion } from 'firebase/firestore';
@@ -40,7 +39,6 @@ const buildTopPlayers = (games) => {
     .slice(0, 10);
 };
 
-const UNASSIGNED_DROPPABLE_ID = 'unassigned-members';
 
 export default function TrainerGroupDashboard() {
   const [searchParams] = useSearchParams();
@@ -63,6 +61,8 @@ export default function TrainerGroupDashboard() {
   const [isUpdatingAttendance, setIsUpdatingAttendance] = React.useState({});
   const [slotSearch, setSlotSearch] = React.useState({});
   const [addingRoster, setAddingRoster] = React.useState({});
+  const [selectedMember, setSelectedMember] = React.useState(null);
+  const [isAssigningMember, setIsAssigningMember] = React.useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -174,6 +174,14 @@ export default function TrainerGroupDashboard() {
       meta?.name || group?.members?.[uid]?.name || group?.members?.[uid]?.email || meta?.email || uid,
     [group]
   );
+  const handleSelectMember = React.useCallback((uid, sourceSlotId = null) => {
+    setSelectedMember((prev) => {
+      if (prev?.uid === uid && prev?.sourceSlotId === sourceSlotId) {
+        return null;
+      }
+      return { uid, sourceSlotId };
+    });
+  }, []);
   const memberIds = React.useMemo(() => {
     if (group?.member_uids?.length) return group.member_uids;
     return Object.keys(group?.members || {});
@@ -625,6 +633,62 @@ export default function TrainerGroupDashboard() {
     }
   };
 
+  const moveRosterMember = async (sourceSlotId, targetSlotId, uid) => {
+    if (!groupId || !sourceSlotId || !targetSlotId || !uid) return;
+    if (sourceSlotId === targetSlotId) return;
+    try {
+      await runTransaction(db, async (transaction) => {
+        const groupRef = doc(db, 'training_groups', groupId);
+        const snap = await transaction.get(groupRef);
+        if (!snap.exists()) throw new Error('Gruppi ei leitud');
+        const data = snap.data();
+        const currentSlots = Array.isArray(data.slots) ? data.slots : [];
+        const targetSlot = currentSlots.find((slot) => slot.id === targetSlotId);
+        if (!targetSlot) throw new Error('Trenni ei leitud');
+        const targetRoster = Array.isArray(targetSlot.roster_uids) ? targetSlot.roster_uids : [];
+        const targetMax = Number(targetSlot.max_spots || 0);
+        if (targetMax > 0 && targetRoster.length >= targetMax) {
+          throw new Error('Püsikohad täis');
+        }
+        const nextSlots = currentSlots.map((slot) => {
+          if (slot.id === sourceSlotId) {
+            const roster = Array.isArray(slot.roster_uids) ? slot.roster_uids : [];
+            return { ...slot, roster_uids: roster.filter((memberId) => memberId !== uid) };
+          }
+          if (slot.id === targetSlotId) {
+            const roster = Array.isArray(slot.roster_uids) ? slot.roster_uids : [];
+            if (roster.includes(uid)) return slot;
+            return { ...slot, roster_uids: [...roster, uid] };
+          }
+          return slot;
+        });
+        transaction.update(groupRef, { slots: nextSlots });
+      });
+      await updateAttendance(sourceSlotId, (slotData) => {
+        const released = (slotData.released_uids || []).filter((memberId) => memberId !== uid);
+        return { ...slotData, released_uids: released };
+      });
+      queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
+    } catch (error) {
+      toast.error(error?.message || 'Liigutamine ebaõnnestus');
+    }
+  };
+
+  const handleAssignSelected = async (targetSlotId) => {
+    if (!selectedMember?.uid || !targetSlotId) return;
+    setIsAssigningMember(true);
+    try {
+      if (selectedMember.sourceSlotId) {
+        await moveRosterMember(selectedMember.sourceSlotId, targetSlotId, selectedMember.uid);
+      } else {
+        await addUserToRoster(targetSlotId, selectedMember.uid);
+      }
+      setSelectedMember(null);
+    } finally {
+      setIsAssigningMember(false);
+    }
+  };
+
   const handleAddRosterMember = async (slotId, entry) => {
     if (!entry?.id || !groupId) return;
     const slot = slots.find((item) => item.id === slotId);
@@ -788,75 +852,6 @@ export default function TrainerGroupDashboard() {
     });
   };
 
-  const handleDragEnd = async (result) => {
-    if (!result?.destination) return;
-    const { source, destination, draggableId } = result;
-    if (!source?.droppableId || !destination?.droppableId) return;
-    if (source.droppableId === destination.droppableId) return;
-
-    const sourceIsUnassigned = source.droppableId === UNASSIGNED_DROPPABLE_ID;
-    const destinationIsUnassigned = destination.droppableId === UNASSIGNED_DROPPABLE_ID;
-    const sourceSlot = slots.find((slot) => slot.id === source.droppableId);
-    const destinationSlot = slots.find((slot) => slot.id === destination.droppableId);
-
-    if (destinationIsUnassigned && sourceSlot) {
-      const nextSlots = slots.map((slot) => {
-        if (slot.id !== sourceSlot.id) return slot;
-        const roster = Array.isArray(slot.roster_uids) ? slot.roster_uids : [];
-        return { ...slot, roster_uids: roster.filter((uid) => uid !== draggableId) };
-      });
-      await updateGroupSlots(nextSlots);
-      await updateAttendance(sourceSlot.id, (slotData) => {
-        const released = (slotData.released_uids || []).filter((uid) => uid !== draggableId);
-        return { ...slotData, released_uids: released };
-      });
-      return;
-    }
-
-    if (sourceIsUnassigned && destinationSlot) {
-      const destRoster = Array.isArray(destinationSlot.roster_uids) ? destinationSlot.roster_uids : [];
-      const destMax = Number(destinationSlot.max_spots || 0);
-      if (destMax > 0 && destRoster.length >= destMax) {
-        toast.error('Püsikohad täis');
-        return;
-      }
-      const nextSlots = slots.map((slot) => {
-        if (slot.id !== destinationSlot.id) return slot;
-        if (destRoster.includes(draggableId)) return slot;
-        return { ...slot, roster_uids: [...destRoster, draggableId] };
-      });
-      await updateGroupSlots(nextSlots);
-      return;
-    }
-
-    if (!sourceSlot || !destinationSlot) return;
-
-    const destRoster = Array.isArray(destinationSlot.roster_uids) ? destinationSlot.roster_uids : [];
-    const destMax = Number(destinationSlot.max_spots || 0);
-    if (destMax > 0 && destRoster.length >= destMax) {
-      toast.error('Püsikohad täis');
-      return;
-    }
-
-    const nextSlots = slots.map((slot) => {
-      if (slot.id === sourceSlot.id) {
-        const roster = Array.isArray(slot.roster_uids) ? slot.roster_uids : [];
-        return { ...slot, roster_uids: roster.filter((uid) => uid !== draggableId) };
-      }
-      if (slot.id === destinationSlot.id) {
-        const roster = Array.isArray(slot.roster_uids) ? slot.roster_uids : [];
-        if (roster.includes(draggableId)) return slot;
-        return { ...slot, roster_uids: [...roster, draggableId] };
-      }
-      return slot;
-    });
-
-    await updateGroupSlots(nextSlots);
-    await updateAttendance(sourceSlot.id, (slotData) => {
-      const released = (slotData.released_uids || []).filter((uid) => uid !== draggableId);
-      return { ...slotData, released_uids: released };
-    });
-  };
 
   const handleSaveAnnouncement = async () => {
     if (!groupId) return;
@@ -975,49 +970,98 @@ export default function TrainerGroupDashboard() {
           )}
 
           {canManageTraining ? (
-            <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="space-y-3">
               {unassignedMembers.length > 0 && (
-                <div className="rounded-[20px] border border-slate-100 bg-white px-4 py-4 mb-4 dark:bg-black dark:border-white/10">
+                <div className="rounded-[20px] border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10">
                   <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Sortimata liikmed</div>
-                  <Droppable droppableId={UNASSIGNED_DROPPABLE_ID} direction="horizontal">
-                    {(provided) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2"
-                      >
-                        {unassignedMembers.map((member, index) => (
-                          <Draggable key={`unassigned-${member.uid}`} draggableId={member.uid} index={index}>
-                            {(dragProvided) => (
-                              <div
-                                ref={dragProvided.innerRef}
-                                {...dragProvided.draggableProps}
-                                {...dragProvided.dragHandleProps}
-                                className="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-3 text-xs text-slate-600 shadow-sm"
-                              >
-                                <div className="text-[10px] uppercase text-slate-400">Sortimata</div>
-                                <div className="text-sm font-semibold text-slate-800 truncate">
-                                  {getMemberLabel(member.uid)}
-                                </div>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                    {unassignedMembers.map((member) => {
+                      const isSelected =
+                        selectedMember?.uid === member.uid && !selectedMember?.sourceSlotId;
+                      return (
+                        <button
+                          key={`unassigned-${member.uid}`}
+                          type="button"
+                          onClick={() => handleSelectMember(member.uid, null)}
+                          className={`rounded-2xl border border-dashed px-3 py-3 text-xs text-slate-600 shadow-sm text-left transition ${
+                            isSelected
+                              ? 'border-emerald-300 ring-2 ring-emerald-200'
+                              : 'border-slate-200'
+                          }`}
+                        >
+                          <div className="text-[10px] uppercase text-slate-400">Sortimata</div>
+                          <div className="text-sm font-semibold text-slate-800 truncate">
+                            {getMemberLabel(member.uid)}
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-1">Vali trenn</div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
-              <div className="space-y-3">
-                {slots.map((slot) => {
+
+              {selectedMember && (
+                <div className="rounded-[20px] border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10">
+                  <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Määra trenn</div>
+                  <div className="text-[11px] text-slate-500 mb-3">
+                    Valitud: {getMemberLabel(selectedMember.uid)}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {slots.map((slot) => {
+                      const rosterCount = Array.isArray(slot.roster_uids) ? slot.roster_uids.length : 0;
+                      const maxSpots = Number(slot.max_spots || 0);
+                      const isFull = maxSpots > 0 && rosterCount >= maxSpots;
+                      const isCurrent = selectedMember?.sourceSlotId === slot.id;
+                      return (
+                        <button
+                          key={`assign-${selectedMember.uid}-${slot.id}`}
+                          type="button"
+                          disabled={isAssigningMember || isFull || isCurrent}
+                          onClick={() => handleAssignSelected(slot.id)}
+                          className={`rounded-2xl border px-3 py-2 text-left text-xs font-semibold transition ${
+                            isCurrent
+                              ? 'border-slate-200 text-slate-400'
+                              : isFull
+                                ? 'border-slate-200 text-slate-400'
+                                : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                          }`}
+                        >
+                          <div className="text-sm font-semibold">
+                            {getDayFullLabel(slot.day)} • {slot.time}
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-1">
+                            Püsikohti: {rosterCount}/{maxSpots || '-'}
+                          </div>
+                          {isCurrent && (
+                            <div className="text-[10px] text-slate-400 mt-1">Praegune</div>
+                          )}
+                          {isFull && !isCurrent && (
+                            <div className="text-[10px] text-amber-600 mt-1">Täis</div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMember(null)}
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                    >
+                      Tühista
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {slots.map((slot) => {
               const availability = attendanceBySlot(slot);
               const maxSpots = availability.maxSpots || Number(slot.max_spots) || 0;
               const attendance = group?.attendance?.[weekKey]?.[slot.id] || {};
               const releasedSet = new Set(attendance.released_uids || []);
               const rosterIds = Array.isArray(slot.roster_uids) ? slot.roster_uids : [];
               const activeRosterIds = rosterIds.filter((uid) => !releasedSet.has(uid));
-              const activeIndexByUid = new Map(activeRosterIds.map((uid, idx) => [uid, idx]));
               const releasedRosterIds = rosterIds.filter((uid) => releasedSet.has(uid));
               const isRosterMember = rosterIds.includes(user?.id);
               const isReleased = releasedSet.has(user?.id);
@@ -1196,80 +1240,79 @@ export default function TrainerGroupDashboard() {
 
                   <div className="mt-4">
                     {canManageTraining ? (
-                      <Droppable droppableId={slot.id} direction="horizontal">
-                        {(provided) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2"
-                          >
-                            {seatAssignments.map((seat, seatIndex) => {
-                              if (seat.type === 'roster' && activeIndexByUid.has(seat.uid)) {
-                                const dragIndex = activeIndexByUid.get(seat.uid);
-                                const label = getMemberLabel(seat.uid);
-                                return (
-                                  <Draggable key={`${slot.id}-${seat.uid}`} draggableId={seat.uid} index={dragIndex}>
-                                    {(dragProvided) => (
-                                      <div
-                                        ref={dragProvided.innerRef}
-                                        {...dragProvided.draggableProps}
-                                        {...dragProvided.dragHandleProps}
-                                        className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700 shadow-sm dark:bg-black dark:border-white/10"
-                                      >
-                                        <div className="text-[10px] uppercase text-slate-400">Püsikoht</div>
-                                        <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleRemoveRosterMember(slot.id, seat.uid)}
-                                          className="mt-2 text-[10px] font-semibold text-red-500"
-                                        >
-                                          Eemalda
-                                        </button>
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                );
-                              }
-
-                              if (seat.type === 'claim') {
-                                const label = getMemberLabel(seat.uid, seat.meta);
-                                return (
-                                  <div
-                                    key={`${slot.id}-claim-${seat.uid}-${seatIndex}`}
-                                    className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs text-emerald-700 shadow-sm"
+                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                        {seatAssignments.map((seat, seatIndex) => {
+                          if (seat.type === 'roster') {
+                            const label = getMemberLabel(seat.uid);
+                            const isSelected =
+                              selectedMember?.uid === seat.uid && selectedMember?.sourceSlotId === slot.id;
+                            return (
+                              <div
+                                key={`${slot.id}-roster-${seat.uid}`}
+                                className={`rounded-2xl border px-3 py-3 text-xs shadow-sm dark:bg-black dark:border-white/10 ${
+                                  isSelected
+                                    ? 'border-emerald-300 ring-2 ring-emerald-200 bg-emerald-50/40'
+                                    : 'border-slate-200 bg-slate-50'
+                                }`}
+                              >
+                                <div className="text-[10px] uppercase text-slate-400">Püsikoht</div>
+                                <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
+                                <div className="mt-2 flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectMember(seat.uid, slot.id)}
+                                    className="text-[10px] font-semibold text-emerald-700"
                                   >
-                                    <div className="text-[10px] uppercase text-emerald-500">1x</div>
-                                    <div className="text-sm font-semibold text-emerald-900 truncate">{label}</div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveClaimedMember(slot.id, seat.uid)}
-                                      className="mt-2 text-[10px] font-semibold text-emerald-700"
-                                    >
-                                      Eemalda
-                                    </button>
-                                  </div>
-                                );
-                              }
-
-                              const releasedLabel = seat.releasedBy ? getMemberLabel(seat.releasedBy) : null;
-                              return (
-                                <div
-                                  key={`${slot.id}-free-${seatIndex}`}
-                                  className="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-3 text-xs text-slate-400"
-                                >
-                                  <div className="text-[10px] uppercase text-slate-400">Vaba</div>
-                                  {releasedLabel && (
-                                    <div className="text-[10px] text-slate-400 mt-1 truncate">
-                                      püsikoht: {releasedLabel}
-                                    </div>
-                                  )}
+                                    {isSelected ? 'Valitud' : 'Vali'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveRosterMember(slot.id, seat.uid)}
+                                    className="text-[10px] font-semibold text-red-500"
+                                  >
+                                    Eemalda
+                                  </button>
                                 </div>
-                              );
-                            })}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
+                              </div>
+                            );
+                          }
+
+                          if (seat.type === 'claim') {
+                            const label = getMemberLabel(seat.uid, seat.meta);
+                            return (
+                              <div
+                                key={`${slot.id}-claim-${seat.uid}-${seatIndex}`}
+                                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs text-emerald-700 shadow-sm"
+                              >
+                                <div className="text-[10px] uppercase text-emerald-500">1x</div>
+                                <div className="text-sm font-semibold text-emerald-900 truncate">{label}</div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveClaimedMember(slot.id, seat.uid)}
+                                  className="mt-2 text-[10px] font-semibold text-emerald-700"
+                                >
+                                  Eemalda
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          const releasedLabel = seat.releasedBy ? getMemberLabel(seat.releasedBy) : null;
+                          return (
+                            <div
+                              key={`${slot.id}-free-${seatIndex}`}
+                              className="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-3 text-xs text-slate-400"
+                            >
+                              <div className="text-[10px] uppercase text-slate-400">Vaba</div>
+                              {releasedLabel && (
+                                <div className="text-[10px] text-slate-400 mt-1 truncate">
+                                  püsikoht: {releasedLabel}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
                         {seatAssignments.map((seat, seatIndex) => {
@@ -1442,7 +1485,6 @@ export default function TrainerGroupDashboard() {
                   );
                 })}
               </div>
-            </DragDropContext>
           ) : (
             <div className="space-y-3">
               {slots.map((slot) => {

@@ -26,6 +26,17 @@ const FORMAT_RULES = {
       'Mängi 20 ringi (kokku 100 putti)'
     ]
   },
+  mini_league: {
+    title: 'Mini Liiga reeglid',
+    range: '5m - 10m',
+    start: '10m',
+    rules: [
+      'Classic formaat, aga 10 ringi (50 putti)',
+      'Alusta 10m pealt, viska 5 ketast',
+      'Järgmine distants sõltub sissevisetest (0→5m … 5→10m)',
+      'Punktid = distants × sees'
+    ]
+  },
   short: {
     title: 'Short reeglid',
     range: '3m - 8m',
@@ -87,6 +98,27 @@ const FORMAT_RULES = {
       '10m võit lõpetab duelli antud jaamas'
     ]
   },
+  streak_challenge: {
+    title: 'Streak reeglid',
+    range: '3m - 15m',
+    start: 'Vali distants',
+    rules: [
+      'Vali distants ja viska 1 ketas korraga',
+      'Sees → seeria +1, Mööda → seeria 0',
+      'Tulemus = parim seeria',
+      'Lõpetad ise'
+    ]
+  },
+  random_distance: {
+    title: 'Random reeglid',
+    range: '3m - 10m',
+    start: 'Juhuslik',
+    rules: [
+      'Iga ringi distants loosib (3–10m)',
+      'Viska 5 ketast, 20 ringi (100 putti)',
+      'Punktid = distants × sees'
+    ]
+  },
   time_ladder: {
     title: 'Aja väljakutse reeglid',
     range: '5m - 10m',
@@ -97,6 +129,17 @@ const FORMAT_RULES = {
       'Mööda → seeria nulli',
       'Appis ainult stopper: Start alguses, Stop finišis',
       'Tulemus = aeg (väiksem on parem)'
+    ]
+  },
+  around_the_world: {
+    title: 'Around the World reeglid',
+    range: '5m - 10m',
+    start: '5m',
+    rules: [
+      'Liigud 5m → 10m → 5m, täisring = 1 lap',
+      'Raskus = ketaste arv + edasi‑liikumise lävend',
+      '3+ ketast: 2+ mööda või 0 sees → tagasi 5m',
+      'Punktid = distants × sees (parim katse distantsil loeb)'
     ]
   }
 };

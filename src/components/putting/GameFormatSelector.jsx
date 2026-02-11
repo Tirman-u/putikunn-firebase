@@ -73,7 +73,7 @@ const GAME_FORMATS = [
     id: 'time_ladder',
     name: 'Aja väljakutse',
     distance: '5-10m',
-    description: '5 järjest sees → +1m, aeg',
+    description: 'Stopper + 5 järjest sees → +1m',
     color: 'emerald',
     icon: Timer
   },

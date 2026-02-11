@@ -93,9 +93,9 @@ const FORMAT_RULES = {
     start: '5m',
     rules: [
       'Alusta 5m pealt',
-      '5 järjest sees → distants +1m',
+      '5 järjest sees → distants +1m (füüsiline arvestus)',
       'Mööda → seeria nulli',
-      'Mäng lõpeb, kui 10m peal saad 5 järjest sisse',
+      'Appis ainult stopper: Start alguses, Stop finišis',
       'Tulemus = aeg (väiksem on parem)'
     ]
   }

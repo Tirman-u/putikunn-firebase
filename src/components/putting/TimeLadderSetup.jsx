@@ -20,7 +20,6 @@ export default function TimeLadderSetup({ isSolo, onBack, onStart, initialName, 
       puttType,
       config: {
         discs_per_turn: discCount,
-        streak_target: 5,
         start_distance: 5,
         end_distance: 10
       }
@@ -90,9 +89,9 @@ export default function TimeLadderSetup({ isSolo, onBack, onStart, initialName, 
         <h3 className="font-semibold text-blue-900 mb-2 dark:text-slate-100">Kuidas mängida?</h3>
         <ul className="text-sm text-blue-800 space-y-1 dark:text-slate-300">
           <li>• Alusta 5m pealt, eesmärk on jõuda 10m-ni</li>
-          <li>• 5 järjest sees → liigu +1m</li>
+          <li>• 5 järjest sees → liigu +1m (füüsiline arvestus)</li>
           <li>• Mööda → seeria nulli</li>
-          <li>• Aeg läheb käima Start nupust ja peatub finišis</li>
+          <li>• Appis ainult stopper: Start alguses, Stop finišis</li>
         </ul>
       </div>
     </div>

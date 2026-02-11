@@ -21,6 +21,7 @@ import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getSlotAttendance, getWeekKey } from '@/lib/training-utils';
 import {
   SCORE_DIRECTIONS,
   computeHcPoints,
@@ -54,6 +55,7 @@ export default function TrainingSession() {
   const [offlinePoints, setOfflinePoints] = React.useState({});
   const [offlineRanks, setOfflineRanks] = React.useState({});
   const [offlineParticipants, setOfflineParticipants] = React.useState('');
+  const [offlineParticipantsTouched, setOfflineParticipantsTouched] = React.useState(false);
   const [offlineCutPercent, setOfflineCutPercent] = React.useState(70);
   const [offlineCutBonus, setOfflineCutBonus] = React.useState(0.25);
   const [isSavingApp, setIsSavingApp] = React.useState(false);
@@ -173,11 +175,40 @@ export default function TrainingSession() {
     return map;
   }, [members]);
 
+  const slot = React.useMemo(() => {
+    if (!group?.slots || !session?.slot_id) return null;
+    return group.slots.find((item) => item.id === session.slot_id) || null;
+  }, [group?.slots, session?.slot_id]);
+
+  const sessionWeekKey = React.useMemo(() => {
+    if (session?.date) {
+      return getWeekKey(new Date(session.date));
+    }
+    return getWeekKey();
+  }, [session?.date]);
+
+  const slotAttendance = React.useMemo(() => {
+    if (!group || !session?.slot_id) return {};
+    return getSlotAttendance(group, sessionWeekKey, session.slot_id) || {};
+  }, [group, session?.slot_id, sessionWeekKey]);
+
+  const slotMemberIds = React.useMemo(() => {
+    const roster = Array.isArray(slot?.roster_uids) ? slot.roster_uids : [];
+    const claimed = Array.isArray(slotAttendance?.claimed_uids) ? slotAttendance.claimed_uids : [];
+    return Array.from(new Set([...roster, ...claimed]));
+  }, [slot?.roster_uids, slotAttendance?.claimed_uids]);
+
+  const filteredMembers = React.useMemo(() => {
+    if (!slotMemberIds.length) return members;
+    return members.filter((member) => slotMemberIds.includes(member.uid));
+  }, [members, slotMemberIds]);
+
   React.useEffect(() => {
-    if (!members.length) return;
-    if (offlineParticipants) return;
-    setOfflineParticipants(String(members.length));
-  }, [members.length, offlineParticipants]);
+    if (offlineMode !== 'rank_hc') return;
+    if (offlineParticipantsTouched) return;
+    if (!filteredMembers.length) return;
+    setOfflineParticipants(String(filteredMembers.length));
+  }, [filteredMembers.length, offlineMode, offlineParticipantsTouched]);
 
   const { data: groupGames = [], isLoading: isLoadingGroupGames } = useQuery({
     queryKey: ['training-group-games-list', season?.group_id],
@@ -188,11 +219,6 @@ export default function TrainingSession() {
     },
     staleTime: 15000
   });
-
-  const slot = React.useMemo(() => {
-    if (!group?.slots || !session?.slot_id) return null;
-    return group.slots.find((item) => item.id === session.slot_id) || null;
-  }, [group?.slots, session?.slot_id]);
 
   const resultsByEvent = React.useMemo(() => {
     const map = {};
@@ -653,6 +679,10 @@ export default function TrainingSession() {
                   value={offlineName}
                   onChange={(event) => setOfflineName(event.target.value)}
                 />
+                <div className="text-xs text-slate-500">
+                  Trenn: {formatSlotLabel(slot)} • Mängijaid: {filteredMembers.length}/{members.length}
+                  {slotMemberIds.length === 0 && ' (pole püsikohti, näitan kõiki)'}
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -667,7 +697,10 @@ export default function TrainingSession() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setOfflineMode('rank_hc')}
+                    onClick={() => {
+                      setOfflineMode('rank_hc');
+                      setOfflineParticipantsTouched(false);
+                    }}
                     className={`rounded-full px-3 py-1 text-xs font-semibold border ${
                       offlineMode === 'rank_hc'
                         ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
@@ -684,7 +717,10 @@ export default function TrainingSession() {
                         type="number"
                         min={1}
                         value={offlineParticipants}
-                        onChange={(event) => setOfflineParticipants(event.target.value)}
+                        onChange={(event) => {
+                          setOfflineParticipants(event.target.value);
+                          setOfflineParticipantsTouched(true);
+                        }}
                         className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
                         placeholder="Osalejaid"
                       />
@@ -712,7 +748,7 @@ export default function TrainingSession() {
                       Top {offlineCutPercentValue}% = {offlineCutCount} mängijat saavad +{round1(offlineCutBonusValue).toFixed(1)}p
                     </div>
                     <div className="space-y-2">
-                      {members.map((member) => {
+                      {filteredMembers.map((member) => {
                         const rankValue = Number(offlineRanks[member.uid]) || 0;
                         const qualifies = rankValue > 0 && offlineCutCount > 0 && rankValue <= offlineCutCount;
                         const pointsPreview = rankValue > 0
@@ -741,7 +777,7 @@ export default function TrainingSession() {
                   </div>
                 ) : (
                 <div className="space-y-2">
-                  {members.map((member) => (
+                  {filteredMembers.map((member) => (
                     <div key={member.uid} className="flex items-center gap-2">
                       <div className="text-xs text-slate-600 w-32">{member.name || member.email}</div>
                       <input

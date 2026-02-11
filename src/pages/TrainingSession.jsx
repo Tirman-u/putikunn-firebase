@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   addDoc,
   collection,
@@ -44,6 +44,7 @@ export default function TrainingSession() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('sessionId');
+  const queryClient = useQueryClient();
 
   const [appPin, setAppPin] = React.useState('');
   const [appName, setAppName] = React.useState('');
@@ -291,6 +292,9 @@ export default function TrainingSession() {
       setAppPin('');
       setAppName('');
       setAppLowerIsBetter(false);
+      queryClient.invalidateQueries({ queryKey: ['training-events', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-event-results', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
       toast.success('Event lisatud');
     } catch (error) {
       toast.error(error?.message || 'Eventi lisamine ebaõnnestus');
@@ -368,6 +372,9 @@ export default function TrainingSession() {
       await batch.commit();
       setOfflineName('');
       setOfflinePoints({});
+      queryClient.invalidateQueries({ queryKey: ['training-events', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-event-results', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
       toast.success('Offline event lisatud');
     } catch (error) {
       toast.error(error?.message || 'Offline eventi lisamine ebaõnnestus');

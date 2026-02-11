@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Trophy, Plus, Calendar } from 'lucide-react';
@@ -18,6 +18,7 @@ export default function TrainingLeague() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const groupId = searchParams.get('groupId');
+  const queryClient = useQueryClient();
   const [seasonName, setSeasonName] = React.useState('');
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
@@ -94,6 +95,9 @@ export default function TrainingLeague() {
         status: 'active'
       });
       setSeasonName('');
+      setStartDate('');
+      setEndDate('');
+      queryClient.invalidateQueries({ queryKey: ['training-seasons', groupId] });
       toast.success('Hooaeg loodud');
     } catch (error) {
       toast.error(error?.message || 'Hooaja loomine ebaõnnestus');

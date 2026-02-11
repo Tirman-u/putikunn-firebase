@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Calendar, Trophy, Plus } from 'lucide-react';
@@ -18,6 +18,7 @@ export default function TrainingSeason() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const seasonId = searchParams.get('seasonId');
+  const queryClient = useQueryClient();
   const [selectedTab, setSelectedTab] = React.useState('overall');
   const [newSessionDate, setNewSessionDate] = React.useState('');
   const [newSessionSlotId, setNewSessionSlotId] = React.useState('');
@@ -122,6 +123,7 @@ export default function TrainingSeason() {
         created_at: serverTimestamp()
       });
       setNewSessionDate('');
+      queryClient.invalidateQueries({ queryKey: ['training-sessions', seasonId] });
       toast.success('Treening lisatud');
     } catch (error) {
       toast.error(error?.message || 'Treeningu lisamine ebaõnnestus');

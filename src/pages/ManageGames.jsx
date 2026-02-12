@@ -888,7 +888,7 @@ export default function ManageGames() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <Link
-                        to={`${createPageUrl('DuelHost')}?id=${game.id}${game.pin ? `&pin=${game.pin}` : ''}`}
+                        to={`${createPageUrl('DuelReport')}?id=${game.id}`}
                         className="min-w-0 flex-1"
                       >
                         <div className="font-bold text-slate-800 truncate">{game.name}</div>

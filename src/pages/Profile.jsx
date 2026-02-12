@@ -1249,7 +1249,7 @@ export default function Profile() {
                     <div className="flex items-center gap-3">
                       <span>{duel.dateLabel}</span>
                       <Link
-                        to={`${createPageUrl('DuelJoin')}?id=${duel.id}${duel.pin ? `&pin=${duel.pin}` : ''}`}
+                        to={`${createPageUrl('DuelReport')}?id=${duel.id}`}
                         className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
                       >
                         <ExternalLink className="w-4 h-4" />

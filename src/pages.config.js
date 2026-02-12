@@ -13,6 +13,7 @@ import TrainerGroupDashboard from './pages/TrainerGroupDashboard';
 import DuelHost from './pages/DuelHost';
 import DuelHostControl from './pages/DuelHostControl';
 import DuelJoin from './pages/DuelJoin';
+import DuelReport from './pages/DuelReport';
 import DuelSolo from './pages/DuelSolo';
 import PuttingKing from './pages/PuttingKing';
 import PuttingKingOverview from './pages/PuttingKingOverview';
@@ -45,6 +46,7 @@ export const PAGES = {
     "DuelHost": DuelHost,
     "DuelHostControl": DuelHostControl,
     "DuelJoin": DuelJoin,
+    "DuelReport": DuelReport,
     "DuelSolo": DuelSolo,
     "PuttingRecordsPage": PuttingRecordsPage,
     "HostDuelPreview": HostDuelPreviewPage,

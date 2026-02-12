@@ -105,6 +105,53 @@ export default function TrainingSeason() {
   const remaining = countRemainingBySlot(seasonSlots, season?.end_date);
   const remainingWeeks = Math.max(0, ...Object.values(remaining?.bySlot || {}));
 
+  const getSessionDateKey = React.useCallback((value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  const slotById = React.useMemo(() => {
+    const map = {};
+    slots.forEach((slotItem) => {
+      if (slotItem?.id) {
+        map[slotItem.id] = slotItem;
+      }
+    });
+    return map;
+  }, [slots]);
+
+  const sessionGroups = React.useMemo(() => {
+    const grouped = {};
+    sessions.forEach((entry) => {
+      const dateKey = getSessionDateKey(entry.date);
+      if (!dateKey) return;
+      if (!grouped[dateKey]) grouped[dateKey] = [];
+      grouped[dateKey].push(entry);
+    });
+
+    return Object.entries(grouped)
+      .map(([dateKey, entries]) => {
+        const sortedEntries = [...entries].sort((a, b) => {
+          const slotA = slotById[a.slot_id];
+          const slotB = slotById[b.slot_id];
+          const labelA = formatSlotLabel(slotA);
+          const labelB = formatSlotLabel(slotB);
+          return labelA.localeCompare(labelB);
+        });
+        return {
+          dateKey,
+          date: sortedEntries[0]?.date || null,
+          sessionIds: sortedEntries.map((item) => item.id),
+          primarySessionId: sortedEntries[0]?.id,
+          slotLabels: sortedEntries.map((item) => formatSlotLabel(slotById[item.slot_id])),
+          count: sortedEntries.length
+        };
+      })
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  }, [sessions, getSessionDateKey, slotById]);
+
   const leaderboard = React.useMemo(() => {
     const rows = stats.map((entry) => {
       const slotPoints = selectedTab === 'overall'
@@ -407,27 +454,33 @@ export default function TrainingSeason() {
 
         <div className="rounded-[28px] border border-white/80 bg-white/90 p-4 shadow-[0_22px_46px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black sm:p-5">
           <div className="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-100">{tr('Treeningud', 'Trainings')}</div>
-          {sessions.length === 0 ? (
+          {sessionGroups.length === 0 ? (
             <div className="text-sm text-slate-400">{tr('Treeninguid pole veel.', 'No trainings yet.')}</div>
           ) : (
             <div className="space-y-2.5">
-              {sessions.map((session) => {
-                const slot = slots.find((item) => item.id === session.slot_id);
+              {sessionGroups.map((groupEntry) => {
                 return (
                   <button
-                    key={session.id}
+                    key={groupEntry.dateKey}
                     type="button"
-                    onClick={() => navigate(`${createPageUrl('TrainingSession')}?sessionId=${session.id}`)}
+                    onClick={() =>
+                      navigate(
+                        `${createPageUrl('TrainingSession')}?sessionId=${groupEntry.primarySessionId}&dateKey=${groupEntry.dateKey}`
+                      )
+                    }
                     className="w-full rounded-2xl border border-slate-100 bg-white/95 px-4 py-3 text-left transition hover:bg-emerald-50 dark:border-white/10 dark:bg-black"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                          {session.date ? format(new Date(session.date), 'MMM d') : tr('Treening', 'Training')}
+                          {groupEntry.date ? format(new Date(groupEntry.date), 'MMM d') : tr('Treening', 'Training')}
                         </div>
                         <div className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                           <Clock3 className="h-3 w-3" />
-                          {formatSlotLabel(slot)}
+                          {groupEntry.slotLabels.join(' • ')}
+                        </div>
+                        <div className="mt-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-300">
+                          {tr('Ajagruppe', 'Time groups')}: {groupEntry.count}
                         </div>
                       </div>
                       <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />

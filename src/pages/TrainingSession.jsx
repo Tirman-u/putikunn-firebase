@@ -45,6 +45,7 @@ const getGamePlayers = (game) => {
 export default function TrainingSession() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('sessionId');
+  const dateKeyParam = searchParams.get('dateKey') || '';
   const queryClient = useQueryClient();
 
   const [appPin, setAppPin] = React.useState('');
@@ -205,6 +206,16 @@ export default function TrainingSession() {
     return group.slots.find((item) => item.id === session.slot_id) || null;
   }, [group?.slots, session?.slot_id]);
 
+  const slotById = React.useMemo(() => {
+    const map = {};
+    (group?.slots || []).forEach((slotItem) => {
+      if (slotItem?.id) {
+        map[slotItem.id] = slotItem;
+      }
+    });
+    return map;
+  }, [group?.slots]);
+
   const sessionWeekKey = React.useMemo(() => {
     if (session?.date) {
       return getWeekKey(new Date(session.date));
@@ -254,14 +265,39 @@ export default function TrainingSession() {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }, []);
 
+  const daySessions = React.useMemo(() => {
+    if (!session?.id) return [];
+    const targetDateKey = dateKeyParam || getSessionDateKey(session.date);
+    if (!targetDateKey) return [session];
+    const matches = seasonSessions
+      .filter((entry) => getSessionDateKey(entry.date) === targetDateKey)
+      .sort((a, b) => {
+        const labelA = formatSlotLabel(slotById[a.slot_id]);
+        const labelB = formatSlotLabel(slotById[b.slot_id]);
+        return labelA.localeCompare(labelB);
+      });
+    return matches.length > 0 ? matches : [session];
+  }, [dateKeyParam, getSessionDateKey, seasonSessions, session, slotById]);
+
+  const isDayGroupedView = daySessions.length > 1 || Boolean(dateKeyParam);
+
   const appTargetSessions = React.useMemo(() => {
     if (!session?.id) return [];
+    if (isDayGroupedView) {
+      return daySessions;
+    }
     if (!applyAppToSameDate) return [session];
     const dayKey = getSessionDateKey(session.date);
     if (!dayKey) return [session];
     const matches = seasonSessions.filter((entry) => getSessionDateKey(entry.date) === dayKey);
     return matches.length > 0 ? matches : [session];
-  }, [applyAppToSameDate, getSessionDateKey, seasonSessions, session]);
+  }, [isDayGroupedView, daySessions, session, applyAppToSameDate, getSessionDateKey, seasonSessions]);
+
+  const daySlotLabels = React.useMemo(() => (
+    daySessions
+      .map((entry) => formatSlotLabel(slotById[entry.slot_id]))
+      .filter(Boolean)
+  ), [daySessions, slotById]);
 
   const offlineRankEntries = React.useMemo(() => (
     Object.entries(offlineRanks)
@@ -716,7 +752,14 @@ export default function TrainingSession() {
             <Calendar className="w-5 h-5 text-emerald-600" />
             {session.date ? format(new Date(session.date), 'MMM d') : 'Treening'}
           </h1>
-          <div className="text-sm text-slate-500">{formatSlotLabel(slot)}</div>
+          <div className="text-sm text-slate-500">
+            {isDayGroupedView ? daySlotLabels.join(' • ') : formatSlotLabel(slot)}
+          </div>
+          {isDayGroupedView && (
+            <div className="mt-1 text-xs font-semibold text-emerald-600">
+              Päevavaade: 1 PIN koondatult {daySessions.length} ajagrupile
+            </div>
+          )}
         </div>
 
         {canManageTraining && (
@@ -757,24 +800,52 @@ export default function TrainingSession() {
                   value={appName}
                   onChange={(event) => setAppName(event.target.value)}
                 />
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setApplyAppToSameDate((prev) => !prev)}
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                      applyAppToSameDate
-                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-200 bg-white text-slate-600'
-                    } dark:bg-black dark:border-white/10 dark:text-emerald-300`}
-                  >
-                    {applyAppToSameDate
-                      ? `Rakenda kõigile sama päeva trennidele (${appTargetSessions.length})`
-                      : 'Rakenda ainult sellele trennile'}
-                  </button>
-                  <div className="text-xs text-slate-500">
-                    Sisesta PIN 1x ja sama app-event lisatakse valitud päeva kõikidele gruppidele/aegadele.
+                {isDayGroupedView ? (
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
+                    <div className="text-xs font-semibold uppercase text-emerald-700 mb-2">Trenni grupid (sama päev)</div>
+                    <div className="overflow-hidden rounded-xl border border-emerald-100 bg-white">
+                      {daySessions.map((daySession, index) => {
+                        const slotLabel = formatSlotLabel(slotById[daySession.slot_id]);
+                        const appEventCount = seasonEvents.filter(
+                          (entry) => entry.session_id === daySession.id && entry.type === 'app'
+                        ).length;
+                        return (
+                          <div
+                            key={daySession.id}
+                            className={`grid grid-cols-[1fr_auto] items-center gap-2 px-3 py-2 text-xs ${
+                              index % 2 === 0 ? 'bg-white' : 'bg-emerald-50/40'
+                            }`}
+                          >
+                            <div className="font-semibold text-slate-700">{slotLabel}</div>
+                            <div className="text-slate-500">{appEventCount} eventi</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 text-[11px] text-emerald-700">
+                      Sisesta PIN üks kord ja event lisatakse automaatselt kõigile ülalolevatele gruppidele.
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setApplyAppToSameDate((prev) => !prev)}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                        applyAppToSameDate
+                          ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                          : 'border-slate-200 bg-white text-slate-600'
+                      } dark:bg-black dark:border-white/10 dark:text-emerald-300`}
+                    >
+                      {applyAppToSameDate
+                        ? `Rakenda kõigile sama päeva trennidele (${appTargetSessions.length})`
+                        : 'Rakenda ainult sellele trennile'}
+                    </button>
+                    <div className="text-xs text-slate-500">
+                      Sisesta PIN 1x ja sama app-event lisatakse valitud päeva kõikidele gruppidele/aegadele.
+                    </div>
+                  </div>
+                )}
                 <div className="rounded-2xl border border-white/70 bg-white/70 p-3 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
                   <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Trenni mängud</div>
                   {isLoadingGroupGames ? (

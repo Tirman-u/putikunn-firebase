@@ -28,7 +28,7 @@ const GlobalThemeToggle = () => {
   if (isHome && !homeMode) return null;
 
   return (
-    <div className="fixed top-6 right-6 z-50">
+    <div className="fixed bottom-14 right-4 z-50 sm:bottom-auto sm:top-6 sm:right-6">
       <ThemeToggle />
     </div>
   );

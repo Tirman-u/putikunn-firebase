@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { Trophy, Plus, Calendar, Clock3, ChevronRight } from 'lucide-react';
+import { Trophy, Plus, Calendar, Clock3, ChevronRight, Info } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -149,6 +149,104 @@ export default function TrainingLeague() {
             </div>
             <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-black dark:text-slate-300">
               {tr('Aktiivsed ajad', 'Active slots')}: {slots.length}
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-5 rounded-[28px] border border-white/80 bg-white/90 p-4 shadow-[0_18px_42px_rgba(15,23,42,0.07)] backdrop-blur-xl sm:mb-6 sm:p-5 dark:border-white/10 dark:bg-black">
+          <div className="flex items-center gap-2">
+            <Info className="h-4 w-4 text-emerald-600" />
+            <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {tr('Liiga reeglid', 'League rules')}
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-3 text-xs text-slate-600 sm:text-sm dark:text-slate-300">
+            <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-black">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {tr('App event (PIN)', 'App event (PIN)')}
+              </div>
+              <div className="mt-1">
+                {tr('Punktid = 1.0 + HC boonus.', 'Points = 1.0 + HC bonus.')}
+              </div>
+              <div className="mt-1">
+                {tr(
+                  'HC: kõrgem-parem mängul HC = skoor / hooaja parim; madalam-parem mängul HC = hooaja parim / skoor.',
+                  'HC: for higher-is-better games HC = score / season best; for lower-is-better games HC = season best / score.'
+                )}
+              </div>
+              <div className="mt-1">
+                {tr(
+                  'HC boonus = min(4.0, max(0, (HC - 0.8) * 10)), ümardus 0.1 peale.',
+                  'HC bonus = min(4.0, max(0, (HC - 0.8) * 10)), rounded to 0.1.'
+                )}
+              </div>
+              <div className="mt-1">
+                {tr(
+                  'Kui hooaja parim või skoor puudub (0), kasutatakse HC=1.0 (ehk 3.0p).',
+                  'If season best or score is missing (0), HC=1.0 is used (equals 3.0p).'
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-black">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {tr('Offline: Punktid', 'Offline: Points')}
+              </div>
+              <div className="mt-1">
+                {tr(
+                  'Sisestatud punktisumma läheb mängijale otse (lisa-bonust ei arvutata).',
+                  'Entered point value is applied directly to the player (no extra bonus).'
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-black">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {tr('Offline: Koht + HC', 'Offline: Rank + HC')}
+              </div>
+              <div className="mt-1">
+                {tr(
+                  'Osalejate arv = ainult need mängijad, kellele on koht sisestatud.',
+                  'Participants count = only players with an entered rank.'
+                )}
+              </div>
+              <div className="mt-1">
+                {tr(
+                  'Top cut = lagi(osalejad × cut% / 100). Top cut sisse jäänud saavad lisaboonust.',
+                  'Top cut = ceil(participants × cut% / 100). Players inside top cut get bonus.'
+                )}
+              </div>
+              <div className="mt-1">
+                {tr(
+                  'Punktid = 1.0 + boonus; boonus = (top cut - koht + 1) × boonus-samm.',
+                  'Points = 1.0 + bonus; bonus = (top cut - rank + 1) × bonus step.'
+                )}
+              </div>
+              <div className="mt-1">
+                {tr(
+                  'Vaikimisi: cut 70% ja boonus-samm +0.3, kuid mõlemad on sisestusel muudetavad.',
+                  'Defaults: cut 70% and bonus step +0.3, but both are configurable at entry time.'
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-black">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {tr('Arvestus hooajas', 'Season accounting')}
+              </div>
+              <div className="mt-1">
+                {tr(
+                  'Iga salvestatud tulemus lisab mängijale +1 osaluse ning punktid lähevad nii kogusummasse kui ajagrupi summasse.',
+                  'Each saved result adds +1 attendance and updates both total points and slot points.'
+                )}
+              </div>
+              <div className="mt-1">
+                {tr(
+                  'Kui event kustutatakse, lahutatakse samad punktid ja osalus tagasi.',
+                  'If an event is deleted, the same points and attendance are subtracted back.'
+                )}
+              </div>
             </div>
           </div>
         </div>

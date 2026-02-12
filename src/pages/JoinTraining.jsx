@@ -9,7 +9,7 @@ import { createPageUrl } from '@/utils';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
-import { getDayFullLabel, getSlotAvailability, getWeekKey } from '@/lib/training-utils';
+import { getDayFullLabel, getEffectiveSlotAttendance, getSlotAvailability, getWeekKey } from '@/lib/training-utils';
 import { cn } from '@/lib/utils';
 import {
   collection,
@@ -20,8 +20,6 @@ import {
   getDoc,
   updateDoc,
   doc,
-  serverTimestamp,
-  arrayUnion,
   deleteField,
   arrayRemove,
   runTransaction
@@ -143,11 +141,11 @@ export default function JoinTraining() {
         return;
       }
       const slots = Array.isArray(detail.slots) ? detail.slots : [];
-      const weekData = detail.attendance?.[weekKey] || {};
       map[groupId] = slots.some((slot) => {
         const roster = Array.isArray(slot?.roster_uids) ? slot.roster_uids : [];
         if (roster.includes(user.id)) return true;
-        const claimed = Array.isArray(weekData?.[slot.id]?.claimed_uids) ? weekData[slot.id].claimed_uids : [];
+        const attendance = getEffectiveSlotAttendance(detail, weekKey, slot);
+        const claimed = Array.isArray(attendance?.claimed_uids) ? attendance.claimed_uids : [];
         return claimed.includes(user.id);
       });
     });
@@ -160,40 +158,60 @@ export default function JoinTraining() {
     setSelectedSlotId('');
   };
 
-  const finalizeJoin = async (group, slotId) => {
-    if (!group?.id || !user?.id) return;
-    const displayName = user?.display_name || user?.full_name || user?.email || 'Mängija';
-    const updates = {
-      member_uids: arrayUnion(user.id),
-      [`members.${user.id}`]: {
-        name: displayName,
-        email: user?.email || '',
-        joined_at: serverTimestamp()
-      }
-    };
-
-    if (slotId) {
-      const groupSlots = Array.isArray(group.slots) ? group.slots : [];
-      const targetSlot = groupSlots.find((slot) => slot.id === slotId);
-      if (targetSlot) {
-        const roster = Array.isArray(targetSlot.roster_uids) ? targetSlot.roster_uids : [];
-        const maxSpots = Number(targetSlot.max_spots || 0);
-        if (maxSpots > 0 && roster.length >= maxSpots) {
-          throw new Error('Valitud trenn on täis');
-        }
-        const nextSlots = groupSlots.map((slot) => {
-          if (slot.id !== slotId) return slot;
-          if (roster.includes(user.id)) return slot;
-          return { ...slot, roster_uids: [...roster, user.id] };
-        });
-        updates.slots = nextSlots;
-        updates.has_public_slots = nextSlots.some((slot) => slot.is_public);
-      }
+  const submitJoinRequest = async (group, slotId, source = 'pin') => {
+    if (!group?.id || !user?.id || !slotId) {
+      throw new Error('Vali trenn');
     }
 
-    await updateDoc(doc(db, 'training_groups', group.id), updates);
-    await updateDoc(doc(db, 'users', user.id), {
-      [`training_groups.${group.id}`]: group?.name || 'Treening'
+    const displayName = user?.display_name || user?.full_name || user?.email || 'Trenniline';
+    const userEmail = user?.email || '';
+
+    await runTransaction(db, async (transaction) => {
+      const groupRef = doc(db, 'training_groups', group.id);
+      const snap = await transaction.get(groupRef);
+      if (!snap.exists()) throw new Error('Gruppi ei leitud');
+      const groupData = snap.data();
+      const currentWeek = getWeekKey();
+      const slots = Array.isArray(groupData.slots) ? groupData.slots : [];
+      const targetSlot = slots.find((slot) => slot.id === slotId);
+      if (!targetSlot) throw new Error('Valitud trenni ei leitud');
+
+      const weekData = { ...(groupData.attendance?.[currentWeek] || {}) };
+      const slotData = weekData[slotId] || {
+        released_uids: [],
+        claimed_uids: [],
+        waitlist_uids: [],
+        waitlist_meta: {},
+        request_uids: [],
+        request_meta: {}
+      };
+
+      const requests = new Set(slotData.request_uids || []);
+      requests.add(user.id);
+      const waitlist = (slotData.waitlist_uids || []).filter((uid) => uid !== user.id);
+      const waitlistMeta = { ...(slotData.waitlist_meta || {}) };
+      delete waitlistMeta[user.id];
+
+      weekData[slotId] = {
+        ...slotData,
+        request_uids: Array.from(requests),
+        request_meta: {
+          ...(slotData.request_meta || {}),
+          [user.id]: {
+            name: displayName,
+            email: userEmail,
+            type: 'roster',
+            source,
+            requested_at: new Date().toISOString()
+          }
+        },
+        waitlist_uids: waitlist,
+        waitlist_meta: waitlistMeta
+      };
+
+      transaction.update(groupRef, {
+        [`attendance.${currentWeek}`]: weekData
+      });
     });
   };
 
@@ -210,7 +228,6 @@ export default function JoinTraining() {
 
     setIsJoining(true);
     try {
-      const hadGroups = groupIds.length > 0;
       const q = query(collection(db, 'training_groups'), where('pin', '==', cleanedPin), limit(1));
       const snap = await getDocs(q);
       if (snap.empty) {
@@ -221,6 +238,14 @@ export default function JoinTraining() {
       const docSnap = snap.docs[0];
       const group = { id: docSnap.id, ...docSnap.data() };
       const slots = Array.isArray(group.slots) ? group.slots : [];
+      const hasExistingGroups = groupIds.length > 0;
+      const joiningNewGroup = !groupIds.includes(group.id);
+      if (hasExistingGroups && joiningNewGroup) {
+        const wantsExtra = window.confirm('Sul on juba aktiivne grupp olemas. Kas soovid teist püsiaega juurde?');
+        if (!wantsExtra) {
+          return;
+        }
+      }
       if (slots.length > 0) {
         setPendingGroup(group);
         setPendingSlots(slots);
@@ -228,14 +253,12 @@ export default function JoinTraining() {
         return;
       }
 
-      await finalizeJoin(group, null);
-      toast.success(`Liitusid trenniga "${group?.name || 'Treening'}"`);
-      queryClient.invalidateQueries({ queryKey: ['user'] });
+      toast.error('Selles grupis pole ühtegi trenniaega. Palu treenerilt kinnitust käsitsi.');
       queryClient.invalidateQueries({ queryKey: ['training-group-details'] });
       queryClient.invalidateQueries({ queryKey: ['training-games'] });
       resetPendingJoin();
       setPin('');
-      if (hadGroups) {
+      if (hasExistingGroups) {
         setShowJoinForm(false);
       } else {
         navigate(-1);
@@ -249,17 +272,19 @@ export default function JoinTraining() {
 
   const handleConfirmJoin = async (skipSlot = false) => {
     if (!pendingGroup) return;
-    if (!skipSlot && !selectedSlotId) {
+    const fallbackSlotId = pendingSlots[0]?.id || '';
+    const targetSlotId = skipSlot ? fallbackSlotId : selectedSlotId;
+    if (!targetSlotId) {
       toast.error('Vali trenn');
       return;
     }
     setIsJoining(true);
     try {
       const hadGroups = groupIds.length > 0;
-      await finalizeJoin(pendingGroup, skipSlot ? null : selectedSlotId);
-      toast.success(`Liitusid trenniga "${pendingGroup?.name || 'Treening'}"`);
-      queryClient.invalidateQueries({ queryKey: ['user'] });
+      await submitJoinRequest(pendingGroup, targetSlotId, 'pin');
+      toast.success(`Taotlus saadetud treenerile: "${pendingGroup?.name || 'Treening'}"`);
       queryClient.invalidateQueries({ queryKey: ['training-group-details'] });
+      queryClient.invalidateQueries({ queryKey: ['training-public-groups'] });
       queryClient.invalidateQueries({ queryKey: ['training-games'] });
       resetPendingJoin();
       setPin('');
@@ -378,25 +403,6 @@ export default function JoinTraining() {
     }
   };
 
-  const ensureGroupMember = async (group) => {
-    if (!user?.id || !group?.id) return;
-    const isMember = group?.member_uids?.includes(user.id) || group?.members?.[user.id];
-    if (isMember) return;
-    const displayName = user?.display_name || user?.full_name || user?.email || 'Trenniline';
-    await updateDoc(doc(db, 'training_groups', group.id), {
-      member_uids: arrayUnion(user.id),
-      [`members.${user.id}`]: {
-        name: displayName,
-        email: user?.email || '',
-        joined_at: serverTimestamp()
-      }
-    });
-    await updateDoc(doc(db, 'users', user.id), {
-      [`training_groups.${group.id}`]: group?.name || 'Treening'
-    });
-    queryClient.invalidateQueries({ queryKey: ['user'] });
-  };
-
   const updatePublicAttendance = async (groupId, slotId, updater) => {
     setPublicAction((prev) => ({ ...prev, [`${groupId}-${slotId}`]: true }));
     try {
@@ -431,7 +437,6 @@ export default function JoinTraining() {
 
   const handlePublicClaim = async (group, slot) => {
     if (!user?.id) return;
-    await ensureGroupMember(group);
     const displayName = user?.display_name || user?.full_name || user?.email || 'Trenniline';
     const userEmail = user?.email || '';
     await updatePublicAttendance(group.id, slot.id, (slotData, groupData, currentWeek) => {
@@ -464,7 +469,6 @@ export default function JoinTraining() {
 
   const handlePublicWaitlist = async (group, slot) => {
     if (!user?.id) return;
-    await ensureGroupMember(group);
     const displayName = user?.display_name || user?.full_name || user?.email || 'Trenniline';
     const userEmail = user?.email || '';
     await updatePublicAttendance(group.id, slot.id, (slotData) => {
@@ -628,7 +632,7 @@ export default function JoinTraining() {
                     disabled={isJoining || !selectedSlotId}
                     className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
                   >
-                    {isJoining ? 'Liitun...' : 'Liitu valitud trenniga'}
+                    {isJoining ? 'Saadan...' : 'Saada taotlus treenerile'}
                   </button>
                   {pendingSlots.every((slot) => {
                     const maxSpots = Number(slot?.max_spots || 0);
@@ -641,7 +645,7 @@ export default function JoinTraining() {
                       disabled={isJoining}
                       className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
                     >
-                      Liitu ilma kohata
+                      Saada taotlus (ilma kohata)
                     </button>
                   )}
                   <button

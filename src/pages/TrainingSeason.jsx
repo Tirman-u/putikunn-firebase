@@ -2,7 +2,6 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  addDoc,
   collection,
   doc,
   deleteDoc,
@@ -35,6 +34,7 @@ export default function TrainingSeason() {
   const [selectedTab, setSelectedTab] = React.useState('overall');
   const [newSessionDate, setNewSessionDate] = React.useState('');
   const [newSessionSlotId, setNewSessionSlotId] = React.useState('');
+  const [addSessionToAllSlots, setAddSessionToAllSlots] = React.useState(true);
   const [isCreatingSession, setIsCreatingSession] = React.useState(false);
   const [isDeletingSeason, setIsDeletingSeason] = React.useState(false);
 
@@ -121,23 +121,80 @@ export default function TrainingSeason() {
   }, [stats, selectedTab]);
 
   const handleCreateSession = async () => {
-    if (!seasonId || !season?.group_id || !newSessionDate || !newSessionSlotId) {
+    if (!seasonId || !season?.group_id || !newSessionDate) {
       toast.error(tr('Vali kuupäev ja trenniaeg', 'Select date and training time'));
       return;
     }
+    if (!addSessionToAllSlots && !newSessionSlotId) {
+      toast.error(tr('Vali trenniaeg', 'Select training time'));
+      return;
+    }
+    const targetSessions = addSessionToAllSlots
+      ? seasonSlots.map((slotItem) => ({ slot_id: slotItem.id }))
+      : [{ slot_id: newSessionSlotId }];
+    if (targetSessions.length === 0) {
+      toast.error(tr('Aktiivseid trenniaegu pole', 'No active training times'));
+      return;
+    }
+
     setIsCreatingSession(true);
     try {
-      await addDoc(collection(db, 'training_sessions'), {
-        season_id: seasonId,
-        group_id: season.group_id,
-        slot_id: newSessionSlotId,
-        date: new Date(newSessionDate).toISOString(),
-        created_by_uid: user?.id || null,
-        created_at: serverTimestamp()
+      const dateIso = new Date(newSessionDate).toISOString();
+      const sessionDate = new Date(dateIso);
+      const sessionDateKey = `${sessionDate.getFullYear()}-${String(sessionDate.getMonth() + 1).padStart(2, '0')}-${String(sessionDate.getDate()).padStart(2, '0')}`;
+      const existingKeys = new Set(
+        sessions.map((entry) => {
+          const entryDate = new Date(entry.date || 0);
+          const entryDateKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-${String(entryDate.getDate()).padStart(2, '0')}`;
+          return `${entryDateKey}:${entry.slot_id}`;
+        })
+      );
+
+      const batch = writeBatch(db);
+      let createdCount = 0;
+      let skippedCount = 0;
+
+      targetSessions.forEach((target) => {
+        const key = `${sessionDateKey}:${target.slot_id}`;
+        if (existingKeys.has(key)) {
+          skippedCount += 1;
+          return;
+        }
+        const sessionRef = doc(collection(db, 'training_sessions'));
+        batch.set(sessionRef, {
+          season_id: seasonId,
+          group_id: season.group_id,
+          slot_id: target.slot_id,
+          date: dateIso,
+          created_by_uid: user?.id || null,
+          created_at: serverTimestamp()
+        });
+        createdCount += 1;
       });
+
+      if (createdCount === 0) {
+        toast.error(tr('Selle kuupäeva treeningud on juba lisatud', 'Trainings for this date already exist'));
+        return;
+      }
+
+      await batch.commit();
       setNewSessionDate('');
       queryClient.invalidateQueries({ queryKey: ['training-sessions', seasonId] });
-      toast.success(tr('Treening lisatud', 'Training added'));
+      if (skippedCount > 0) {
+        toast.success(
+          tr(
+            `Treening lisatud (${createdCount}), vahele jäetud (${skippedCount})`,
+            `Trainings added (${createdCount}), skipped (${skippedCount})`
+          )
+        );
+      } else {
+        toast.success(
+          tr(
+            createdCount > 1 ? `Treeningud lisatud (${createdCount})` : 'Treening lisatud',
+            createdCount > 1 ? `Trainings added (${createdCount})` : 'Training added'
+          )
+        );
+      }
     } catch (error) {
       toast.error(error?.message || tr('Treeningu lisamine ebaõnnestus', 'Failed to add training'));
     } finally {
@@ -304,6 +361,24 @@ export default function TrainingSeason() {
               </div>
               <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{tr('Lisa treening', 'Add training')}</div>
             </div>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setAddSessionToAllSlots((prev) => !prev)}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                  addSessionToAllSlots
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-200 bg-white text-slate-600'
+                } dark:border-white/10 dark:bg-black dark:text-emerald-300`}
+              >
+                {addSessionToAllSlots
+                  ? tr(`Kõigile aegadele (${seasonSlots.length})`, `All slots (${seasonSlots.length})`)
+                  : tr('Ühele ajale', 'Single slot')}
+              </button>
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                {tr('Lisa sama kuupäev korraga kõigile aktiivsetele aegadele.', 'Add this date to all active slots at once.')}
+              </div>
+            </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <input
                 type="date"
@@ -314,6 +389,7 @@ export default function TrainingSeason() {
               <select
                 value={newSessionSlotId}
                 onChange={(event) => setNewSessionSlotId(event.target.value)}
+                disabled={addSessionToAllSlots}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 dark:border-white/10 dark:bg-black dark:text-slate-100"
               >
                 {seasonSlots.map((slot) => (

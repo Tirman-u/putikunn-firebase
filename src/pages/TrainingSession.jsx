@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   collection,
@@ -43,7 +43,6 @@ const getGamePlayers = (game) => {
 };
 
 export default function TrainingSession() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('sessionId');
   const queryClient = useQueryClient();
@@ -61,6 +60,7 @@ export default function TrainingSession() {
   const [isSavingOffline, setIsSavingOffline] = React.useState(false);
   const [isDeletingEvent, setIsDeletingEvent] = React.useState({});
   const [mode, setMode] = React.useState('app');
+  const [applyAppToSameDate, setApplyAppToSameDate] = React.useState(true);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -114,6 +114,20 @@ export default function TrainingSession() {
     staleTime: 5000
   });
 
+  const { data: seasonEvents = [] } = useQuery({
+    queryKey: ['training-events-season', season?.id],
+    enabled: !!season?.id,
+    queryFn: async () => {
+      const q = query(
+        collection(db, 'training_events'),
+        where('season_id', '==', season.id)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+    },
+    staleTime: 5000
+  });
+
   const { data: results = [] } = useQuery({
     queryKey: ['training-event-results', sessionId],
     enabled: !!sessionId,
@@ -140,6 +154,17 @@ export default function TrainingSession() {
       return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
     },
     staleTime: 5000
+  });
+
+  const { data: seasonSessions = [] } = useQuery({
+    queryKey: ['training-sessions-all', season?.id],
+    enabled: !!season?.id,
+    queryFn: async () => {
+      const q = query(collection(db, 'training_sessions'), where('season_id', '==', season.id));
+      const snap = await getDocs(q);
+      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+    },
+    staleTime: 10000
   });
 
   const statsByParticipant = React.useMemo(() => {
@@ -222,6 +247,22 @@ export default function TrainingSession() {
     return map;
   }, [results]);
 
+  const getSessionDateKey = React.useCallback((value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  const appTargetSessions = React.useMemo(() => {
+    if (!session?.id) return [];
+    if (!applyAppToSameDate) return [session];
+    const dayKey = getSessionDateKey(session.date);
+    if (!dayKey) return [session];
+    const matches = seasonSessions.filter((entry) => getSessionDateKey(entry.date) === dayKey);
+    return matches.length > 0 ? matches : [session];
+  }, [applyAppToSameDate, getSessionDateKey, seasonSessions, session]);
+
   const offlineRankEntries = React.useMemo(() => (
     Object.entries(offlineRanks)
       .map(([uid, value]) => ({ uid, rank: Number(value) }))
@@ -236,14 +277,16 @@ export default function TrainingSession() {
     cutPercent: offlineCutPercentValue
   });
 
-  const createAppEventFromGame = async (game) => {
-    if (!session || !season || !group) {
+  const createAppEventFromGame = async (game, options = {}) => {
+    const targetSession = options.session || session;
+    const existingEvents = Array.isArray(options.existingEvents) ? options.existingEvents : events;
+    if (!targetSession || !season || !group) {
       return { ok: false, message: 'Treeningu andmed puuduvad' };
     }
     if (!game?.id) {
       return { ok: false, message: 'Mäng puudub' };
     }
-    const existingEvent = events.find((entry) => entry?.source_game_id === game.id);
+    const existingEvent = existingEvents.find((entry) => entry?.source_game_id === game.id);
     if (existingEvent) {
       return { ok: false, message: 'See mäng on juba lisatud' };
     }
@@ -259,10 +302,10 @@ export default function TrainingSession() {
     const batch = writeBatch(db);
     const eventRef = doc(collection(db, 'training_events'));
     batch.set(eventRef, {
-      session_id: session.id,
+      session_id: targetSession.id,
       season_id: season.id,
       group_id: season.group_id,
-      slot_id: session.slot_id,
+      slot_id: targetSession.slot_id,
       type: 'app',
       name: eventName,
       metric_key: metricKey,
@@ -301,7 +344,7 @@ export default function TrainingSession() {
 
       const nextPointsBySlot = {
         ...(existing?.points_by_slot || {}),
-        [session.slot_id]: round1((existing?.points_by_slot?.[session.slot_id] || 0) + points)
+        [targetSession.slot_id]: round1((existing?.points_by_slot?.[targetSession.slot_id] || 0) + points)
       };
 
       const nextStats = {
@@ -319,10 +362,10 @@ export default function TrainingSession() {
       const resultRef = doc(collection(db, 'training_event_results'));
       batch.set(resultRef, {
         event_id: eventRef.id,
-        session_id: session.id,
+        session_id: targetSession.id,
         season_id: season.id,
         group_id: season.group_id,
-        slot_id: session.slot_id,
+        slot_id: targetSession.slot_id,
         participant_id: participantId,
         user_id: uid || memberByEmail?.uid || null,
         player_name: displayName,
@@ -338,7 +381,31 @@ export default function TrainingSession() {
     });
 
     await batch.commit();
-    return { ok: true };
+    return { ok: true, sessionId: targetSession.id };
+  };
+
+  const applyAppGameToTargetSessions = async (game) => {
+    const targets = appTargetSessions.length > 0 ? appTargetSessions : [session];
+    const outcomes = [];
+
+    for (const targetSession of targets) {
+      const existingForSession = seasonEvents.filter((entry) => entry.session_id === targetSession.id);
+      // Write each session separately so partial success still works if one target fails.
+      // This keeps coach workflow resilient for bulk add.
+      const result = await createAppEventFromGame(game, {
+        session: targetSession,
+        existingEvents: existingForSession
+      });
+      outcomes.push({
+        sessionId: targetSession.id,
+        slotId: targetSession.slot_id,
+        ...result
+      });
+    }
+
+    const added = outcomes.filter((item) => item.ok).length;
+    const skipped = outcomes.filter((item) => !item.ok).length;
+    return { added, skipped, outcomes };
   };
 
   const handleCreateAppEvent = async () => {
@@ -355,18 +422,24 @@ export default function TrainingSession() {
         toast.error('Mängu ei leitud');
         return;
       }
-      const result = await createAppEventFromGame(games[0]);
-      if (!result?.ok) {
-        toast.error(result?.message || 'Eventi lisamine ebaõnnestus');
+      const summary = await applyAppGameToTargetSessions(games[0]);
+      if (summary.added === 0) {
+        const firstError = summary.outcomes.find((entry) => !entry.ok)?.message;
+        toast.error(firstError || 'Eventi lisamine ebaõnnestus');
         return;
       }
       setAppPin('');
       setAppName('');
       setAppLowerIsBetter(false);
-      queryClient.invalidateQueries({ queryKey: ['training-events', sessionId] });
-      queryClient.invalidateQueries({ queryKey: ['training-event-results', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-events'] });
+      queryClient.invalidateQueries({ queryKey: ['training-events-season', season?.id] });
+      queryClient.invalidateQueries({ queryKey: ['training-event-results'] });
       queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
-      toast.success('Event lisatud');
+      if (summary.skipped > 0) {
+        toast.success(`Event lisatud ${summary.added} trenni, vahele jäetud ${summary.skipped}`);
+      } else {
+        toast.success(summary.added > 1 ? `Event lisatud ${summary.added} trenni` : 'Event lisatud');
+      }
     } catch (error) {
       toast.error(error?.message || 'Eventi lisamine ebaõnnestus');
     } finally {
@@ -378,16 +451,22 @@ export default function TrainingSession() {
     if (!session || !season || !group) return;
     setIsSavingApp(true);
     try {
-      const result = await createAppEventFromGame(game);
-      if (!result?.ok) {
-        toast.error(result?.message || 'Eventi lisamine ebaõnnestus');
+      const summary = await applyAppGameToTargetSessions(game);
+      if (summary.added === 0) {
+        const firstError = summary.outcomes.find((entry) => !entry.ok)?.message;
+        toast.error(firstError || 'Eventi lisamine ebaõnnestus');
         return;
       }
       setAppName('');
-      queryClient.invalidateQueries({ queryKey: ['training-events', sessionId] });
-      queryClient.invalidateQueries({ queryKey: ['training-event-results', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-events'] });
+      queryClient.invalidateQueries({ queryKey: ['training-events-season', season?.id] });
+      queryClient.invalidateQueries({ queryKey: ['training-event-results'] });
       queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
-      toast.success('Event lisatud');
+      if (summary.skipped > 0) {
+        toast.success(`Event lisatud ${summary.added} trenni, vahele jäetud ${summary.skipped}`);
+      } else {
+        toast.success(summary.added > 1 ? `Event lisatud ${summary.added} trenni` : 'Event lisatud');
+      }
     } catch (error) {
       toast.error(error?.message || 'Eventi lisamine ebaõnnestus');
     } finally {
@@ -678,6 +757,24 @@ export default function TrainingSession() {
                   value={appName}
                   onChange={(event) => setAppName(event.target.value)}
                 />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setApplyAppToSameDate((prev) => !prev)}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                      applyAppToSameDate
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-200 bg-white text-slate-600'
+                    } dark:bg-black dark:border-white/10 dark:text-emerald-300`}
+                  >
+                    {applyAppToSameDate
+                      ? `Rakenda kõigile sama päeva trennidele (${appTargetSessions.length})`
+                      : 'Rakenda ainult sellele trennile'}
+                  </button>
+                  <div className="text-xs text-slate-500">
+                    Sisesta PIN 1x ja sama app-event lisatakse valitud päeva kõikidele gruppidele/aegadele.
+                  </div>
+                </div>
                 <div className="rounded-2xl border border-white/70 bg-white/70 p-3 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
                   <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Trenni mängud</div>
                   {isLoadingGroupGames ? (

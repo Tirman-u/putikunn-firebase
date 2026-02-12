@@ -1,9 +1,20 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  deleteField,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where
+} from 'firebase/firestore';
 import { format } from 'date-fns';
-import { Trophy, Plus, Calendar, Clock3, ChevronRight, Info } from 'lucide-react';
+import { Trophy, Plus, Calendar, Clock3, ChevronRight, Info, ChevronDown, ChevronUp, Pencil, Save } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -11,6 +22,7 @@ import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { countRemainingBySlot, formatSlotLabel } from '@/lib/training-league';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/i18n';
@@ -28,6 +40,10 @@ export default function TrainingLeague() {
   const [selectedSlots, setSelectedSlots] = React.useState([]);
   const [isCreating, setIsCreating] = React.useState(false);
   const [showSeasonCreator, setShowSeasonCreator] = React.useState(false);
+  const [isRulesOpen, setIsRulesOpen] = React.useState(false);
+  const [isEditingRules, setIsEditingRules] = React.useState(false);
+  const [rulesDraft, setRulesDraft] = React.useState('');
+  const [isSavingRules, setIsSavingRules] = React.useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -81,6 +97,48 @@ export default function TrainingLeague() {
     return Math.max(0, ...Object.values(remaining?.bySlot || {}));
   }, []);
 
+  const defaultRulesText = React.useMemo(() => tr(
+    [
+      'App event (PIN): iga osaleja saab vähemalt 1 punkti.',
+      'Kui tulemus on sinu varasemast parem, lisandub HC boonus.',
+      'Offline “Punktid”: sisestad punktid ise ja need lähevad otse tabelisse.',
+      'Offline “Koht + HC”: top protsent saab lisapunkte (vaikimisi top 70%).',
+      'Iga salvestus lisab osaluse ja punktid hooaja arvestusse.',
+      'Kui event kustutatakse, võetakse selle eventi punktid ja osalus tagasi.'
+    ].join('\n'),
+    [
+      'App event (PIN): every participant gets at least 1 point.',
+      'If result is better than your previous level, HC bonus is added.',
+      'Offline "Points": you enter points manually and they go directly to standings.',
+      'Offline "Rank + HC": top percent gets bonus points (default top 70%).',
+      'Every saved event adds attendance and points to season standings.',
+      'If an event is deleted, its points and attendance are reverted.'
+    ].join('\n')
+  ), [tr]);
+
+  const normalizedUserEmail = (user?.email || '').trim().toLowerCase();
+  const normalizedGroupOwnerEmail = (group?.created_by || '').trim().toLowerCase();
+  const isGroupOwner = Boolean(
+    (group?.created_by_uid && user?.id && group.created_by_uid === user.id) ||
+    (normalizedUserEmail && normalizedGroupOwnerEmail && normalizedUserEmail === normalizedGroupOwnerEmail)
+  );
+  const canEditLeagueRules = canManageTraining || isGroupOwner;
+  const hasCustomRules = typeof group?.league_rules_text === 'string' && group.league_rules_text.trim().length > 0;
+  const effectiveRulesText = hasCustomRules ? group.league_rules_text.trim() : defaultRulesText;
+  const effectiveRuleLines = React.useMemo(
+    () =>
+      effectiveRulesText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
+    [effectiveRulesText]
+  );
+
+  React.useEffect(() => {
+    if (isEditingRules) return;
+    setRulesDraft(effectiveRulesText);
+  }, [effectiveRulesText, isEditingRules]);
+
   const handleCreateSeason = async () => {
     if (!groupId) {
       toast.error(tr('Grupi ID puudub', 'Group ID is missing'));
@@ -128,6 +186,53 @@ export default function TrainingLeague() {
     }
   };
 
+  const handleSaveRules = async () => {
+    if (!groupId || !canEditLeagueRules) return;
+    const cleaned = rulesDraft
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join('\n');
+    if (!cleaned) {
+      toast.error(tr('Sisesta vähemalt 1 reegli rida', 'Enter at least one rule line'));
+      return;
+    }
+    setIsSavingRules(true);
+    try {
+      await updateDoc(doc(db, 'training_groups', groupId), {
+        league_rules_text: cleaned,
+        league_rules_updated_at: serverTimestamp(),
+        league_rules_updated_by_uid: user?.id || null
+      });
+      queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
+      toast.success(tr('Reeglid salvestatud', 'Rules saved'));
+      setIsEditingRules(false);
+    } catch (error) {
+      toast.error(error?.message || tr('Reeglite salvestamine ebaõnnestus', 'Failed to save rules'));
+    } finally {
+      setIsSavingRules(false);
+    }
+  };
+
+  const handleResetRules = async () => {
+    if (!groupId || !canEditLeagueRules) return;
+    setIsSavingRules(true);
+    try {
+      await updateDoc(doc(db, 'training_groups', groupId), {
+        league_rules_text: deleteField(),
+        league_rules_updated_at: serverTimestamp(),
+        league_rules_updated_by_uid: user?.id || null
+      });
+      queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
+      toast.success(tr('Taastatud vaikimisi reeglid', 'Default rules restored'));
+      setIsEditingRules(false);
+    } catch (error) {
+      toast.error(error?.message || tr('Vaikimisi taastamine ebaõnnestus', 'Failed to restore defaults'));
+    } finally {
+      setIsSavingRules(false);
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.16),_rgba(255,255,255,1)_58%)] px-3 pb-10 pt-4 sm:px-4 sm:pb-12 sm:pt-6 dark:bg-black dark:text-slate-100">
@@ -154,101 +259,110 @@ export default function TrainingLeague() {
         </div>
 
         <div className="mb-5 rounded-[28px] border border-white/80 bg-white/90 p-4 shadow-[0_18px_42px_rgba(15,23,42,0.07)] backdrop-blur-xl sm:mb-6 sm:p-5 dark:border-white/10 dark:bg-black">
-          <div className="flex items-center gap-2">
-            <Info className="h-4 w-4 text-emerald-600" />
-            <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-              {tr('Liiga reeglid', 'League rules')}
+          <button
+            type="button"
+            onClick={() => setIsRulesOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between gap-3 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-emerald-600" />
+              <div>
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  {tr('Liiga reeglid', 'League rules')}
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {tr('Lühike ja lihtne punktiarvestuse ülevaade', 'Short and simple points overview')}
+                </div>
+              </div>
             </div>
-          </div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              {isRulesOpen ? tr('Peida', 'Hide') : tr('Ava', 'Open')}
+              {isRulesOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </div>
+          </button>
 
-          <div className="mt-3 space-y-3 text-xs text-slate-600 sm:text-sm dark:text-slate-300">
-            <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-black">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {tr('App event (PIN)', 'App event (PIN)')}
-              </div>
-              <div className="mt-1">
-                {tr('Punktid = 1.0 + HC boonus.', 'Points = 1.0 + HC bonus.')}
-              </div>
-              <div className="mt-1">
-                {tr(
-                  'HC: kõrgem-parem mängul HC = skoor / hooaja parim; madalam-parem mängul HC = hooaja parim / skoor.',
-                  'HC: for higher-is-better games HC = score / season best; for lower-is-better games HC = season best / score.'
-                )}
-              </div>
-              <div className="mt-1">
-                {tr(
-                  'HC boonus = min(4.0, max(0, (HC - 0.8) * 10)), ümardus 0.1 peale.',
-                  'HC bonus = min(4.0, max(0, (HC - 0.8) * 10)), rounded to 0.1.'
-                )}
-              </div>
-              <div className="mt-1">
-                {tr(
-                  'Kui hooaja parim või skoor puudub (0), kasutatakse HC=1.0 (ehk 3.0p).',
-                  'If season best or score is missing (0), HC=1.0 is used (equals 3.0p).'
-                )}
-              </div>
+          {isRulesOpen && (
+            <div className="mt-3 space-y-3 text-xs text-slate-600 sm:text-sm dark:text-slate-300">
+              {!isEditingRules ? (
+                <>
+                  <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-black">
+                    <ul className="space-y-1.5">
+                      {effectiveRuleLines.map((line, idx) => (
+                        <li key={`${line}-${idx}`} className="flex items-start gap-2">
+                          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          <span>{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {canEditLeagueRules && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRulesDraft(effectiveRulesText);
+                          setIsEditingRules(true);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-black dark:text-slate-200"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        {tr('Muuda teksti', 'Edit text')}
+                      </button>
+                      {hasCustomRules && (
+                        <button
+                          type="button"
+                          onClick={handleResetRules}
+                          disabled={isSavingRules}
+                          className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 disabled:opacity-60 dark:border-white/10 dark:bg-black dark:text-amber-300"
+                        >
+                          {isSavingRules ? tr('Taastan...', 'Restoring...') : tr('Taasta vaikimisi', 'Restore default')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3 rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-black">
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {tr('Iga rida kuvatakse eraldi punktina.', 'Each line is shown as a separate bullet.')}
+                  </div>
+                  <Textarea
+                    value={rulesDraft}
+                    onChange={(event) => setRulesDraft(event.target.value)}
+                    rows={8}
+                    className="text-sm dark:bg-black dark:text-slate-100"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={handleSaveRules} disabled={isSavingRules} className="h-9 rounded-2xl bg-emerald-600 px-4 text-xs font-semibold hover:bg-emerald-700">
+                      <Save className="mr-1 h-3.5 w-3.5" />
+                      {isSavingRules ? tr('Salvestan...', 'Saving...') : tr('Salvesta', 'Save')}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRulesDraft(effectiveRulesText);
+                        setIsEditingRules(false);
+                      }}
+                      disabled={isSavingRules}
+                      className="rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 disabled:opacity-60 dark:border-white/10 dark:bg-black dark:text-slate-200"
+                    >
+                      {tr('Loobu', 'Cancel')}
+                    </button>
+                    {hasCustomRules && (
+                      <button
+                        type="button"
+                        onClick={handleResetRules}
+                        disabled={isSavingRules}
+                        className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 disabled:opacity-60 dark:border-white/10 dark:bg-black dark:text-amber-300"
+                      >
+                        {tr('Taasta vaikimisi', 'Restore default')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-black">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {tr('Offline: Punktid', 'Offline: Points')}
-              </div>
-              <div className="mt-1">
-                {tr(
-                  'Sisestatud punktisumma läheb mängijale otse (lisa-bonust ei arvutata).',
-                  'Entered point value is applied directly to the player (no extra bonus).'
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-black">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {tr('Offline: Koht + HC', 'Offline: Rank + HC')}
-              </div>
-              <div className="mt-1">
-                {tr(
-                  'Osalejate arv = ainult need mängijad, kellele on koht sisestatud.',
-                  'Participants count = only players with an entered rank.'
-                )}
-              </div>
-              <div className="mt-1">
-                {tr(
-                  'Top cut = lagi(osalejad × cut% / 100). Top cut sisse jäänud saavad lisaboonust.',
-                  'Top cut = ceil(participants × cut% / 100). Players inside top cut get bonus.'
-                )}
-              </div>
-              <div className="mt-1">
-                {tr(
-                  'Punktid = 1.0 + boonus; boonus = (top cut - koht + 1) × boonus-samm.',
-                  'Points = 1.0 + bonus; bonus = (top cut - rank + 1) × bonus step.'
-                )}
-              </div>
-              <div className="mt-1">
-                {tr(
-                  'Vaikimisi: cut 70% ja boonus-samm +0.3, kuid mõlemad on sisestusel muudetavad.',
-                  'Defaults: cut 70% and bonus step +0.3, but both are configurable at entry time.'
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-black">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {tr('Arvestus hooajas', 'Season accounting')}
-              </div>
-              <div className="mt-1">
-                {tr(
-                  'Iga salvestatud tulemus lisab mängijale +1 osaluse ning punktid lähevad nii kogusummasse kui ajagrupi summasse.',
-                  'Each saved result adds +1 attendance and updates both total points and slot points.'
-                )}
-              </div>
-              <div className="mt-1">
-                {tr(
-                  'Kui event kustutatakse, lahutatakse samad punktid ja osalus tagasi.',
-                  'If an event is deleted, the same points and attendance are subtracted back.'
-                )}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
         {canManageTraining && (

@@ -6,6 +6,11 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Copy } from 'lucide-react';
 import DuelPlayerView from '@/components/putting/DuelPlayerView';
 import { addPlayerToState, createEmptyDuelState } from '@/lib/duel-utils';
+import {
+  buildDuelParticipantFields,
+  createRandomDuelPin,
+  pickJoinableDuelGame
+} from '@/lib/duel-game-utils';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
 import BackButton from '@/components/ui/back-button';
@@ -21,7 +26,39 @@ export default function DuelSolo() {
   const [joinPin, setJoinPin] = React.useState('');
   const [viewMode, setViewMode] = React.useState('host');
   const [userProfile, setUserProfile] = React.useState(null);
-  const [pin] = React.useState(() => Math.floor(1000 + Math.random() * 9000).toString());
+  const [pin, setPin] = React.useState(createRandomDuelPin);
+  const [activePin, setActivePin] = React.useState('');
+
+  const ensureUniquePin = React.useCallback(async (preferredPin) => {
+    let candidate = preferredPin || createRandomDuelPin();
+    for (let i = 0; i < 40; i += 1) {
+      const matches = await base44.entities.DuelGame.filter({ pin: candidate }, '-created_at', 1);
+      if (!matches?.length) return candidate;
+      candidate = createRandomDuelPin();
+    }
+    throw new Error('Unikaalse PIN-i loomine ebaõnnestus. Proovi uuesti.');
+  }, []);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlId = params.get('id');
+    if (urlId) {
+      setGameId(urlId);
+      setViewMode('host');
+    }
+    const urlName = params.get('name');
+    if (urlName) {
+      const decoded = decodeURIComponent(urlName);
+      if (decoded) {
+        setGameName(decoded);
+      }
+    }
+    const urlPin = params.get('pin');
+    if (urlPin && /^\d{4}$/.test(urlPin)) {
+      setPin(urlPin);
+      setActivePin(urlPin);
+    }
+  }, []);
 
   React.useEffect(() => {
     let active = true;
@@ -47,6 +84,10 @@ export default function DuelSolo() {
       setCreating(true);
       const user = userProfile || (await base44.auth.me());
       const playerName = displayName || user?.display_name || user?.full_name || user?.email || 'Mängija';
+      const uniquePin = await ensureUniquePin(pin);
+      if (uniquePin !== pin) {
+        setPin(uniquePin);
+      }
       const state = createEmptyDuelState(1);
       addPlayerToState(state, {
         id: user?.id || user?.email,
@@ -55,21 +96,25 @@ export default function DuelSolo() {
         joined_at: new Date().toISOString(),
         desired_station: 1
       });
+      const participantFields = buildDuelParticipantFields(state);
       const game = await base44.entities.DuelGame.create({
         name: gameName || `Sõbraduell ${new Date().toLocaleDateString()}`,
-        pin,
+        pin: uniquePin,
         disc_count: Number(discCount),
         station_count: 1,
         mode: 'solo',
         status: 'lobby',
         host_user: user?.email,
         created_at: new Date().toISOString(),
+        ...participantFields,
         state
       });
       setGameId(game.id);
+      setActivePin(game.pin || uniquePin);
+      window.history.replaceState({}, '', `${createPageUrl('DuelSolo')}?id=${game.id}&pin=${game.pin || uniquePin}`);
       setViewMode('host');
     } catch (error) {
-      toast.error('Mängu loomine ebaõnnestus');
+      toast.error(error?.message || 'Mängu loomine ebaõnnestus');
     } finally {
       setCreating(false);
     }
@@ -84,8 +129,9 @@ export default function DuelSolo() {
       }
       setJoining(true);
       const user = userProfile || (await base44.auth.me());
-      const games = await base44.entities.DuelGame.filter({ pin: trimmed });
-      const game = games?.[0];
+      const cleanedPin = trimmed.replace(/\D/g, '').slice(0, 4);
+      const games = await base44.entities.DuelGame.filter({ pin: cleanedPin }, '-created_at', 30);
+      const game = pickJoinableDuelGame(games || []);
       if (!game) {
         toast.error('Mängu PIN ei leitud');
         return;
@@ -110,9 +156,11 @@ export default function DuelSolo() {
 
       await base44.entities.DuelGame.update(game.id, {
         ...game,
+        ...buildDuelParticipantFields(nextState),
         state: nextState
       });
       setGameId(game.id);
+      setActivePin(game.pin || cleanedPin);
       setViewMode('join');
       toast.success('Liitusid mänguga');
     } catch (error) {
@@ -123,7 +171,8 @@ export default function DuelSolo() {
   };
 
   if (gameId) {
-    const joinUrl = `${window.location.origin}${createPageUrl('DuelJoin')}?pin=${pin}`;
+    const resolvedPin = activePin || pin;
+    const joinUrl = `${window.location.origin}${createPageUrl('DuelJoin')}?id=${gameId}${resolvedPin ? `&pin=${resolvedPin}` : ''}`;
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
         <div className="max-w-xl mx-auto px-4 pb-10">
@@ -141,7 +190,7 @@ export default function DuelSolo() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs text-slate-500">PIN</div>
-                  <div className="text-2xl font-semibold text-slate-800">{pin}</div>
+                  <div className="text-2xl font-semibold text-slate-800">{resolvedPin}</div>
                 </div>
                 <Button
                   variant="outline"
@@ -237,7 +286,7 @@ export default function DuelSolo() {
           <div className="text-sm font-semibold text-slate-700">Või liitu sõbra duelliga</div>
           <Input
             value={joinPin}
-            onChange={(e) => setJoinPin(e.target.value)}
+            onChange={(e) => setJoinPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
             placeholder="Sisesta PIN"
             className="h-12 rounded-xl border-slate-200 text-center text-lg tracking-widest"
           />

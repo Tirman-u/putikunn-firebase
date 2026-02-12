@@ -18,6 +18,7 @@ import {
   submitDuelScore,
   undoSubmission
 } from '@/lib/duel-utils';
+import { buildDuelParticipantFields } from '@/lib/duel-game-utils';
 import { cn } from '@/lib/utils';
 
 const DISTANCES = [5, 6, 7, 8, 9, 10];
@@ -84,8 +85,12 @@ export default function DuelPlayerView({ gameId }) {
     const current = games?.[0];
     if (!current) throw new Error('Mängu ei leitud');
     const next = updater(current);
-    await base44.entities.DuelGame.update(gameId, next);
-    queryClient.setQueryData(['duel-game', gameId], next);
+    const withParticipants = {
+      ...next,
+      ...buildDuelParticipantFields(next?.state || current?.state)
+    };
+    await base44.entities.DuelGame.update(gameId, withParticipants);
+    queryClient.setQueryData(['duel-game', gameId], withParticipants);
   };
 
   if (isLoading) {

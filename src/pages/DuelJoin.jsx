@@ -7,10 +7,12 @@ import { createPageUrl } from '@/utils';
 import HomeButton from '@/components/ui/home-button';
 import DuelPlayerView from '@/components/putting/DuelPlayerView';
 import { addPlayerToState, createEmptyDuelState } from '@/lib/duel-utils';
+import { buildDuelParticipantFields, pickJoinableDuelGame } from '@/lib/duel-game-utils';
 import { toast } from 'sonner';
 
 export default function DuelJoin() {
   const [pin, setPin] = React.useState('');
+  const [prefilledGameId, setPrefilledGameId] = React.useState('');
   const [displayName, setDisplayName] = React.useState('');
   const [joining, setJoining] = React.useState(false);
   const [gameId, setGameId] = React.useState(null);
@@ -20,6 +22,8 @@ export default function DuelJoin() {
     const params = new URLSearchParams(window.location.search);
     const urlPin = params.get('pin');
     if (urlPin) setPin(urlPin);
+    const urlId = params.get('id');
+    if (urlId) setPrefilledGameId(urlId);
   }, []);
 
   React.useEffect(() => {
@@ -43,10 +47,22 @@ export default function DuelJoin() {
 
   const handleJoin = async () => {
     try {
+      const cleanedPin = pin.replace(/\D/g, '').slice(0, 4);
+      if (!prefilledGameId && cleanedPin.length !== 4) {
+        toast.error('Sisesta 4-kohaline PIN');
+        return;
+      }
       setJoining(true);
       const user = userProfile || (await base44.auth.me());
-      const games = await base44.entities.DuelGame.filter({ pin });
-      const game = games?.[0];
+      let game = null;
+      if (prefilledGameId) {
+        const byId = await base44.entities.DuelGame.filter({ id: prefilledGameId });
+        game = byId?.[0] || null;
+      }
+      if (!game) {
+        const byPin = await base44.entities.DuelGame.filter({ pin: cleanedPin }, '-created_at', 30);
+        game = pickJoinableDuelGame(byPin || []);
+      }
       if (!game) {
         toast.error('Mängu PIN ei leitud');
         return;
@@ -72,11 +88,16 @@ export default function DuelJoin() {
 
       let nextGame = {
         ...game,
+        ...buildDuelParticipantFields(nextState),
         state: nextState
       };
 
       await base44.entities.DuelGame.update(game.id, nextGame);
       setGameId(game.id);
+      if (game.pin) {
+        setPin(game.pin);
+      }
+      window.history.replaceState({}, '', `${createPageUrl('DuelJoin')}?id=${game.id}${game.pin ? `&pin=${game.pin}` : ''}`);
       toast.success('Liitusid mänguga');
     } catch (error) {
       toast.error('Liitumine ebaõnnestus');
@@ -130,7 +151,7 @@ export default function DuelJoin() {
             <label className="text-xs font-semibold text-slate-500 uppercase">PIN</label>
             <Input
               value={pin}
-              onChange={(e) => setPin(e.target.value)}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
               placeholder="4-kohaline PIN"
               className="mt-2 h-12 rounded-2xl border border-slate-200 bg-white px-4 text-center text-lg font-bold tracking-widest text-slate-800 focus:ring-2 focus:ring-emerald-200 dark:bg-black dark:border-white/10 dark:text-slate-100"
             />

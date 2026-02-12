@@ -8,15 +8,25 @@ import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { toast } from 'sonner';
-import { normalizeLeaderboardGender } from '@/lib/leaderboard-utils';
+import {
+  getLeaderboardEmail,
+  getLeaderboardStats,
+  normalizeLeaderboardGender,
+  resolveLeaderboardPlayer
+} from '@/lib/leaderboard-utils';
 import { formatDuration } from '@/lib/time-format';
 
 export default function PuttingRecords() {
+  const TIME_REPAIR_STORAGE_KEY = 'putikunn:time-records-repair:v1';
   const [selectedView, setSelectedView] = useState('general_classic');
   const [selectedGender, setSelectedGender] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [dgMode, setDgMode] = useState('classic');
   const [page, setPage] = useState(1);
+  const [hasAutoRepairedTimeRecords, setHasAutoRepairedTimeRecords] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.localStorage.getItem(TIME_REPAIR_STORAGE_KEY) === 'done';
+  });
   const queryClient = useQueryClient();
   const PAGE_SIZE = 20;
   const MAX_FETCH = 2000;
@@ -65,6 +75,24 @@ export default function PuttingRecords() {
     while (rows.length < MAX_FETCH) {
       const limit = Math.min(FETCH_BATCH_SIZE, MAX_FETCH - rows.length);
       const chunk = await base44.entities.LeaderboardEntry.filter(filter, sortOrder, limit, skip);
+      if (!chunk?.length) break;
+
+      rows.push(...chunk);
+      skip += chunk.length;
+
+      if (chunk.length < limit) break;
+    }
+
+    return rows;
+  };
+
+  const fetchGameRows = async (filter, sortOrder) => {
+    const rows = [];
+    let skip = 0;
+
+    while (rows.length < MAX_FETCH) {
+      const limit = Math.min(FETCH_BATCH_SIZE, MAX_FETCH - rows.length);
+      const chunk = await base44.entities.Game.filter(filter, sortOrder, limit, skip);
       if (!chunk?.length) break;
 
       rows.push(...chunk);
@@ -125,6 +153,7 @@ export default function PuttingRecords() {
 
   const userRole = user?.app_role || 'user';
   const canDelete = ['admin', 'super_admin'].includes(userRole);
+  const canRepairTimeRecords = ['trainer', 'admin', 'super_admin'].includes(userRole);
 
   const deleteRecordMutation = useMutation({
     mutationFn: async (entry) => {
@@ -141,6 +170,161 @@ export default function PuttingRecords() {
       toast.error(error?.message || 'Kustutamine ebaonnestus');
     }
   });
+
+  const resolveGamePlayers = React.useCallback((game) => {
+    const players = new Set();
+    (game?.players || []).forEach((name) => players.add(name));
+    Object.keys(game?.total_points || {}).forEach((name) => players.add(name));
+    Object.keys(game?.player_uids || {}).forEach((name) => players.add(name));
+    Object.keys(game?.player_emails || {}).forEach((name) => players.add(name));
+    Object.keys(game?.live_stats || {}).forEach((name) => players.add(name));
+    return Array.from(players).filter(Boolean);
+  }, []);
+
+  const repairTimeLadderMutation = useMutation({
+    mutationFn: async () => {
+      const timeGames = await fetchGameRows({ game_type: 'time_ladder' }, '-date');
+      const existingEntries = await fetchLeaderboardRows(
+        { leaderboard_type: 'general', game_type: 'time_ladder' },
+        'score'
+      );
+
+      const timeGamesById = {};
+      timeGames.forEach((game) => {
+        if (game?.id) {
+          timeGamesById[game.id] = game;
+        }
+      });
+
+      let fixedDiscs = 0;
+      for (const entry of existingEntries) {
+        const directDiscs = Number(entry?.time_ladder_discs_per_turn);
+        if (Number.isFinite(directDiscs) && directDiscs > 0) continue;
+        const game = timeGamesById[entry?.game_id];
+        const gameDiscs = Number(game?.time_ladder_config?.discs_per_turn);
+        if (!Number.isFinite(gameDiscs) || gameDiscs <= 0) continue;
+        await base44.entities.LeaderboardEntry.update(entry.id, {
+          time_ladder_discs_per_turn: gameDiscs
+        });
+        entry.time_ladder_discs_per_turn = gameDiscs;
+        fixedDiscs += 1;
+      }
+
+      const getEntryDiscs = (entry) => {
+        const directDiscs = Number(entry?.time_ladder_discs_per_turn);
+        if (Number.isFinite(directDiscs) && directDiscs > 0) return directDiscs;
+        const gameDiscs = Number(timeGamesById[entry?.game_id]?.time_ladder_config?.discs_per_turn);
+        if (Number.isFinite(gameDiscs) && gameDiscs > 0) return gameDiscs;
+        return null;
+      };
+
+      const bestExistingByKey = new Map();
+      existingEntries.forEach((entry) => {
+        const entryKey = `${getPlayerKey(entry)}|discs:${getEntryDiscs(entry) || 'unknown'}`;
+        const existing = bestExistingByKey.get(entryKey);
+        const entryScore = Number(entry?.score || 0);
+        const existingScore = Number(existing?.score || 0);
+        const entryDate = new Date(entry?.date || 0).getTime();
+        const existingDate = new Date(existing?.date || 0).getTime();
+        const isBetter = !existing || entryScore < existingScore || (entryScore === existingScore && entryDate > existingDate);
+        if (isBetter) {
+          bestExistingByKey.set(entryKey, entry);
+        }
+      });
+
+      const profileCache = {};
+      let created = 0;
+      let updated = 0;
+      for (const game of timeGames) {
+        const discs = Number(game?.time_ladder_config?.discs_per_turn);
+        if (!Number.isFinite(discs) || discs <= 0) continue;
+        const gamePlayers = resolveGamePlayers(game);
+
+        for (const rawPlayerName of gamePlayers) {
+          const stats = getLeaderboardStats(game, rawPlayerName);
+          const score = Number(stats?.score || 0);
+          if (!Number.isFinite(score) || score <= 0) continue;
+
+          const resolvedPlayer = await resolveLeaderboardPlayer({
+            game,
+            playerName: rawPlayerName,
+            cache: profileCache
+          });
+          const identityKey = getResolvedPlayerKey(resolvedPlayer);
+          if (!identityKey) continue;
+
+          const payload = {
+            game_id: game.id,
+            player_name: resolvedPlayer.playerName,
+            ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
+            player_email: getLeaderboardEmail(resolvedPlayer),
+            ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
+            game_type: 'time_ladder',
+            score,
+            accuracy: Math.round((Number(stats?.accuracy || 0)) * 10) / 10,
+            made_putts: Number(stats?.madePutts || 0),
+            total_putts: Number(stats?.totalPutts || 0),
+            time_ladder_discs_per_turn: discs,
+            leaderboard_type: 'general',
+            date: new Date(game.date || new Date().toISOString()).toISOString()
+          };
+
+          const key = `${identityKey}|discs:${discs}`;
+          const existing = bestExistingByKey.get(key);
+          if (!existing?.id) {
+            const createdEntry = await base44.entities.LeaderboardEntry.create(payload);
+            bestExistingByKey.set(key, createdEntry || payload);
+            created += 1;
+            continue;
+          }
+
+          const existingScore = Number(existing.score || 0);
+          const existingDate = new Date(existing.date || 0).getTime();
+          const payloadDate = new Date(payload.date || 0).getTime();
+          const isBetter = score < existingScore || (score === existingScore && payloadDate > existingDate);
+          if (isBetter) {
+            await base44.entities.LeaderboardEntry.update(existing.id, payload);
+            bestExistingByKey.set(key, { ...existing, ...payload });
+            updated += 1;
+          }
+        }
+      }
+
+      return {
+        scannedGames: timeGames.length,
+        fixedDiscs,
+        created,
+        updated
+      };
+    },
+    onSuccess: (result) => {
+      toast.success(
+        `Aja väljakutse parandatud (${result.scannedGames} mängu, +${result.created} uut, ${result.updated} uuendatud, ${result.fixedDiscs} ketaste fix)`
+      );
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(TIME_REPAIR_STORAGE_KEY, 'done');
+      }
+      setHasAutoRepairedTimeRecords(true);
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-games'] });
+    },
+    onError: (error) => {
+      setHasAutoRepairedTimeRecords(false);
+      toast.error(error?.message || 'Aja väljakutse parandamine ebaõnnestus');
+    }
+  });
+
+  useEffect(() => {
+    if (!isTimeView || !canRepairTimeRecords) return;
+    if (repairTimeLadderMutation.isPending || hasAutoRepairedTimeRecords) return;
+    setHasAutoRepairedTimeRecords(true);
+    repairTimeLadderMutation.mutate();
+  }, [
+    isTimeView,
+    canRepairTimeRecords,
+    repairTimeLadderMutation,
+    hasAutoRepairedTimeRecords
+  ]);
 
   const normalizeText = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
   const currentUserEmail = normalizeText(user?.email);
@@ -253,6 +437,15 @@ export default function PuttingRecords() {
     return `id:${entry.id}`;
   };
 
+  const getResolvedPlayerKey = (resolvedPlayer) => {
+    if (resolvedPlayer?.playerUid) return `uid:${resolvedPlayer.playerUid}`;
+    const email = normalizeText(resolvedPlayer?.playerEmail);
+    if (email && email !== 'unknown') return `email:${email}`;
+    const name = normalizeText(resolvedPlayer?.playerName);
+    if (name) return `name:${name}`;
+    return '';
+  };
+
   const getRecordKey = (entry) => {
     const playerKey = getPlayerKey(entry);
     if (!isTimeView) return playerKey;
@@ -359,6 +552,16 @@ export default function PuttingRecords() {
                     ))}
                   </SelectContent>
                 </Select>
+                {isTimeView && canRepairTimeRecords && (
+                  <button
+                    type="button"
+                    onClick={() => repairTimeLadderMutation.mutate()}
+                    disabled={repairTimeLadderMutation.isPending}
+                    className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+                  >
+                    {repairTimeLadderMutation.isPending ? 'Parandan...' : 'Paranda vanad time kirjed'}
+                  </button>
+                )}
               </div>
 
               {sortedEntries.length === 0 ? (

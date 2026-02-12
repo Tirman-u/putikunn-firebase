@@ -40,6 +40,9 @@ const getGamePlayers = (game) => {
   (game?.players || []).forEach((name) => players.add(name));
   Object.keys(game?.total_points || {}).forEach((name) => players.add(name));
   Object.keys(game?.player_uids || {}).forEach((name) => players.add(name));
+  Object.keys(game?.player_emails || {}).forEach((name) => players.add(name));
+  Object.keys(game?.live_stats || {}).forEach((name) => players.add(name));
+  Object.keys(game?.atw_state || {}).forEach((name) => players.add(name));
   return Array.from(players).filter(Boolean);
 };
 
@@ -332,13 +335,39 @@ export default function TrainingSession() {
     if (existingEvent) {
       return { ok: false, message: 'See mäng on juba lisatud' };
     }
-    const players = getGamePlayers(game);
+    const isTimeLadderGame = game?.game_type === 'time_ladder';
+    const fallbackByPlayer = {};
+    let players = getGamePlayers(game);
+
+    if (players.length === 0 && game?.id) {
+      const fallbackEntries = await base44.entities.LeaderboardEntry.filter({
+        game_id: game.id,
+        leaderboard_type: 'general'
+      });
+      (fallbackEntries || []).forEach((entry) => {
+        const key = entry?.player_name || entry?.player_email;
+        if (!key) return;
+        const current = fallbackByPlayer[key];
+        const entryScore = Number(entry?.score || 0);
+        const currentScore = Number(current?.score || 0);
+        const isBetter = isTimeLadderGame
+          ? !current || entryScore < currentScore
+          : !current || entryScore > currentScore;
+        if (isBetter) {
+          fallbackByPlayer[key] = entry;
+        }
+      });
+      players = Object.keys(fallbackByPlayer);
+    }
+
     if (players.length === 0) {
-      return { ok: false, message: 'Mängijalist tühi' };
+      return { ok: false, message: 'Mängijalist tühi (kontrolli, et mängul on tulemused)' };
     }
 
     const metricKey = game.game_type || 'unknown';
-    const scoreDirection = appLowerIsBetter ? SCORE_DIRECTIONS.LOWER : SCORE_DIRECTIONS.HIGHER;
+    const scoreDirection = isTimeLadderGame
+      ? SCORE_DIRECTIONS.LOWER
+      : (appLowerIsBetter ? SCORE_DIRECTIONS.LOWER : SCORE_DIRECTIONS.HIGHER);
     const eventName = appName.trim() || game.name || metricKey;
 
     const batch = writeBatch(db);
@@ -358,13 +387,14 @@ export default function TrainingSession() {
     });
 
     players.forEach((playerName) => {
+      const fallbackEntry = fallbackByPlayer[playerName];
       const stats = getLeaderboardStats(game, playerName);
-      const score = stats?.score ?? 0;
-      const uid = game?.player_uids?.[playerName];
-      const email = game?.player_emails?.[playerName];
+      const score = Number(fallbackEntry?.score ?? stats?.score ?? 0);
+      const uid = fallbackEntry?.player_uid || game?.player_uids?.[playerName];
+      const email = fallbackEntry?.player_email || game?.player_emails?.[playerName];
       const memberByUid = uid ? membersByUid[uid] : null;
       const memberByEmail = email ? membersByEmail[email.trim().toLowerCase()] : null;
-      const displayName = memberByUid?.name || memberByEmail?.name || playerName;
+      const displayName = memberByUid?.name || memberByEmail?.name || fallbackEntry?.player_name || playerName;
       const participantId = getParticipantId({ uid, email, name: displayName });
       const existing = statsByParticipant[participantId];
       const seasonBest = existing?.best_by_metric?.[metricKey];

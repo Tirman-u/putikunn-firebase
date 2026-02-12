@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart3, Trophy, Users, Activity, Pencil, Trash2, Check, X, Plus, Megaphone, ChevronDown } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, runTransaction, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, runTransaction, serverTimestamp, arrayUnion, deleteField } from 'firebase/firestore';
 import { createPageUrl } from '@/utils';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import BackButton from '@/components/ui/back-button';
@@ -88,6 +88,7 @@ export default function TrainerGroupDashboard() {
   const [addingRoster, setAddingRoster] = React.useState({});
   const [selectedMember, setSelectedMember] = React.useState(null);
   const [isAssigningMember, setIsAssigningMember] = React.useState(false);
+  const [removingMemberId, setRemovingMemberId] = React.useState(null);
   const [collapsedSlots, setCollapsedSlots] = React.useState({});
   const [joiningGameId, setJoiningGameId] = React.useState(null);
   const defaultCollapsed = React.useMemo(() => {
@@ -1029,6 +1030,123 @@ export default function TrainerGroupDashboard() {
     });
   };
 
+  const handleRemoveMemberFromGroup = async (targetUid) => {
+    if (!groupId || !targetUid) return;
+    if (removingMemberId) return;
+    if (!confirm(tr('Eemalda trenniline grupist täielikult?', 'Remove trainee from group completely?'))) return;
+    setRemovingMemberId(targetUid);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const groupRef = doc(db, 'training_groups', groupId);
+        const snap = await transaction.get(groupRef);
+        if (!snap.exists()) throw new Error(tr('Gruppi ei leitud', 'Group not found'));
+        const data = snap.data();
+
+        const currentSlots = Array.isArray(data.slots) ? data.slots : [];
+        const nextSlots = currentSlots.map((slot) => {
+          const roster = Array.isArray(slot.roster_uids) ? slot.roster_uids : [];
+          if (!roster.includes(targetUid)) return slot;
+          return {
+            ...slot,
+            roster_uids: roster.filter((uid) => uid !== targetUid)
+          };
+        });
+
+        const memberUids = Array.isArray(data.member_uids) ? data.member_uids : [];
+        const nextMemberUids = memberUids.filter((uid) => uid !== targetUid);
+        const nextMembers = { ...(data.members || {}) };
+        if (nextMembers?.[targetUid]) {
+          delete nextMembers[targetUid];
+        }
+
+        const attendanceData = data.attendance || {};
+        const attendanceUpdates = {};
+        Object.entries(attendanceData).forEach(([week, weekRaw]) => {
+          if (!weekRaw || typeof weekRaw !== 'object') return;
+          const weekData = weekRaw;
+          const nextWeekData = {};
+          let weekChanged = false;
+
+          Object.entries(weekData).forEach(([slotId, slotRaw]) => {
+            const slotData = normalizeSlotData(slotRaw);
+            const nextReleased = slotData.released_uids.filter((uid) => uid !== targetUid);
+            const nextClaimed = slotData.claimed_uids.filter((uid) => uid !== targetUid);
+            const nextWaitlist = slotData.waitlist_uids.filter((uid) => uid !== targetUid);
+            const nextRequests = slotData.request_uids.filter((uid) => uid !== targetUid);
+
+            const nextClaimedMeta = { ...(slotData.claimed_meta || {}) };
+            const hadClaimedMeta = Boolean(nextClaimedMeta?.[targetUid]);
+            if (hadClaimedMeta) delete nextClaimedMeta[targetUid];
+
+            const nextWaitlistMeta = { ...(slotData.waitlist_meta || {}) };
+            const hadWaitlistMeta = Boolean(nextWaitlistMeta?.[targetUid]);
+            if (hadWaitlistMeta) delete nextWaitlistMeta[targetUid];
+
+            const nextRequestMeta = { ...(slotData.request_meta || {}) };
+            const hadRequestMeta = Boolean(nextRequestMeta?.[targetUid]);
+            if (hadRequestMeta) delete nextRequestMeta[targetUid];
+
+            const slotChanged =
+              nextReleased.length !== slotData.released_uids.length ||
+              nextClaimed.length !== slotData.claimed_uids.length ||
+              nextWaitlist.length !== slotData.waitlist_uids.length ||
+              nextRequests.length !== slotData.request_uids.length ||
+              hadClaimedMeta ||
+              hadWaitlistMeta ||
+              hadRequestMeta;
+
+            if (slotChanged) {
+              weekChanged = true;
+            }
+
+            nextWeekData[slotId] = {
+              ...slotData,
+              released_uids: nextReleased,
+              claimed_uids: nextClaimed,
+              claimed_meta: nextClaimedMeta,
+              waitlist_uids: nextWaitlist,
+              waitlist_meta: nextWaitlistMeta,
+              request_uids: nextRequests,
+              request_meta: nextRequestMeta
+            };
+          });
+
+          if (weekChanged) {
+            attendanceUpdates[`attendance.${week}`] = nextWeekData;
+          }
+        });
+
+        transaction.update(groupRef, {
+          slots: nextSlots,
+          has_public_slots: nextSlots.some((slot) => slot.is_public),
+          member_uids: nextMemberUids,
+          members: nextMembers,
+          ...attendanceUpdates
+        });
+      });
+
+      try {
+        await updateDoc(doc(db, 'users', targetUid), {
+          [`training_groups.${groupId}`]: deleteField()
+        });
+      } catch (error) {
+        // User doc may be missing; group cleanup still succeeded.
+      }
+
+      if (selectedMember?.uid === targetUid) {
+        setSelectedMember(null);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+      toast.success(tr('Trenniline eemaldatud grupist', 'Trainee removed from group'));
+    } catch (error) {
+      toast.error(error?.message || tr('Eemaldamine ebaõnnestus', 'Removal failed'));
+    } finally {
+      setRemovingMemberId(null);
+    }
+  };
+
 
   const handleSaveAnnouncement = async () => {
     if (!groupId) return;
@@ -1240,22 +1358,36 @@ export default function TrainerGroupDashboard() {
                       const isSelected =
                         selectedMember?.uid === member.uid && !selectedMember?.sourceSlotId;
                       return (
-                        <button
+                        <div
                           key={`unassigned-${member.uid}`}
-                          type="button"
-                          onClick={() => handleSelectMember(member.uid, null)}
                           className={`rounded-2xl border border-dashed px-3 py-3 text-xs text-slate-600 shadow-sm text-left transition ${
                             isSelected
                               ? 'border-emerald-300 ring-2 ring-emerald-200'
                               : 'border-slate-200'
                           }`}
                         >
-                          <div className="text-[10px] uppercase text-slate-400">{tr('Sortimata', 'Unassigned')}</div>
-                          <div className="text-sm font-semibold text-slate-800 truncate">
-                            {getMemberLabel(member.uid)}
-                          </div>
-                          <div className="text-[10px] text-slate-400 mt-1">{tr('Vali trenn', 'Choose training')}</div>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectMember(member.uid, null)}
+                            className="w-full text-left"
+                          >
+                            <div className="text-[10px] uppercase text-slate-400">{tr('Sortimata', 'Unassigned')}</div>
+                            <div className="text-sm font-semibold text-slate-800 truncate">
+                              {getMemberLabel(member.uid)}
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-1">{tr('Vali trenn', 'Choose training')}</div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMemberFromGroup(member.uid)}
+                            disabled={removingMemberId === member.uid}
+                            className="mt-2 inline-flex items-center rounded-full border border-rose-200 px-2.5 py-1 text-[10px] font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+                          >
+                            {removingMemberId === member.uid
+                              ? tr('Eemaldan...', 'Removing...')
+                              : tr('Eemalda grupist', 'Remove from group')}
+                          </button>
+                        </div>
                       );
                     })}
                   </div>

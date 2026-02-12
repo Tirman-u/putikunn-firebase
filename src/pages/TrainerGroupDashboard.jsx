@@ -14,6 +14,7 @@ import { useLanguage } from '@/lib/i18n';
 import {
   TRAINING_DAYS,
   getDayFullLabel,
+  getEffectiveSlotAttendance,
   getSlotAvailability,
   getWeekKey,
   createSlotId
@@ -255,11 +256,17 @@ export default function TrainerGroupDashboard() {
   const memberRosterSlots = slots.filter((slot) =>
     Array.isArray(slot?.roster_uids) && slot.roster_uids.includes(user?.id)
   );
-  const memberClaimedSlots = slots.filter((slot) =>
-    (group?.attendance?.[weekKey]?.[slot.id]?.claimed_uids || []).includes(user?.id)
-  );
+  const memberClaimedSlots = slots.filter((slot) => {
+    const attendance = getEffectiveSlotAttendance(group, weekKey, slot);
+    return attendance.claimed_uids.includes(user?.id);
+  });
+  const memberReleasedSlots = slots.filter((slot) => {
+    const attendance = getEffectiveSlotAttendance(group, weekKey, slot);
+    return attendance.released_uids.includes(user?.id);
+  });
   const hasConfirmedSpot = canManageTraining || memberRosterSlots.length > 0 || memberClaimedSlots.length > 0;
   const hasActiveSwap = memberClaimedSlots.length > 0;
+  const hasReleasedOwnSpot = memberReleasedSlots.length > 0;
   const memberRosterSlotIds = memberRosterSlots.map((slot) => slot.id);
   const getMemberLabel = React.useCallback(
     (uid, meta = null) =>
@@ -884,6 +891,84 @@ export default function TrainerGroupDashboard() {
     });
   };
 
+  const handleSecondSessionClaim = async (targetSlotId) => {
+    const userId = user?.id;
+    if (!userId) return;
+    const userName = user?.display_name || user?.full_name || user?.email || tr('Trenniline', 'Trainee');
+    const userEmail = user?.email || '';
+    await updateAttendanceMulti((weekData, groupData, currentWeek) => {
+      const slotsList = Array.isArray(groupData.slots) ? groupData.slots : [];
+      const targetSlot = slotsList.find((slot) => slot.id === targetSlotId);
+      if (!targetSlot) return weekData;
+      const availability = getSlotAvailability(targetSlot, groupData, currentWeek);
+      if (availability.available <= 0) {
+        throw new Error(tr('Vabu kohti pole', 'No free spots'));
+      }
+
+      const rosterSlotIds = slotsList
+        .filter((slot) => Array.isArray(slot.roster_uids) && slot.roster_uids.includes(userId))
+        .map((slot) => slot.id);
+      if (rosterSlotIds.length === 0) {
+        throw new Error(tr('Sul pole püsikohta', 'You do not have a reserved spot'));
+      }
+
+      const hasReleased = rosterSlotIds.some((slotId) => {
+        const slotData = normalizeSlotData(weekData[slotId]);
+        return slotData.released_uids.includes(userId);
+      });
+      if (hasReleased) {
+        throw new Error(tr('Vabasta 1x asendus enne või kasuta "Asendan koha"', 'Release swap is active, use "Claim spot"'));
+      }
+
+      Object.keys(weekData).forEach((slotId) => {
+        const slotData = normalizeSlotData(weekData[slotId]);
+        const nextClaimed = slotData.claimed_uids.filter((uid) => uid !== userId);
+        const nextRequests = slotData.request_uids.filter((uid) => uid !== userId);
+        const nextWaitlist = slotData.waitlist_uids.filter((uid) => uid !== userId);
+        const nextClaimedMeta = { ...(slotData.claimed_meta || {}) };
+        if (nextClaimedMeta?.[userId]) {
+          delete nextClaimedMeta[userId];
+        }
+        const nextRequestMeta = { ...(slotData.request_meta || {}) };
+        if (nextRequestMeta?.[userId]) {
+          delete nextRequestMeta[userId];
+        }
+        const nextWaitlistMeta = { ...(slotData.waitlist_meta || {}) };
+        if (nextWaitlistMeta?.[userId]) {
+          delete nextWaitlistMeta[userId];
+        }
+        weekData[slotId] = {
+          ...slotData,
+          claimed_uids: nextClaimed,
+          claimed_meta: nextClaimedMeta,
+          request_uids: nextRequests,
+          request_meta: nextRequestMeta,
+          waitlist_uids: nextWaitlist,
+          waitlist_meta: nextWaitlistMeta
+        };
+      });
+
+      const targetData = normalizeSlotData(weekData[targetSlotId]);
+      const claimed = new Set(targetData.claimed_uids || []);
+      claimed.add(userId);
+      weekData[targetSlotId] = {
+        ...targetData,
+        claimed_uids: Array.from(claimed),
+        claimed_meta: {
+          ...(targetData.claimed_meta || {}),
+          [userId]: {
+            name: userName,
+            email: userEmail,
+            type: 'double_session',
+            claimed_at: new Date().toISOString()
+          }
+        }
+      };
+
+      return weekData;
+    });
+  };
+
   const handleRemoveWaitlist = async (slotId, targetUid) => {
     await updateAttendance(slotId, (slotData) => {
       const waitlist = (slotData.waitlist_uids || []).filter((uid) => uid !== targetUid);
@@ -1234,7 +1319,7 @@ export default function TrainerGroupDashboard() {
               {slots.map((slot) => {
               const availability = attendanceBySlot(slot);
               const maxSpots = availability.maxSpots || Number(slot.max_spots) || 0;
-              const attendance = group?.attendance?.[weekKey]?.[slot.id] || {};
+              const attendance = getEffectiveSlotAttendance(group, weekKey, slot);
               const releasedSet = new Set(attendance.released_uids || []);
               const rosterIds = Array.isArray(slot.roster_uids) ? slot.roster_uids : [];
               const activeRosterIds = rosterIds.filter((uid) => !releasedSet.has(uid));
@@ -1283,6 +1368,7 @@ export default function TrainerGroupDashboard() {
               const canAnnounce = availability.available > 0;
               const isOwnSlot = memberRosterSlotIds.includes(slot.id);
               const canMemberSwap = !canManageTraining && memberRosterSlots.length > 0 && !hasActiveSwap;
+              const canSecondSessionClaim = canMemberSwap && !hasReleasedOwnSpot;
               const isCollapsed = collapsedSlots[slot.id] ?? false;
               const isExpanded = !isCollapsed || editingSlotId === slot.id;
 
@@ -1291,17 +1377,42 @@ export default function TrainerGroupDashboard() {
                   key={slot.id}
                   className="rounded-2xl border border-slate-100 bg-white px-3 py-3 dark:bg-black dark:border-white/10"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleSlotCollapse(slot.id)}
-                      aria-expanded={isExpanded}
-                      className="flex items-center gap-3 text-left"
-                    >
+                  <div
+                    className={`flex items-center justify-between gap-3 ${!isExpanded ? 'cursor-pointer' : ''}`}
+                    onClick={
+                      !isExpanded
+                        ? () => toggleSlotCollapse(slot.id)
+                        : undefined
+                    }
+                    role={!isExpanded ? 'button' : undefined}
+                    tabIndex={!isExpanded ? 0 : undefined}
+                    onKeyDown={
+                      !isExpanded
+                        ? (event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              toggleSlotCollapse(slot.id);
+                            }
+                          }
+                        : undefined
+                    }
+                  >
+                    <div className="flex items-center gap-3 text-left">
                       <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-600">
-                        <ChevronDown
-                          className={`h-4 w-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-                        />
+                        <button
+                          type="button"
+                          aria-expanded={isExpanded}
+                          aria-label={isExpanded ? tr('Ahenda', 'Collapse') : tr('Laienda', 'Expand')}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleSlotCollapse(slot.id);
+                          }}
+                          className="flex h-8 w-8 items-center justify-center rounded-full"
+                        >
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                          />
+                        </button>
                       </span>
                       <div>
                         <div className="text-sm font-semibold text-slate-800">
@@ -1311,7 +1422,7 @@ export default function TrainerGroupDashboard() {
                           {slot.duration_minutes || 90} min • {tr('Max', 'Max')} {slot.max_spots} {tr('kohta', 'spots')}
                         </div>
                       </div>
-                    </button>
+                    </div>
                     <div className="flex flex-wrap items-center gap-2 text-[11px]">
                       <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700 font-semibold">
                         {tr('Vabu', 'Free')}: {availability.available}
@@ -1552,10 +1663,18 @@ export default function TrainerGroupDashboard() {
                               {canClaimSeat && (
                                 <button
                                   type="button"
-                                  onClick={() => handleSwapClaim(slot.id)}
+                                  onClick={() => {
+                                    if (canSecondSessionClaim) {
+                                      handleSecondSessionClaim(slot.id);
+                                      return;
+                                    }
+                                    handleSwapClaim(slot.id);
+                                  }}
                                   className="rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-semibold text-white"
                                 >
-                                  {tr('Asendan koha', 'Claim spot')}
+                                  {canSecondSessionClaim
+                                    ? tr('Teen teise trenni järjest', 'Second session')
+                                    : tr('Asendan koha', 'Claim spot')}
                                 </button>
                               )}
                             </div>
@@ -1686,7 +1805,7 @@ export default function TrainerGroupDashboard() {
               {slots.map((slot) => {
                 const availability = attendanceBySlot(slot);
                 const maxSpots = availability.maxSpots || Number(slot.max_spots) || 0;
-                const attendance = group?.attendance?.[weekKey]?.[slot.id] || {};
+                const attendance = getEffectiveSlotAttendance(group, weekKey, slot);
                 const releasedSet = new Set(attendance.released_uids || []);
                 const rosterIds = Array.isArray(slot.roster_uids) ? slot.roster_uids : [];
                 const activeRosterIds = rosterIds.filter((uid) => !releasedSet.has(uid));
@@ -1723,6 +1842,7 @@ export default function TrainerGroupDashboard() {
                 }
                 const isOwnSlot = memberRosterSlotIds.includes(slot.id);
                 const canMemberSwap = memberRosterSlots.length > 0 && !hasActiveSwap;
+                const canSecondSessionClaim = canMemberSwap && !hasReleasedOwnSpot;
                 const isCollapsed = collapsedSlots[slot.id] ?? false;
                 const isExpanded = !isCollapsed;
 
@@ -1731,17 +1851,42 @@ export default function TrainerGroupDashboard() {
                     key={slot.id}
                     className="rounded-2xl border border-slate-100 bg-white px-3 py-3 dark:bg-black dark:border-white/10"
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <button
-                        type="button"
-                        onClick={() => toggleSlotCollapse(slot.id)}
-                        aria-expanded={isExpanded}
-                        className="flex items-center gap-3 text-left"
-                      >
+                    <div
+                      className={`flex items-center justify-between gap-3 ${!isExpanded ? 'cursor-pointer' : ''}`}
+                      onClick={
+                        !isExpanded
+                          ? () => toggleSlotCollapse(slot.id)
+                          : undefined
+                      }
+                      role={!isExpanded ? 'button' : undefined}
+                      tabIndex={!isExpanded ? 0 : undefined}
+                      onKeyDown={
+                        !isExpanded
+                          ? (event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                toggleSlotCollapse(slot.id);
+                              }
+                            }
+                          : undefined
+                      }
+                    >
+                      <div className="flex items-center gap-3 text-left">
                         <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-600">
-                          <ChevronDown
-                            className={`h-4 w-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-                          />
+                          <button
+                            type="button"
+                            aria-expanded={isExpanded}
+                            aria-label={isExpanded ? tr('Ahenda', 'Collapse') : tr('Laienda', 'Expand')}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleSlotCollapse(slot.id);
+                            }}
+                            className="flex h-8 w-8 items-center justify-center rounded-full"
+                          >
+                            <ChevronDown
+                              className={`h-4 w-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                            />
+                          </button>
                         </span>
                         <div>
                           <div className="text-sm font-semibold text-slate-800">
@@ -1751,7 +1896,7 @@ export default function TrainerGroupDashboard() {
                             {slot.duration_minutes || 90} min • Max {slot.max_spots} kohta
                           </div>
                         </div>
-                      </button>
+                      </div>
                       <div className="flex flex-wrap items-center gap-2 text-[11px]">
                         <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700 font-semibold">
                           {tr('Vabu', 'Free')}: {availability.available}
@@ -1828,10 +1973,18 @@ export default function TrainerGroupDashboard() {
                                 {canClaimSeat && (
                                   <button
                                     type="button"
-                                    onClick={() => handleSwapClaim(slot.id)}
+                                    onClick={() => {
+                                      if (canSecondSessionClaim) {
+                                        handleSecondSessionClaim(slot.id);
+                                        return;
+                                      }
+                                      handleSwapClaim(slot.id);
+                                    }}
                                     className="rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-semibold text-white"
                                   >
-                                    {tr('Asendan koha', 'Claim spot')}
+                                    {canSecondSessionClaim
+                                      ? tr('Teen teise trenni järjest', 'Second session')
+                                      : tr('Asendan koha', 'Claim spot')}
                                   </button>
                                 )}
                               </div>

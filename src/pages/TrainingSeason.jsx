@@ -103,6 +103,7 @@ export default function TrainingSeason() {
   }, [seasonSlots, newSessionSlotId]);
 
   const remaining = countRemainingBySlot(seasonSlots, season?.end_date);
+  const remainingWeeks = Math.max(0, ...Object.values(remaining?.bySlot || {}));
 
   const leaderboard = React.useMemo(() => {
     const rows = stats.map((entry) => {
@@ -227,7 +228,7 @@ export default function TrainingSeason() {
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <div className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-white/10 dark:bg-black dark:text-emerald-300">
-              {tr('Trenni jäänud', 'Trainings left')}: {remaining.total}
+              {tr('Nädalaid jäänud', 'Weeks left')}: {remainingWeeks}
             </div>
             <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-black dark:text-slate-300">
               {tr('Treeninguid', 'Sessions')}: {sessions.length}

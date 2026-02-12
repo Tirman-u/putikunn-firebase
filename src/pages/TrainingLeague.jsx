@@ -27,6 +27,7 @@ export default function TrainingLeague() {
   const [endDate, setEndDate] = React.useState('');
   const [selectedSlots, setSelectedSlots] = React.useState([]);
   const [isCreating, setIsCreating] = React.useState(false);
+  const [showSeasonCreator, setShowSeasonCreator] = React.useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -76,6 +77,10 @@ export default function TrainingLeague() {
     );
   };
 
+  const getRemainingWeeks = React.useCallback((remaining) => {
+    return Math.max(0, ...Object.values(remaining?.bySlot || {}));
+  }, []);
+
   const handleCreateSeason = async () => {
     if (!groupId) {
       toast.error(tr('Grupi ID puudub', 'Group ID is missing'));
@@ -113,6 +118,7 @@ export default function TrainingLeague() {
       setSeasonName('');
       setStartDate('');
       setEndDate('');
+      setShowSeasonCreator(false);
       queryClient.invalidateQueries({ queryKey: ['training-seasons', groupId] });
       toast.success(tr('Hooaeg loodud', 'Season created'));
     } catch (error) {
@@ -148,63 +154,85 @@ export default function TrainingLeague() {
         </div>
 
         {canManageTraining && (
-          <div className="mb-5 rounded-[30px] border border-white/80 bg-white/90 p-4 shadow-[0_24px_50px_rgba(15,23,42,0.09)] backdrop-blur-xl sm:mb-6 sm:p-5 dark:border-white/10 dark:bg-black">
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 dark:border-white/10 dark:bg-black">
-                <Plus className="h-4 w-4 text-emerald-600" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{tr('Loo hooaeg', 'Create season')}</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">{tr('Mobile-first kiire sisestus', 'Mobile-first quick setup')}</div>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <Input
-                placeholder={tr('Hooaja nimi', 'Season name')}
-                value={seasonName}
-                onChange={(event) => setSeasonName(event.target.value)}
-              />
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(event) => setStartDate(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 dark:border-white/10 dark:bg-black dark:text-slate-100"
-                />
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(event) => setEndDate(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 dark:border-white/10 dark:bg-black dark:text-slate-100"
-                />
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{tr('Trenni ajad', 'Training times')}</div>
-              <div className="flex gap-2 overflow-x-auto pb-1 pr-1">
-                {slots.map((slot) => (
+          <div className="mb-5 sm:mb-6">
+            {!showSeasonCreator ? (
+              <button
+                type="button"
+                onClick={() => setShowSeasonCreator(true)}
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm dark:border-white/10 dark:bg-black dark:text-emerald-300"
+              >
+                <Plus className="h-4 w-4" />
+                {tr('Loo hooaeg', 'Create season')}
+              </button>
+            ) : (
+              <div className="rounded-[30px] border border-white/80 bg-white/90 p-4 shadow-[0_24px_50px_rgba(15,23,42,0.09)] backdrop-blur-xl sm:p-5 dark:border-white/10 dark:bg-black">
+                <div className="mb-4 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 dark:border-white/10 dark:bg-black">
+                      <Plus className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{tr('Loo hooaeg', 'Create season')}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{tr('Mobile-first kiire sisestus', 'Mobile-first quick setup')}</div>
+                    </div>
+                  </div>
                   <button
-                    key={slot.id}
                     type="button"
-                    onClick={() => toggleSlot(slot.id)}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                      selectedSlots.includes(slot.id)
-                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700 shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-600'
-                    } dark:border-white/10 dark:bg-black dark:text-emerald-300`}
+                    onClick={() => setShowSeasonCreator(false)}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-black dark:text-slate-300"
                   >
-                    {formatSlotLabel(slot)}
+                    {tr('Peida', 'Hide')}
                   </button>
-                ))}
+                </div>
+                <div className="space-y-3">
+                  <Input
+                    placeholder={tr('Hooaja nimi', 'Season name')}
+                    value={seasonName}
+                    onChange={(event) => setSeasonName(event.target.value)}
+                  />
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(event) => setStartDate(event.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 dark:border-white/10 dark:bg-black dark:text-slate-100"
+                    />
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(event) => setEndDate(event.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 dark:border-white/10 dark:bg-black dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{tr('Trenni ajad', 'Training times')}</div>
+                  <div className="flex gap-2 overflow-x-auto pb-1 pr-1">
+                    {slots.map((slot) => (
+                      <button
+                        key={slot.id}
+                        type="button"
+                        onClick={() => toggleSlot(slot.id)}
+                        className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          selectedSlots.includes(slot.id)
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600'
+                        } dark:border-white/10 dark:bg-black dark:text-emerald-300`}
+                      >
+                        {formatSlotLabel(slot)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  onClick={handleCreateSeason}
+                  disabled={isCreating}
+                  className="mt-4 h-11 w-full rounded-2xl bg-emerald-600 text-base font-semibold hover:bg-emerald-700"
+                >
+                  {isCreating ? tr('Loon...', 'Creating...') : tr('Loo hooaeg', 'Create season')}
+                </Button>
               </div>
-            </div>
-            <Button
-              onClick={handleCreateSeason}
-              disabled={isCreating}
-              className="mt-4 h-11 w-full rounded-2xl bg-emerald-600 text-base font-semibold hover:bg-emerald-700"
-            >
-              {isCreating ? tr('Loon...', 'Creating...') : tr('Loo hooaeg', 'Create season')}
-            </Button>
+            )}
           </div>
         )}
 
@@ -217,10 +245,13 @@ export default function TrainingLeague() {
           {seasons.map((season) => {
             const seasonSlots = slots.filter((slot) => (season.slot_ids || []).includes(slot.id));
             const remaining = countRemainingBySlot(seasonSlots, season.end_date);
+            const remainingWeeks = getRemainingWeeks(remaining);
             return (
-              <div
+              <button
+                type="button"
+                onClick={() => navigate(`${createPageUrl('TrainingSeason')}?seasonId=${season.id}`)}
                 key={season.id}
-                className="rounded-[28px] border border-white/85 bg-white/90 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black"
+                className="w-full rounded-[28px] border border-white/85 bg-white/90 p-4 text-left shadow-[0_20px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl transition hover:bg-emerald-50/50 dark:border-white/10 dark:bg-black"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -232,11 +263,14 @@ export default function TrainingLeague() {
                     </div>
                     <div className="mt-1 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-300">
                       <Clock3 className="h-3 w-3" />
-                      {tr('Trenni jäänud', 'Trainings left')}: {remaining.total}
+                      {tr('Nädalaid jäänud', 'Weeks left')}: {remainingWeeks}
                     </div>
                   </div>
-                  <div className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-white/10 dark:bg-black dark:text-emerald-300">
-                    {remaining.total}
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-white/10 dark:bg-black dark:text-emerald-300">
+                      {remainingWeeks}
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-500" />
                   </div>
                 </div>
                 {seasonSlots.length > 0 && (
@@ -251,18 +285,7 @@ export default function TrainingLeague() {
                     ))}
                   </div>
                 )}
-                <Button
-                  variant="outline"
-                  onClick={() => navigate(`${createPageUrl('TrainingSeason')}?seasonId=${season.id}`)}
-                  className="mt-4 h-10 w-full justify-between rounded-2xl border-slate-200 px-4 text-sm font-semibold dark:border-white/10 dark:bg-black"
-                >
-                  <span>{tr('Ava hooaeg', 'Open season')}</span>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <div className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
-                  {tr('Puuduta kaarti, et avada hooaja detailid.', 'Tap to open season details.')}
-                </div>
-              </div>
+              </button>
             );
           })}
         </div>

@@ -55,8 +55,6 @@ export default function TrainingSession() {
   const [offlineMode, setOfflineMode] = React.useState('points');
   const [offlinePoints, setOfflinePoints] = React.useState({});
   const [offlineRanks, setOfflineRanks] = React.useState({});
-  const [offlineParticipants, setOfflineParticipants] = React.useState('');
-  const [offlineParticipantsTouched, setOfflineParticipantsTouched] = React.useState(false);
   const [offlineCutPercent, setOfflineCutPercent] = React.useState(70);
   const [offlineCutBonus, setOfflineCutBonus] = React.useState(0.3);
   const [isSavingApp, setIsSavingApp] = React.useState(false);
@@ -205,13 +203,6 @@ export default function TrainingSession() {
     return members.filter((member) => slotMemberIds.includes(member.uid));
   }, [members, slotMemberIds]);
 
-  React.useEffect(() => {
-    if (offlineMode !== 'rank_hc') return;
-    if (offlineParticipantsTouched) return;
-    if (!filteredMembers.length) return;
-    setOfflineParticipants(String(filteredMembers.length));
-  }, [filteredMembers.length, offlineMode, offlineParticipantsTouched]);
-
   const { data: groupGames = [], isLoading: isLoadingGroupGames } = useQuery({
     queryKey: ['training-group-games-list', season?.group_id],
     enabled: Boolean(season?.group_id && canManageTraining),
@@ -231,7 +222,13 @@ export default function TrainingSession() {
     return map;
   }, [results]);
 
-  const offlineParticipantsCount = Number(offlineParticipants) || 0;
+  const offlineRankEntries = React.useMemo(() => (
+    Object.entries(offlineRanks)
+      .map(([uid, value]) => ({ uid, rank: Number(value) }))
+      .filter((entry) => Number.isFinite(entry.rank) && entry.rank > 0)
+  ), [offlineRanks]);
+
+  const offlineParticipantsCount = offlineRankEntries.length;
   const offlineCutPercentValue = Math.min(100, Math.max(0, Number(offlineCutPercent) || 0));
   const offlineCutBonusValue = Math.max(0, Number(offlineCutBonus) || 0);
   const offlineCutCount = getCutCount({
@@ -404,20 +401,14 @@ export default function TrainingSession() {
     try {
       const eventName = offlineName.trim() || 'Offline';
       if (offlineMode === 'rank_hc') {
-        const entries = Object.entries(offlineRanks)
-          .map(([uid, value]) => ({ uid, rank: Number(value) }))
-          .filter((entry) => Number.isFinite(entry.rank) && entry.rank > 0);
+        const entries = offlineRankEntries;
         if (entries.length === 0) {
           toast.error('Sisesta vähemalt üks koht');
           return;
         }
-        if (!Number.isFinite(offlineParticipantsCount) || offlineParticipantsCount < 1) {
-          toast.error('Sisesta osalejate arv');
-          return;
-        }
         const maxRank = Math.max(...entries.map((entry) => entry.rank));
         if (maxRank > offlineParticipantsCount) {
-          toast.error('Koht ei saa olla suurem kui osalejate arv');
+          toast.error('Koht ei saa olla suurem kui märgitud tulemuste arv');
           return;
         }
 
@@ -764,10 +755,7 @@ export default function TrainingSession() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setOfflineMode('rank_hc');
-                      setOfflineParticipantsTouched(false);
-                    }}
+                    onClick={() => setOfflineMode('rank_hc')}
                     className={`rounded-full px-3 py-1 text-xs font-semibold border ${
                       offlineMode === 'rank_hc'
                         ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
@@ -779,18 +767,7 @@ export default function TrainingSession() {
                 </div>
                 {offlineMode === 'rank_hc' ? (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <input
-                        type="number"
-                        min={1}
-                        value={offlineParticipants}
-                        onChange={(event) => {
-                          setOfflineParticipants(event.target.value);
-                          setOfflineParticipantsTouched(true);
-                        }}
-                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
-                        placeholder="Osalejaid"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <input
                         type="number"
                         min={0}
@@ -798,7 +775,7 @@ export default function TrainingSession() {
                         step="1"
                         value={offlineCutPercent}
                         onChange={(event) => setOfflineCutPercent(event.target.value)}
-                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
                         placeholder="Cut %"
                       />
                       <input
@@ -807,12 +784,13 @@ export default function TrainingSession() {
                         step="0.05"
                         value={offlineCutBonus}
                         onChange={(event) => setOfflineCutBonus(event.target.value)}
-                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
                         placeholder="HC boonus"
                       />
                     </div>
                     <div className="text-xs text-slate-500">
-                      Top {offlineCutPercentValue}% = {offlineCutCount} mängijat.
+                      Märgitud tulemusi: {offlineParticipantsCount}.
+                      {` Top ${offlineCutPercentValue}% = ${offlineCutCount} mängijat.`}
                       {` ${offlineCutCount}. koht saab +${round1(offlineCutBonusValue).toFixed(1)}p, iga koht ülespoole +${round1(offlineCutBonusValue).toFixed(1)}p juurde.`}
                     </div>
                     <div className="space-y-2">
@@ -835,7 +813,7 @@ export default function TrainingSession() {
                               onChange={(event) =>
                                 setOfflineRanks((prev) => ({ ...prev, [member.uid]: event.target.value }))
                               }
-                              className="flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                              className="flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
                               placeholder="Koht"
                             />
                             {pointsPreview && (
@@ -858,7 +836,7 @@ export default function TrainingSession() {
                         onChange={(event) =>
                           setOfflinePoints((prev) => ({ ...prev, [member.uid]: event.target.value }))
                         }
-                        className="flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                        className="flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
                         placeholder="Punktid"
                       />
                     </div>

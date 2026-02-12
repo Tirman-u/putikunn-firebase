@@ -131,9 +131,10 @@ export const computeRankCutPoints = ({
 };
 
 export const getParticipantId = ({ uid, email, name }) => {
-  if (uid) return `uid:${uid}`;
-  if (email) return `email:${email.toLowerCase()}`;
-  return `name:${(name || '').toLowerCase()}`;
+  const sanitize = (value) => String(value || '').trim().toLowerCase().replaceAll('/', '-');
+  if (uid) return `uid:${sanitize(uid)}`;
+  if (email) return `email:${sanitize(email)}`;
+  return `name:${sanitize(name)}`;
 };
 
 export const isScoreBetter = ({ score, best, direction }) => {

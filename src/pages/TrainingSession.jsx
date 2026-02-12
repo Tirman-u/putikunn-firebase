@@ -328,6 +328,7 @@ export default function TrainingSession() {
 
   const createAppEventFromGame = async (game, options = {}) => {
     const targetSession = options.session || session;
+    const targetSlotId = targetSession?.slot_id || null;
     const existingEvents = Array.isArray(options.existingEvents)
       ? options.existingEvents
       : seasonEvents.filter((entry) => entry.session_id === targetSession?.id);
@@ -346,29 +347,33 @@ export default function TrainingSession() {
     let players = getGamePlayers(game);
 
     if (players.length === 0 && game?.id) {
-      const fallbackEntries = await base44.entities.LeaderboardEntry.filter({
-        game_id: game.id,
-        leaderboard_type: 'general'
-      });
-      (fallbackEntries || []).forEach((entry) => {
-        const key = entry?.player_name || entry?.player_email;
-        if (!key) return;
-        const current = fallbackByPlayer[key];
-        const entryScore = Number(entry?.score || 0);
-        const currentScore = Number(current?.score || 0);
-        const isBetter = isTimeLadderGame
-          ? !current || entryScore < currentScore
-          : !current || entryScore > currentScore;
-        if (isBetter) {
-          fallbackByPlayer[key] = entry;
-        }
-      });
-      players = Object.keys(fallbackByPlayer);
+      try {
+        const fallbackEntries = await base44.entities.LeaderboardEntry.filter({
+          game_id: game.id,
+          leaderboard_type: 'general'
+        });
+        (fallbackEntries || []).forEach((entry) => {
+          const key = entry?.player_name || entry?.player_email;
+          if (!key) return;
+          const current = fallbackByPlayer[key];
+          const entryScore = Number(entry?.score || 0);
+          const currentScore = Number(current?.score || 0);
+          const isBetter = isTimeLadderGame
+            ? !current || entryScore < currentScore
+            : !current || entryScore > currentScore;
+          if (isBetter) {
+            fallbackByPlayer[key] = entry;
+          }
+        });
+        players = Object.keys(fallbackByPlayer);
+      } catch {
+        // Keep flow usable even when fallback lookup fails.
+        players = [];
+      }
     }
 
-    if (players.length === 0) {
-      return { ok: false, message: 'Mängijalist tühi (kontrolli, et mängul on tulemused)' };
-    }
+    // Allow creating the event even when no player stats are detected yet.
+    // This keeps the coach flow usable and the event can be edited later.
 
     const metricKey = game.game_type || 'unknown';
     const scoreDirection = isTimeLadderGame
@@ -381,8 +386,8 @@ export default function TrainingSession() {
     batch.set(eventRef, {
       session_id: targetSession.id,
       season_id: season.id,
-      group_id: season.group_id,
-      slot_id: targetSession.slot_id,
+      group_id: season.group_id || null,
+      slot_id: targetSlotId,
       type: 'app',
       name: eventName,
       metric_key: metricKey,
@@ -393,15 +398,18 @@ export default function TrainingSession() {
     });
 
     players.forEach((playerName) => {
+      if (typeof playerName !== 'string' || !playerName.trim()) return;
       const fallbackEntry = fallbackByPlayer[playerName];
       const stats = getLeaderboardStats(game, playerName);
-      const score = Number(fallbackEntry?.score ?? stats?.score ?? 0);
-      const uid = fallbackEntry?.player_uid || game?.player_uids?.[playerName];
-      const email = fallbackEntry?.player_email || game?.player_emails?.[playerName];
+      const rawScore = Number(fallbackEntry?.score ?? stats?.score ?? 0);
+      const score = Number.isFinite(rawScore) ? rawScore : 0;
+      const uid = fallbackEntry?.player_uid || game?.player_uids?.[playerName] || null;
+      const email = fallbackEntry?.player_email || game?.player_emails?.[playerName] || null;
       const memberByUid = uid ? membersByUid[uid] : null;
-      const memberByEmail = email ? membersByEmail[email.trim().toLowerCase()] : null;
-      const displayName = memberByUid?.name || memberByEmail?.name || fallbackEntry?.player_name || playerName;
-      const participantId = getParticipantId({ uid, email, name: displayName });
+      const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+      const memberByEmail = normalizedEmail ? membersByEmail[normalizedEmail] : null;
+      const displayName = String(memberByUid?.name || memberByEmail?.name || fallbackEntry?.player_name || playerName || 'Mängija').trim();
+      const participantId = getParticipantId({ uid, email: normalizedEmail || email, name: displayName });
       const existing = statsByParticipant[participantId];
       const seasonBest = existing?.best_by_metric?.[metricKey];
       const { hc, hcBonus, points } = computeHcPoints({
@@ -420,10 +428,12 @@ export default function TrainingSession() {
         ...(shouldUpdateBest ? { [metricKey]: score } : {})
       };
 
-      const nextPointsBySlot = {
-        ...(existing?.points_by_slot || {}),
-        [targetSession.slot_id]: round1((existing?.points_by_slot?.[targetSession.slot_id] || 0) + points)
-      };
+      const nextPointsBySlot = targetSlotId
+        ? {
+          ...(existing?.points_by_slot || {}),
+          [targetSlotId]: round1((existing?.points_by_slot?.[targetSlotId] || 0) + points)
+        }
+        : (existing?.points_by_slot || {});
 
       const nextStats = {
         season_id: season.id,
@@ -442,8 +452,8 @@ export default function TrainingSession() {
         event_id: eventRef.id,
         session_id: targetSession.id,
         season_id: season.id,
-        group_id: season.group_id,
-        slot_id: targetSession.slot_id,
+        group_id: season.group_id || null,
+        slot_id: targetSlotId,
         participant_id: participantId,
         user_id: uid || memberByEmail?.uid || null,
         player_name: displayName,
@@ -470,15 +480,24 @@ export default function TrainingSession() {
       const existingForSession = seasonEvents.filter((entry) => entry.session_id === targetSession.id);
       // Write each session separately so partial success still works if one target fails.
       // This keeps coach workflow resilient for bulk add.
-      const result = await createAppEventFromGame(game, {
-        session: targetSession,
-        existingEvents: existingForSession
-      });
-      outcomes.push({
-        sessionId: targetSession.id,
-        slotId: targetSession.slot_id,
-        ...result
-      });
+      try {
+        const result = await createAppEventFromGame(game, {
+          session: targetSession,
+          existingEvents: existingForSession
+        });
+        outcomes.push({
+          sessionId: targetSession.id,
+          slotId: targetSession.slot_id,
+          ...result
+        });
+      } catch (error) {
+        outcomes.push({
+          sessionId: targetSession.id,
+          slotId: targetSession.slot_id,
+          ok: false,
+          message: error?.message || 'Eventi lisamine ebaõnnestus'
+        });
+      }
     }
 
     const added = outcomes.filter((item) => item.ok).length;

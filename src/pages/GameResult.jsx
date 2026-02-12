@@ -172,10 +172,13 @@ export default function GameResult() {
       const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, matchedName);
       const resolvedPlayer = await resolveLeaderboardPlayer({ game, playerName: matchedName, cache: {} });
       const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
+      const timeLadderDiscsPerTurn = Number(game?.time_ladder_config?.discs_per_turn);
+      const hasTimeLadderDiscs = game.game_type === 'time_ladder' && Number.isFinite(timeLadderDiscsPerTurn) && timeLadderDiscsPerTurn > 0;
       const [existingEntry] = await base44.entities.LeaderboardEntry.filter({
         ...identityFilter,
         game_type: game.game_type,
-        leaderboard_type: 'general'
+        leaderboard_type: 'general',
+        ...(hasTimeLadderDiscs ? { time_ladder_discs_per_turn: timeLadderDiscsPerTurn } : {})
       });
 
       const payload = {
@@ -190,6 +193,7 @@ export default function GameResult() {
         made_putts: madePutts,
         total_putts: totalPutts,
         leaderboard_type: 'general',
+        ...(hasTimeLadderDiscs ? { time_ladder_discs_per_turn: timeLadderDiscsPerTurn } : {}),
         date: new Date(game.date || new Date().toISOString()).toISOString()
       };
 
@@ -224,6 +228,9 @@ export default function GameResult() {
     mutationFn: async () => {
       const results = [];
       const profileCache = {};
+      const isTimeLadderGame = game.game_type === 'time_ladder';
+      const timeLadderDiscsPerTurn = Number(game?.time_ladder_config?.discs_per_turn);
+      const hasTimeLadderDiscs = isTimeLadderGame && Number.isFinite(timeLadderDiscsPerTurn) && timeLadderDiscsPerTurn > 0;
       
       for (const rawPlayerName of game.players || []) {
         const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, rawPlayerName);
@@ -248,6 +255,7 @@ export default function GameResult() {
           ...(game.game_type === 'streak_challenge'
             ? { streak_distance: game.player_distances?.[rawPlayerName] || 0 }
             : {}),
+          ...(hasTimeLadderDiscs ? { time_ladder_discs_per_turn: timeLadderDiscsPerTurn } : {}),
           date: normalizedDate
         };
 
@@ -282,11 +290,13 @@ export default function GameResult() {
         const [existingGeneral] = await base44.entities.LeaderboardEntry.filter({
           ...identityFilter,
           game_type: game.game_type,
-          leaderboard_type: 'general'
+          leaderboard_type: 'general',
+          ...(hasTimeLadderDiscs ? { time_ladder_discs_per_turn: timeLadderDiscsPerTurn } : {})
         });
 
         if (existingGeneral) {
-          if (score > existingGeneral.score) {
+          const isBetter = isTimeLadderGame ? score < existingGeneral.score : score > existingGeneral.score;
+          if (isBetter) {
             await base44.entities.LeaderboardEntry.update(existingGeneral.id, {
               ...basePayload,
               leaderboard_type: 'general'

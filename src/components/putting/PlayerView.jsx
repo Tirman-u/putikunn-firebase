@@ -538,6 +538,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         cache: {}
       });
       const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
+      const isTimeLadder = game.game_type === 'time_ladder';
+      const timeLadderDiscsPerTurn = Number(game?.time_ladder_config?.discs_per_turn);
+      const hasTimeLadderDiscs = isTimeLadder && Number.isFinite(timeLadderDiscsPerTurn) && timeLadderDiscsPerTurn > 0;
 
       const leaderboardData = {
         game_id: game.id,
@@ -551,6 +554,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         total_putts: totalPutts,
         leaderboard_type: 'general',
         ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
+        ...(hasTimeLadderDiscs ? { time_ladder_discs_per_turn: timeLadderDiscsPerTurn } : {}),
         date: new Date().toISOString()
       };
 
@@ -562,11 +566,11 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       const [existingEntry] = await base44.entities.LeaderboardEntry.filter({
         ...identityFilter,
         game_type: game.game_type,
-        leaderboard_type: 'general'
+        leaderboard_type: 'general',
+        ...(hasTimeLadderDiscs ? { time_ladder_discs_per_turn: timeLadderDiscsPerTurn } : {})
       });
 
       if (existingEntry) {
-        const isTimeLadder = game.game_type === 'time_ladder';
         const currentScore = Number(leaderboardData.score || 0);
         const existingScore = Number(existingEntry.score || 0);
         const isBetter = isTimeLadder ? currentScore < existingScore : currentScore > existingScore;

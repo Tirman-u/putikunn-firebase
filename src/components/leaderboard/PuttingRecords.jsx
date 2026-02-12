@@ -93,7 +93,7 @@ export default function PuttingRecords() {
 
   const isATWView = effectiveView?.gameType === 'around_the_world';
   const isTimeView = effectiveView?.gameType === 'time_ladder';
-  const needsGameData = Boolean(effectiveView?.hostedOnly || isATWView);
+  const needsGameData = Boolean(effectiveView?.hostedOnly || isATWView || isTimeView);
 
   const leaderboardGameIds = useMemo(() => {
     if (!needsGameData) return [];
@@ -223,6 +223,22 @@ export default function PuttingRecords() {
     return discs === 1 ? '1 ketas' : `${discs} ketast`;
   };
 
+  const getTimeDiscsCount = (entry) => {
+    if (!isTimeView) return null;
+    const directValue = Number(entry?.time_ladder_discs_per_turn);
+    if (Number.isFinite(directValue) && directValue > 0) return directValue;
+    const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
+    const gameValue = Number(game?.time_ladder_config?.discs_per_turn);
+    if (Number.isFinite(gameValue) && gameValue > 0) return gameValue;
+    return null;
+  };
+
+  const getTimeDiscsLabel = (entry) => {
+    const discs = getTimeDiscsCount(entry);
+    if (!discs) return '-';
+    return discs === 1 ? '1 ketas' : `${discs} ketast`;
+  };
+
   const getPlayerKey = (entry) => {
     if (entry?.player_uid) return `uid:${entry.player_uid}`;
 
@@ -237,22 +253,35 @@ export default function PuttingRecords() {
     return `id:${entry.id}`;
   };
 
-  // Group by player and keep only the best score for each
+  const getRecordKey = (entry) => {
+    const playerKey = getPlayerKey(entry);
+    if (!isTimeView) return playerKey;
+    return `${playerKey}|discs:${getTimeDiscsCount(entry) || 'unknown'}`;
+  };
+
+  // Group by player (and for time challenge also by discs config) and keep the best score for each group
   const bestScoresByPlayer = {};
   filteredEntries.forEach(entry => {
-    const key = getPlayerKey(entry);
+    const key = getRecordKey(entry);
     const existing = bestScoresByPlayer[key];
+    const entryScore = Number(entry.score || 0);
+    const existingScore = Number(existing?.score || 0);
     const isBetter = isTimeView
-      ? (!existing || entry.score < existing.score || (entry.score === existing.score && entry.date > existing.date))
-      : (!existing || entry.score > existing.score || (entry.score === existing.score && entry.date > existing.date));
+      ? (!existing || entryScore < existingScore || (entryScore === existingScore && entry.date > existing.date))
+      : (!existing || entryScore > existingScore || (entryScore === existingScore && entry.date > existing.date));
     if (isBetter) {
       bestScoresByPlayer[key] = entry;
     }
   });
 
   const uniqueEntries = Object.values(bestScoresByPlayer).sort((a, b) => {
-    if (isTimeView) return a.score - b.score;
-    return b.score - a.score;
+    const aScore = Number(a.score || 0);
+    const bScore = Number(b.score || 0);
+    if (isTimeView) {
+      if (aScore !== bScore) return aScore - bScore;
+      return (getTimeDiscsCount(a) || Number.MAX_SAFE_INTEGER) - (getTimeDiscsCount(b) || Number.MAX_SAFE_INTEGER);
+    }
+    return bScore - aScore;
   });
   const totalPages = Math.max(1, Math.ceil(uniqueEntries.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -352,12 +381,15 @@ export default function PuttingRecords() {
                         <th className="text-left py-3 px-2 text-slate-600 font-semibold">#</th>
                         <th className="text-left py-3 px-2 text-slate-600 font-semibold">Mängija</th>
                         <th className="text-center py-3 px-2 text-slate-600 font-semibold">Tulemus</th>
-                        {!isATWView && (
+                        {isTimeView && (
+                          <th className="text-center py-3 px-2 text-slate-600 font-semibold">Kettad</th>
+                        )}
+                        {!isATWView && !isTimeView && (
                           <th className="text-center py-3 px-2 text-slate-600 font-semibold">
                             {effectiveView?.gameType === 'streak_challenge' ? 'Distants' : 'Täpsus'}
                           </th>
                         )}
-                        {!isATWView && (
+                        {!isATWView && !isTimeView && (
                           <th className="text-center py-3 px-2 text-slate-600 font-semibold">Putid</th>
                         )}
                         <th className="text-right py-3 px-2 text-slate-600 font-semibold">Kuupäev</th>
@@ -416,7 +448,14 @@ export default function PuttingRecords() {
                               </span>
                             </Link>
                           </td>
-                          {!isATWView && (
+                          {isTimeView && (
+                            <td className="py-3 px-2 text-center text-slate-700">
+                              <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
+                                {getTimeDiscsLabel(entry)}
+                              </Link>
+                            </td>
+                          )}
+                          {!isATWView && !isTimeView && (
                             <td className="py-3 px-2 text-center text-slate-700">
                               <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                                 {effectiveView?.gameType === 'streak_challenge' 
@@ -426,7 +465,7 @@ export default function PuttingRecords() {
                               </Link>
                             </td>
                           )}
-                          {!isATWView && (
+                          {!isATWView && !isTimeView && (
                             <td className="py-3 px-2 text-center text-slate-600">
                               <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                                 {entry.made_putts}/{entry.total_putts}

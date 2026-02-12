@@ -8,6 +8,7 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch
 } from 'firebase/firestore';
@@ -60,6 +61,9 @@ export default function TrainingSession() {
   const [isSavingApp, setIsSavingApp] = React.useState(false);
   const [isSavingOffline, setIsSavingOffline] = React.useState(false);
   const [isDeletingEvent, setIsDeletingEvent] = React.useState({});
+  const [isRenamingEvent, setIsRenamingEvent] = React.useState(false);
+  const [editingEventId, setEditingEventId] = React.useState('');
+  const [editingEventName, setEditingEventName] = React.useState('');
   const [mode, setMode] = React.useState('app');
   const [applyAppToSameDate, setApplyAppToSameDate] = React.useState(true);
 
@@ -101,20 +105,6 @@ export default function TrainingSession() {
     staleTime: 30000
   });
 
-  const { data: events = [] } = useQuery({
-    queryKey: ['training-events', sessionId],
-    enabled: !!sessionId,
-    queryFn: async () => {
-      const q = query(
-        collection(db, 'training_events'),
-        where('session_id', '==', sessionId)
-      );
-      const snap = await getDocs(q);
-      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
-    },
-    staleTime: 5000
-  });
-
   const { data: seasonEvents = [] } = useQuery({
     queryKey: ['training-events-season', season?.id],
     enabled: !!season?.id,
@@ -129,13 +119,13 @@ export default function TrainingSession() {
     staleTime: 5000
   });
 
-  const { data: results = [] } = useQuery({
-    queryKey: ['training-event-results', sessionId],
-    enabled: !!sessionId,
+  const { data: seasonResults = [] } = useQuery({
+    queryKey: ['training-event-results-season', season?.id],
+    enabled: !!season?.id,
     queryFn: async () => {
       const q = query(
         collection(db, 'training_event_results'),
-        where('session_id', '==', sessionId)
+        where('season_id', '==', season.id)
       );
       const snap = await getDocs(q);
       return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
@@ -249,15 +239,6 @@ export default function TrainingSession() {
     staleTime: 15000
   });
 
-  const resultsByEvent = React.useMemo(() => {
-    const map = {};
-    results.forEach((entry) => {
-      if (!map[entry.event_id]) map[entry.event_id] = [];
-      map[entry.event_id].push(entry);
-    });
-    return map;
-  }, [results]);
-
   const getSessionDateKey = React.useCallback((value) => {
     if (!value) return '';
     const date = new Date(value);
@@ -313,9 +294,34 @@ export default function TrainingSession() {
     cutPercent: offlineCutPercentValue
   });
 
+  const visibleSessionIds = React.useMemo(() => {
+    if (isDayGroupedView) {
+      return daySessions.map((entry) => entry.id).filter(Boolean);
+    }
+    return session?.id ? [session.id] : [];
+  }, [isDayGroupedView, daySessions, session?.id]);
+
+  const visibleEvents = React.useMemo(() => {
+    if (!visibleSessionIds.length) return [];
+    const sessionIdSet = new Set(visibleSessionIds);
+    return seasonEvents
+      .filter((entry) => sessionIdSet.has(entry.session_id))
+      .sort((a, b) => {
+        const aTime = a?.created_at?.seconds
+          ? a.created_at.seconds * 1000
+          : new Date(a?.created_at || 0).getTime();
+        const bTime = b?.created_at?.seconds
+          ? b.created_at.seconds * 1000
+          : new Date(b?.created_at || 0).getTime();
+        return bTime - aTime;
+      });
+  }, [seasonEvents, visibleSessionIds]);
+
   const createAppEventFromGame = async (game, options = {}) => {
     const targetSession = options.session || session;
-    const existingEvents = Array.isArray(options.existingEvents) ? options.existingEvents : events;
+    const existingEvents = Array.isArray(options.existingEvents)
+      ? options.existingEvents
+      : seasonEvents.filter((entry) => entry.session_id === targetSession?.id);
     if (!targetSession || !season || !group) {
       return { ok: false, message: 'Treeningu andmed puuduvad' };
     }
@@ -467,9 +473,8 @@ export default function TrainingSession() {
       setAppPin('');
       setAppName('');
       setAppLowerIsBetter(false);
-      queryClient.invalidateQueries({ queryKey: ['training-events'] });
       queryClient.invalidateQueries({ queryKey: ['training-events-season', season?.id] });
-      queryClient.invalidateQueries({ queryKey: ['training-event-results'] });
+      queryClient.invalidateQueries({ queryKey: ['training-event-results-season', season?.id] });
       queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
       if (summary.skipped > 0) {
         toast.success(`Event lisatud ${summary.added} trenni, vahele jäetud ${summary.skipped}`);
@@ -494,9 +499,8 @@ export default function TrainingSession() {
         return;
       }
       setAppName('');
-      queryClient.invalidateQueries({ queryKey: ['training-events'] });
       queryClient.invalidateQueries({ queryKey: ['training-events-season', season?.id] });
-      queryClient.invalidateQueries({ queryKey: ['training-event-results'] });
+      queryClient.invalidateQueries({ queryKey: ['training-event-results-season', season?.id] });
       queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
       if (summary.skipped > 0) {
         toast.success(`Event lisatud ${summary.added} trenni, vahele jäetud ${summary.skipped}`);
@@ -663,14 +667,63 @@ export default function TrainingSession() {
         setOfflineName('');
         setOfflinePoints({});
       }
-      queryClient.invalidateQueries({ queryKey: ['training-events', sessionId] });
-      queryClient.invalidateQueries({ queryKey: ['training-event-results', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-events-season', season?.id] });
+      queryClient.invalidateQueries({ queryKey: ['training-event-results-season', season?.id] });
       queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
       toast.success('Offline event lisatud');
     } catch (error) {
       toast.error(error?.message || 'Offline eventi lisamine ebaõnnestus');
     } finally {
       setIsSavingOffline(false);
+    }
+  };
+
+  const resultsByEvent = React.useMemo(() => {
+    const map = {};
+    seasonResults.forEach((entry) => {
+      if (!map[entry.event_id]) map[entry.event_id] = [];
+      map[entry.event_id].push(entry);
+    });
+    return map;
+  }, [seasonResults]);
+
+  const startRenamingEvent = (event) => {
+    setEditingEventId(event?.id || '');
+    setEditingEventName(event?.name || '');
+  };
+
+  const cancelRenamingEvent = () => {
+    setEditingEventId('');
+    setEditingEventName('');
+  };
+
+  const handleRenameEvent = async (event) => {
+    if (!event?.id) return;
+    if (!canManageTraining) {
+      toast.error('Pole treeneri õigusi');
+      return;
+    }
+    const nextName = editingEventName.trim();
+    if (!nextName) {
+      toast.error('Sisesta eventi nimi');
+      return;
+    }
+    if (nextName === (event.name || '')) {
+      cancelRenamingEvent();
+      return;
+    }
+    setIsRenamingEvent(true);
+    try {
+      await updateDoc(doc(db, 'training_events', event.id), {
+        name: nextName
+      });
+      queryClient.invalidateQueries({ queryKey: ['training-events-season', season?.id] });
+      toast.success('Event uuendatud');
+      cancelRenamingEvent();
+    } catch (error) {
+      toast.error(error?.message || 'Eventi muutmine ebaõnnestus');
+    } finally {
+      setIsRenamingEvent(false);
     }
   };
 
@@ -693,7 +746,8 @@ export default function TrainingSession() {
           const existing = statsByParticipant[participantId];
           if (!existing) return;
           const deduction = Number(entry.points || 0);
-          const currentSlotPoints = Number(existing.points_by_slot?.[session?.slot_id] || 0);
+          const slotId = entry.slot_id || event.slot_id || session?.slot_id;
+          const currentSlotPoints = Number(existing.points_by_slot?.[slotId] || 0);
           const nextSlotPoints = round1(Math.max(0, currentSlotPoints - deduction));
           const nextTotal = round1(Math.max(0, Number(existing.points_total || 0) - deduction));
           const nextAttendance = Math.max(0, (existing.attendance_count || 0) - 1);
@@ -702,7 +756,7 @@ export default function TrainingSession() {
             attendance_count: nextAttendance,
             points_by_slot: {
               ...(existing.points_by_slot || {}),
-              [session?.slot_id]: nextSlotPoints
+              [slotId]: nextSlotPoints
             },
             updated_at: new Date().toISOString()
           };
@@ -724,8 +778,8 @@ export default function TrainingSession() {
           .commit();
       }
 
-      queryClient.invalidateQueries({ queryKey: ['training-events', sessionId] });
-      queryClient.invalidateQueries({ queryKey: ['training-event-results', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['training-events-season', season?.id] });
+      queryClient.invalidateQueries({ queryKey: ['training-event-results-season', season?.id] });
       queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
       toast.success('Event kustutatud');
     } catch (error) {
@@ -848,6 +902,9 @@ export default function TrainingSession() {
                 )}
                 <div className="rounded-2xl border border-white/70 bg-white/70 p-3 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
                   <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Trenni mängud</div>
+                  <div className="mb-2 text-[11px] text-slate-500">
+                    See nimekiri on allikas. Vajuta <span className="font-semibold">Lisa event</span>, et mäng ilmuks all Eventid plokis.
+                  </div>
                   {isLoadingGroupGames ? (
                     <div className="text-xs text-slate-400">Laen...</div>
                   ) : groupGames.length === 0 ? (
@@ -1024,30 +1081,72 @@ export default function TrainingSession() {
             <ClipboardList className="w-4 h-4 text-emerald-600" />
             <div className="text-sm font-semibold text-slate-800">Eventid</div>
           </div>
-          {events.length === 0 ? (
+          {visibleEvents.length === 0 ? (
             <div className="text-sm text-slate-400">Evente pole veel.</div>
           ) : (
             <div className="space-y-3">
-              {events.map((event) => {
+              {visibleEvents.map((event) => {
                 const eventResults = resultsByEvent[event.id] || [];
+                const isEditingThisEvent = editingEventId === event.id;
+                const slotLabel = formatSlotLabel(slotById[event.slot_id]);
                 return (
                   <div key={event.id} className="rounded-2xl border border-slate-100 bg-white/80 p-4 dark:bg-black dark:border-white/10">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-slate-800">{event.name}</div>
-                        <div className="text-xs text-slate-500">{event.type === 'app' ? 'App event' : 'Offline'}</div>
+                        {isEditingThisEvent ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editingEventName}
+                              onChange={(entry) => setEditingEventName(entry.target.value)}
+                              className="h-9 w-56 max-w-full"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRenameEvent(event)}
+                              disabled={isRenamingEvent}
+                              className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-emerald-300"
+                            >
+                              {isRenamingEvent ? 'Salvestan...' : 'Salvesta'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelRenamingEvent}
+                              disabled={isRenamingEvent}
+                              className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-slate-200"
+                            >
+                              Loobu
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-sm font-semibold text-slate-800">{event.name}</div>
+                        )}
+                        <div className="text-xs text-slate-500">
+                          {event.type === 'app' ? 'App event' : 'Offline'}
+                          {isDayGroupedView && slotLabel ? ` • ${slotLabel}` : ''}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <div className="text-xs text-slate-400">{eventResults.length} osalejat</div>
                         {canManageTraining && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteEvent(event)}
-                            disabled={Boolean(isDeletingEvent[event.id])}
-                            className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-600 shadow-sm transition hover:bg-red-100 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-red-300"
-                          >
-                            {isDeletingEvent[event.id] ? 'Kustutan...' : 'Kustuta'}
-                          </button>
+                          <>
+                            {!isEditingThisEvent && (
+                              <button
+                                type="button"
+                                onClick={() => startRenamingEvent(event)}
+                                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 dark:bg-black dark:border-white/10 dark:text-slate-200"
+                              >
+                                Muuda
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteEvent(event)}
+                              disabled={Boolean(isDeletingEvent[event.id])}
+                              className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-600 shadow-sm transition hover:bg-red-100 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-red-300"
+                            >
+                              {isDeletingEvent[event.id] ? 'Kustutan...' : 'Kustuta'}
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>

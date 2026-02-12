@@ -1,7 +1,7 @@
 {
   "name": "base44-app",
   "private": true,
-  "version": "0.1.48",
+  "version": "0.1.49",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "training:recalc-rank-hc": "node scripts/recalc-training-rank-hc-points.mjs"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.3",

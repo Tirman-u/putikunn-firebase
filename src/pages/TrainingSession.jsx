@@ -2,7 +2,6 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
@@ -24,8 +23,10 @@ import { Input } from '@/components/ui/input';
 import { getSlotAttendance, getWeekKey } from '@/lib/training-utils';
 import {
   SCORE_DIRECTIONS,
+  computeRankCutPoints,
   computeHcPoints,
   formatSlotLabel,
+  getCutCount,
   getParticipantId,
   isScoreBetter,
   round1
@@ -57,7 +58,7 @@ export default function TrainingSession() {
   const [offlineParticipants, setOfflineParticipants] = React.useState('');
   const [offlineParticipantsTouched, setOfflineParticipantsTouched] = React.useState(false);
   const [offlineCutPercent, setOfflineCutPercent] = React.useState(70);
-  const [offlineCutBonus, setOfflineCutBonus] = React.useState(0.25);
+  const [offlineCutBonus, setOfflineCutBonus] = React.useState(0.3);
   const [isSavingApp, setIsSavingApp] = React.useState(false);
   const [isSavingOffline, setIsSavingOffline] = React.useState(false);
   const [isDeletingEvent, setIsDeletingEvent] = React.useState({});
@@ -233,9 +234,10 @@ export default function TrainingSession() {
   const offlineParticipantsCount = Number(offlineParticipants) || 0;
   const offlineCutPercentValue = Math.min(100, Math.max(0, Number(offlineCutPercent) || 0));
   const offlineCutBonusValue = Math.max(0, Number(offlineCutBonus) || 0);
-  const offlineCutCount = offlineParticipantsCount > 0
-    ? Math.ceil((offlineParticipantsCount * offlineCutPercentValue) / 100)
-    : 0;
+  const offlineCutCount = getCutCount({
+    participantsCount: offlineParticipantsCount,
+    cutPercent: offlineCutPercentValue
+  });
 
   const createAppEventFromGame = async (game) => {
     if (!session || !season || !group) {
@@ -443,9 +445,12 @@ export default function TrainingSession() {
           const displayName = member?.name || member?.email || 'Mängija';
           const participantId = getParticipantId({ uid, email: member?.email, name: displayName });
           const existing = statsByParticipant[participantId];
-          const qualifies = offlineCutCount > 0 && rank <= offlineCutCount;
-          const bonus = qualifies ? offlineCutBonusValue : 0;
-          const points = round1(1 + bonus);
+          const { cutBonus: bonus, points } = computeRankCutPoints({
+            rank,
+            participantsCount: offlineParticipantsCount,
+            cutPercent: offlineCutPercentValue,
+            bonusStep: offlineCutBonusValue
+          });
           const nextPointsBySlot = {
             ...(existing?.points_by_slot || {}),
             [session.slot_id]: round1((existing?.points_by_slot?.[session.slot_id] || 0) + points)
@@ -807,15 +812,19 @@ export default function TrainingSession() {
                       />
                     </div>
                     <div className="text-xs text-slate-500">
-                      Top {offlineCutPercentValue}% = {offlineCutCount} mängijat saavad +{round1(offlineCutBonusValue).toFixed(1)}p
+                      Top {offlineCutPercentValue}% = {offlineCutCount} mängijat.
+                      {` ${offlineCutCount}. koht saab +${round1(offlineCutBonusValue).toFixed(1)}p, iga koht ülespoole +${round1(offlineCutBonusValue).toFixed(1)}p juurde.`}
                     </div>
                     <div className="space-y-2">
                       {filteredMembers.map((member) => {
                         const rankValue = Number(offlineRanks[member.uid]) || 0;
-                        const qualifies = rankValue > 0 && offlineCutCount > 0 && rankValue <= offlineCutCount;
-                        const pointsPreview = rankValue > 0
-                          ? round1(1 + (qualifies ? offlineCutBonusValue : 0)).toFixed(1)
-                          : null;
+                        const { points } = computeRankCutPoints({
+                          rank: rankValue,
+                          participantsCount: offlineParticipantsCount,
+                          cutPercent: offlineCutPercentValue,
+                          bonusStep: offlineCutBonusValue
+                        });
+                        const pointsPreview = Number.isFinite(points) ? points.toFixed(1) : null;
                         return (
                           <div key={member.uid} className="flex items-center gap-2">
                             <div className="text-xs text-slate-600 w-32">{member.name || member.email}</div>

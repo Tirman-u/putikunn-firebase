@@ -99,6 +99,37 @@ export const computeHcPoints = ({ score, seasonBest, direction }) => {
   return { hc: round1(hc), hcBonus, points };
 };
 
+export const getCutCount = ({ participantsCount, cutPercent }) => {
+  const safeParticipants = Math.max(0, Number(participantsCount) || 0);
+  const safeCutPercent = Math.min(100, Math.max(0, Number(cutPercent) || 0));
+  if (safeParticipants === 0 || safeCutPercent === 0) return 0;
+  return Math.ceil((safeParticipants * safeCutPercent) / 100);
+};
+
+export const computeRankCutPoints = ({
+  rank,
+  participantsCount,
+  cutPercent,
+  bonusStep,
+  basePoints = 1
+}) => {
+  const safeRank = Number(rank);
+  const safeBonusStep = Math.max(0, Number(bonusStep) || 0);
+  const cutCount = getCutCount({ participantsCount, cutPercent });
+  const hasRank = Number.isFinite(safeRank) && safeRank > 0;
+  const qualifies = hasRank && cutCount > 0 && safeRank <= cutCount;
+  const stepCount = qualifies ? (cutCount - safeRank + 1) : 0;
+  const cutBonus = qualifies ? round1(stepCount * safeBonusStep) : 0;
+  const points = hasRank ? round1(basePoints + cutBonus) : null;
+  return {
+    cutCount,
+    qualifies,
+    stepCount,
+    cutBonus,
+    points
+  };
+};
+
 export const getParticipantId = ({ uid, email, name }) => {
   if (uid) return `uid:${uid}`;
   if (email) return `email:${email.toLowerCase()}`;

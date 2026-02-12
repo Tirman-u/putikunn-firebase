@@ -25,38 +25,48 @@ export default function JoinGame({ onJoin, onBack }) {
   });
 
   const { data: recentGames = [] } = useQuery({
-    queryKey: ['recent-games'],
+    queryKey: ['recent-games-v2'],
     queryFn: async () => {
-      const [activeGames, duelGames] = await Promise.all([
-        base44.entities.Game.filter({
-          status: { $in: ['setup', 'active'] }
-        }, '-date', 10),
-        base44.entities.DuelGame.filter({}, '-created_at', 20)
+      const [hostedGames, duelGames] = await Promise.all([
+        base44.entities.Game.filter({ pin: { $ne: '0000' } }, '-date', 80),
+        base44.entities.DuelGame.filter({}, '-created_at', 50)
       ]);
 
-      const regularEntries = activeGames
-        .filter((g) =>
-          g.pin !== null &&
-          g.pin !== '0000' &&
-          g.join_closed !== true &&
-          g.status !== 'closed'
-        )
+      const regularEntries = (hostedGames || [])
+        .filter((g) => {
+          const status = String(g?.status || '').toLowerCase();
+          return Boolean(
+            g?.pin &&
+            g.pin !== '0000' &&
+            g.join_closed !== true &&
+            status !== 'closed' &&
+            status !== 'completed' &&
+            status !== 'finished'
+          );
+        })
         .map((g) => ({ ...g, __kind: 'regular', __sortDate: g.date || g.created_date || null }));
 
-      const duelEntries = duelGames
-        .filter((g) =>
-          g?.pin &&
-          g.pin !== '0000' &&
-          g.status !== 'finished'
-        )
+      const duelEntries = (duelGames || [])
+        .filter((g) => {
+          const status = String(g?.status || '').toLowerCase();
+          return Boolean(
+            g?.pin &&
+            g.pin !== '0000' &&
+            status !== 'finished' &&
+            status !== 'closed' &&
+            status !== 'cancelled'
+          );
+        })
         .map((g) => ({ ...g, __kind: 'duel', __sortDate: g.created_at || g.started_at || g.date || null }));
 
       return [...regularEntries, ...duelEntries]
         .sort((a, b) => new Date(b.__sortDate || 0) - new Date(a.__sortDate || 0))
         .slice(0, 10);
     },
-    enabled: !!user,
-    refetchInterval: false
+    enabled: true,
+    staleTime: 5000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 15000
   });
 
   // Realtime updates removed to keep Firestore read usage low.

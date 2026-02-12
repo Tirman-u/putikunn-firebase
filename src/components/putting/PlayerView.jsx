@@ -529,7 +529,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const submitToLeaderboardMutation = useMutation({
     mutationFn: async () => {
       const playerPutts = game.player_putts?.[playerName] || [];
-      const madePutts = playerPutts.filter(p => p.result === 'made').length;
+      const madePutts = playerPutts.filter((p) => p.result === 'made').length;
       const totalPutts = playerPutts.length;
       const accuracy = totalPutts > 0 ? (madePutts / totalPutts) * 100 : 0;
       const resolvedPlayer = await resolveLeaderboardPlayer({
@@ -538,16 +538,19 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         cache: {}
       });
       const identityFilter = buildLeaderboardIdentityFilter(resolvedPlayer);
-      const isTimeLadder = game.game_type === 'time_ladder';
+      const gameType = game.game_type;
+      const isTimeLadder = gameType === 'time_ladder';
+      const isStreak = gameType === 'streak_challenge';
       const timeLadderDiscsPerTurn = Number(game?.time_ladder_config?.discs_per_turn);
       const hasTimeLadderDiscs = isTimeLadder && Number.isFinite(timeLadderDiscsPerTurn) && timeLadderDiscsPerTurn > 0;
+      const streakDistance = isStreak ? Number(game.player_distances?.[playerName] || 0) : null;
 
       const leaderboardData = {
         game_id: game.id,
         ...(resolvedPlayer.playerUid ? { player_uid: resolvedPlayer.playerUid } : {}),
         player_email: getLeaderboardEmail(resolvedPlayer),
         player_name: resolvedPlayer.playerName,
-        game_type: game.game_type,
+        game_type: gameType,
         score: game.total_points[playerName] || 0,
         accuracy: Math.round(accuracy * 10) / 10,
         made_putts: madePutts,
@@ -555,27 +558,26 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         leaderboard_type: 'general',
         ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
         ...(hasTimeLadderDiscs ? { time_ladder_discs_per_turn: timeLadderDiscsPerTurn } : {}),
+        ...(isStreak ? { streak_distance: streakDistance || 0 } : {}),
         date: new Date().toISOString()
       };
 
-      // Add distance for streak challenge
-      if (game.game_type === 'streak_challenge') {
-        leaderboardData.streak_distance = game.player_distances?.[playerName] || 0;
-      }
-
-      const [existingEntry] = await base44.entities.LeaderboardEntry.filter({
+      const entryFilter = {
         ...identityFilter,
-        game_type: game.game_type,
+        game_id: game.id,
+        game_type: gameType,
         leaderboard_type: 'general',
-        ...(hasTimeLadderDiscs ? { time_ladder_discs_per_turn: timeLadderDiscsPerTurn } : {})
-      });
+        ...(hasTimeLadderDiscs ? { time_ladder_discs_per_turn: timeLadderDiscsPerTurn } : {}),
+        ...(isStreak ? { streak_distance: streakDistance || 0 } : {})
+      };
+      const [existingEntry] = await base44.entities.LeaderboardEntry.filter(entryFilter, isTimeLadder ? 'score' : '-score', 1);
 
       if (existingEntry) {
         const currentScore = Number(leaderboardData.score || 0);
         const existingScore = Number(existingEntry.score || 0);
         const isBetter = isTimeLadder ? currentScore < existingScore : currentScore > existingScore;
         if (isBetter) {
-          await base44.entities.LeaderboardEntry.update(existingEntry.id, leaderboardData);
+          return await base44.entities.LeaderboardEntry.update(existingEntry.id, leaderboardData);
         }
         return existingEntry;
       }

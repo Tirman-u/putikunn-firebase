@@ -411,6 +411,8 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       const accuracy = Math.max(playerState.best_accuracy || 0, currentAccuracy);
       const currentScore = game?.total_points?.[playerName] || 0;
       const bestScore = Math.max(playerState.best_score || 0, currentScore);
+      const atwDiscsPerTurn = Number(game?.atw_config?.discs_per_turn);
+      const hasAtwDiscs = Number.isFinite(atwDiscsPerTurn) && atwDiscsPerTurn > 0;
 
       const resolvedPlayer = await resolveLeaderboardPlayer({
         game,
@@ -430,14 +432,17 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
         total_putts: totalPutts,
         leaderboard_type: 'general',
         ...(resolvedPlayer.playerGender ? { player_gender: resolvedPlayer.playerGender } : {}),
+        ...(hasAtwDiscs ? { atw_discs_per_turn: atwDiscsPerTurn } : {}),
         date: new Date().toISOString()
       };
 
       const [existingEntry] = await base44.entities.LeaderboardEntry.filter({
         ...identityFilter,
+        game_id: game.id,
         game_type: 'around_the_world',
-        leaderboard_type: 'general'
-      });
+        leaderboard_type: 'general',
+        ...(hasAtwDiscs ? { atw_discs_per_turn: atwDiscsPerTurn } : {})
+      }, '-date', 1);
 
       if (existingEntry) {
         if (payload.score > existingEntry.score) {

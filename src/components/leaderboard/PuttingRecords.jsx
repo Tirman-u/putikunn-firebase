@@ -121,6 +121,7 @@ export default function PuttingRecords() {
 
   const isATWView = effectiveView?.gameType === 'around_the_world';
   const isTimeView = effectiveView?.gameType === 'time_ladder';
+  const isStreakView = effectiveView?.gameType === 'streak_challenge';
   const needsGameData = Boolean(effectiveView?.hostedOnly || isATWView || isTimeView);
 
   const leaderboardGameIds = useMemo(() => {
@@ -218,26 +219,41 @@ export default function PuttingRecords() {
         return null;
       };
 
-      const bestExistingByKey = new Map();
-      existingEntries.forEach((entry) => {
-        const entryKey = `${getPlayerKey(entry)}|discs:${getEntryDiscs(entry) || 'unknown'}`;
-        const existing = bestExistingByKey.get(entryKey);
-        const entryScore = Number(entry?.score || 0);
-        const existingScore = Number(existing?.score || 0);
-        const entryDate = new Date(entry?.date || 0).getTime();
-        const existingDate = new Date(existing?.date || 0).getTime();
-        const isBetter = !existing || entryScore < existingScore || (entryScore === existingScore && entryDate > existingDate);
-        if (isBetter) {
-          bestExistingByKey.set(entryKey, entry);
+      const signatureForExisting = (entry) => `${getPlayerKey(entry)}|game:${entry?.game_id || 'unknown'}|discs:${getEntryDiscs(entry) || 'unknown'}`;
+      const entriesBySignature = new Map();
+      let removedDuplicates = 0;
+
+      for (const entry of existingEntries) {
+        const signature = signatureForExisting(entry);
+        const current = entriesBySignature.get(signature);
+        if (!current) {
+          entriesBySignature.set(signature, entry);
+          continue;
         }
-      });
+
+        const entryScore = Number(entry?.score || 0);
+        const currentScore = Number(current?.score || 0);
+        const entryDate = new Date(entry?.date || 0).getTime();
+        const currentDate = new Date(current?.date || 0).getTime();
+        const entryIsBetter = entryScore < currentScore || (entryScore === currentScore && entryDate > currentDate);
+
+        if (entryIsBetter) {
+          if (current?.id) {
+            await base44.entities.LeaderboardEntry.delete(current.id);
+            removedDuplicates += 1;
+          }
+          entriesBySignature.set(signature, entry);
+        } else if (entry?.id) {
+          await base44.entities.LeaderboardEntry.delete(entry.id);
+          removedDuplicates += 1;
+        }
+      }
 
       const profileCache = {};
       let created = 0;
       let updated = 0;
       for (const game of timeGames) {
         const discs = Number(game?.time_ladder_config?.discs_per_turn);
-        if (!Number.isFinite(discs) || discs <= 0) continue;
         const gamePlayers = resolveGamePlayers(game);
 
         for (const rawPlayerName of gamePlayers) {
@@ -264,16 +280,17 @@ export default function PuttingRecords() {
             accuracy: Math.round((Number(stats?.accuracy || 0)) * 10) / 10,
             made_putts: Number(stats?.madePutts || 0),
             total_putts: Number(stats?.totalPutts || 0),
-            time_ladder_discs_per_turn: discs,
+            ...(Number.isFinite(discs) && discs > 0 ? { time_ladder_discs_per_turn: discs } : {}),
             leaderboard_type: 'general',
             date: new Date(game.date || new Date().toISOString()).toISOString()
           };
 
-          const key = `${identityKey}|discs:${discs}`;
-          const existing = bestExistingByKey.get(key);
+          const signature = `${identityKey}|game:${game.id}|discs:${Number.isFinite(discs) && discs > 0 ? discs : 'unknown'}`;
+          const existing = entriesBySignature.get(signature);
+
           if (!existing?.id) {
             const createdEntry = await base44.entities.LeaderboardEntry.create(payload);
-            bestExistingByKey.set(key, createdEntry || payload);
+            entriesBySignature.set(signature, createdEntry || payload);
             created += 1;
             continue;
           }
@@ -284,7 +301,7 @@ export default function PuttingRecords() {
           const isBetter = score < existingScore || (score === existingScore && payloadDate > existingDate);
           if (isBetter) {
             await base44.entities.LeaderboardEntry.update(existing.id, payload);
-            bestExistingByKey.set(key, { ...existing, ...payload });
+            entriesBySignature.set(signature, { ...existing, ...payload });
             updated += 1;
           }
         }
@@ -294,12 +311,13 @@ export default function PuttingRecords() {
         scannedGames: timeGames.length,
         fixedDiscs,
         created,
-        updated
+        updated,
+        removedDuplicates
       };
     },
     onSuccess: (result) => {
       toast.success(
-        `Aja väljakutse parandatud (${result.scannedGames} mängu, +${result.created} uut, ${result.updated} uuendatud, ${result.fixedDiscs} ketaste fix)`
+        `Aja väljakutse parandatud (${result.scannedGames} mängu, +${result.created} uut, ${result.updated} uuendatud, ${result.fixedDiscs} ketaste fix, ${result.removedDuplicates} duplikaati eemaldatud)`
       );
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(TIME_REPAIR_STORAGE_KEY, 'done');
@@ -399,10 +417,18 @@ export default function PuttingRecords() {
     return true;
   });
 
-  const getAtwDiscsLabel = (entry) => {
+  const getAtwDiscsCount = (entry) => {
     if (!isATWView) return null;
+    const directValue = Number(entry?.atw_discs_per_turn);
+    if (Number.isFinite(directValue) && directValue > 0) return directValue;
     const game = entry?.game_id ? gamesById?.[entry.game_id] : null;
-    const discs = game?.atw_config?.discs_per_turn;
+    const gameValue = Number(game?.atw_config?.discs_per_turn);
+    if (Number.isFinite(gameValue) && gameValue > 0) return gameValue;
+    return null;
+  };
+
+  const getAtwDiscsLabel = (entry) => {
+    const discs = getAtwDiscsCount(entry);
     if (!discs) return null;
     return discs === 1 ? '1 ketas' : `${discs} ketast`;
   };
@@ -421,6 +447,13 @@ export default function PuttingRecords() {
     const discs = getTimeDiscsCount(entry);
     if (!discs) return '-';
     return discs === 1 ? '1 ketas' : `${discs} ketast`;
+  };
+
+  const getStreakDistance = (entry) => {
+    if (!isStreakView) return null;
+    const distance = Number(entry?.streak_distance);
+    if (Number.isFinite(distance) && distance > 0) return distance;
+    return 0;
   };
 
   const getPlayerKey = (entry) => {
@@ -448,13 +481,21 @@ export default function PuttingRecords() {
 
   const getRecordKey = (entry) => {
     const playerKey = getPlayerKey(entry);
-    if (!isTimeView) return playerKey;
-    return `${playerKey}|discs:${getTimeDiscsCount(entry) || 'unknown'}`;
+    if (isTimeView) {
+      return `${playerKey}|time_discs:${getTimeDiscsCount(entry) || 'unknown'}`;
+    }
+    if (isATWView) {
+      return `${playerKey}|atw_discs:${getAtwDiscsCount(entry) || 'unknown'}`;
+    }
+    if (isStreakView) {
+      return `${playerKey}|streak_distance:${getStreakDistance(entry) || 0}`;
+    }
+    return playerKey;
   };
 
-  // Group by player (and for time challenge also by discs config) and keep the best score for each group
+  // Group by player + relevant variant (time discs, ATW discs, streak distance) and keep best score per group.
   const bestScoresByPlayer = {};
-  filteredEntries.forEach(entry => {
+  filteredEntries.forEach((entry) => {
     const key = getRecordKey(entry);
     const existing = bestScoresByPlayer[key];
     const entryScore = Number(entry.score || 0);
@@ -473,6 +514,14 @@ export default function PuttingRecords() {
     if (isTimeView) {
       if (aScore !== bScore) return aScore - bScore;
       return (getTimeDiscsCount(a) || Number.MAX_SAFE_INTEGER) - (getTimeDiscsCount(b) || Number.MAX_SAFE_INTEGER);
+    }
+    if (isStreakView) {
+      if (aScore !== bScore) return bScore - aScore;
+      return (getStreakDistance(b) || 0) - (getStreakDistance(a) || 0);
+    }
+    if (isATWView) {
+      if (aScore !== bScore) return bScore - aScore;
+      return (getAtwDiscsCount(a) || Number.MAX_SAFE_INTEGER) - (getAtwDiscsCount(b) || Number.MAX_SAFE_INTEGER);
     }
     return bScore - aScore;
   });

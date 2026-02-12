@@ -21,6 +21,8 @@
 - Host-mänge ei teki: viga avaldub sõbraduelli HOST mängu loomisel.
 - Telefonis, kui teha oma sõbraduelli HOST mäng, ei ole võimalik hosti vaates mängu avada (st “minna mängu sisse” / lahti märkida).
 - Dark Theme nupp läheb vahepeal teiste nuppude peale (nt `Alusta` nupp mängu loomisel). Parandus: väldi overlap'i ja taga korrektne paigutus kõigis vaadetes.
+- Nädala vahetusel peavad `1x` trenni võtmised automaatselt tagasi oma püsikohtadele minema (nt neljapäeval ei tohi eelmise nädala `1x` asendused jääda aktiivseks).
+- SOLO sõbraduell peab pärast mängu salvestamist tekkima mõlema mängija profiili alla; hetkel see teisele osapoolele profiilis ei ilmu.
 
 ## ✅ Done (viimati tehtud)
 - Treeningu liigapunktid (rank + HC): astmeline 70% boonus töötab korrektselt (`6. koht +0.3`, iga koht üles +0.3); varasemad salvestatud tulemused ja hooaja punktid backfillitud.

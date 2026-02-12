@@ -14,14 +14,13 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { Calendar, Trophy, Plus } from 'lucide-react';
+import { Calendar, Trophy, Plus, Clock3, ChevronRight } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { countRemainingBySlot, formatSlotLabel, round1 } from '@/lib/training-league';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/i18n';
@@ -195,48 +194,60 @@ export default function TrainingSeason() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.12),_rgba(255,255,255,1)_55%)] px-4 pb-12 dark:bg-black dark:text-slate-100">
-      <div className="max-w-5xl mx-auto pt-6">
-        <div className="mb-6 flex items-center gap-2">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_rgba(255,255,255,1)_58%)] px-3 pb-10 pt-4 dark:bg-black dark:text-slate-100 sm:px-4 sm:pb-12 sm:pt-6">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-4 flex items-center gap-2 sm:mb-6">
           <BackButton fallbackTo={`${createPageUrl('TrainingLeague')}?groupId=${season.group_id}`} forceFallback label={tr('Tagasi', 'Back')} />
           <HomeButton label={tr('Avaleht', 'Home')} />
         </div>
 
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-emerald-600" />
-              {season.name}
-            </h1>
-            <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
-              <Calendar className="w-3 h-3" />
-              {season.start_date ? format(new Date(season.start_date), 'MMM d') : '-'} –{' '}
-              {season.end_date ? format(new Date(season.end_date), 'MMM d') : '-'}
+        <div className="mb-5 rounded-[30px] border border-white/80 bg-white/90 p-4 shadow-[0_24px_50px_rgba(15,23,42,0.09)] backdrop-blur-xl dark:border-white/10 dark:bg-black sm:mb-6 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-800 dark:text-slate-100">
+                <Trophy className="h-5 w-5 text-emerald-600" />
+                {season.name}
+              </h1>
+              <div className="mt-1 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                <Calendar className="h-3 w-3" />
+                {season.start_date ? format(new Date(season.start_date), 'MMM d') : '-'} –{' '}
+                {season.end_date ? format(new Date(season.end_date), 'MMM d') : '-'}
+              </div>
             </div>
-            <div className="text-xs text-emerald-600 mt-1">{tr('Trenni jäänud', 'Trainings left')}: {remaining.total}</div>
+            {canManageTraining && (
+              <button
+                type="button"
+                onClick={handleDeleteSeason}
+                disabled={isDeletingSeason}
+                className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-100 disabled:opacity-60 dark:border-white/10 dark:bg-black dark:text-red-300"
+              >
+                {isDeletingSeason ? tr('Kustutan...', 'Deleting...') : tr('Kustuta hooaeg', 'Delete season')}
+              </button>
+            )}
           </div>
-          {canManageTraining && (
-            <button
-              type="button"
-              onClick={handleDeleteSeason}
-              disabled={isDeletingSeason}
-              className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-100 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-red-300"
-            >
-              {isDeletingSeason ? tr('Kustutan...', 'Deleting...') : tr('Kustuta hooaeg', 'Delete season')}
-            </button>
-          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <div className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-white/10 dark:bg-black dark:text-emerald-300">
+              {tr('Trenni jäänud', 'Trainings left')}: {remaining.total}
+            </div>
+            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-black dark:text-slate-300">
+              {tr('Treeninguid', 'Sessions')}: {sessions.length}
+            </div>
+          </div>
         </div>
 
-        <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-6 dark:bg-black dark:border-white/10">
-          <div className="flex flex-wrap gap-2">
+        <div className="mb-5 rounded-[28px] border border-white/80 bg-white/90 p-4 shadow-[0_22px_46px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black sm:mb-6 sm:p-5">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            {tr('Edetabeli filter', 'Leaderboard filter')}
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
             <button
               type="button"
               onClick={() => setSelectedTab('overall')}
-              className={`rounded-full px-3 py-1 text-xs font-semibold border ${
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${
                 selectedTab === 'overall'
                   ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
                   : 'border-slate-200 bg-white text-slate-600'
-              } dark:bg-black dark:border-white/10 dark:text-emerald-300`}
+              } dark:border-white/10 dark:bg-black dark:text-emerald-300`}
             >
               {tr('Üld', 'Overall')}
             </button>
@@ -245,11 +256,11 @@ export default function TrainingSeason() {
                 key={slot.id}
                 type="button"
                 onClick={() => setSelectedTab(slot.id)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold border ${
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${
                   selectedTab === slot.id
                     ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
                     : 'border-slate-200 bg-white text-slate-600'
-                } dark:bg-black dark:border-white/10 dark:text-emerald-300`}
+                } dark:border-white/10 dark:bg-black dark:text-emerald-300`}
               >
                 {formatSlotLabel(slot)}
               </button>
@@ -257,26 +268,30 @@ export default function TrainingSeason() {
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-6 dark:bg-black dark:border-white/10">
-          <div className="text-sm font-semibold text-slate-800 mb-3">{tr('Edetabel', 'Leaderboard')}</div>
+        <div className="mb-5 rounded-[28px] border border-white/80 bg-white/90 p-4 shadow-[0_22px_46px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black sm:mb-6 sm:p-5">
+          <div className="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-100">{tr('Edetabel', 'Leaderboard')}</div>
           {leaderboard.length === 0 ? (
             <div className="text-sm text-slate-400">{tr('Punkte veel pole.', 'No points yet.')}</div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {leaderboard.map((entry, index) => (
                 <div
                   key={entry.id}
-                  className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white/80 px-4 py-3 text-sm text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                  className="rounded-2xl border border-slate-100 bg-white/90 px-3.5 py-3 dark:border-white/10 dark:bg-black"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold dark:bg-black dark:text-emerald-300">
-                      {index + 1}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700 dark:bg-black dark:text-emerald-300">
+                        {index + 1}
+                      </div>
+                      <div className="truncate text-sm font-semibold text-slate-700 dark:text-slate-100">
+                        {entry.player_name || entry.participant_id || tr('Mängija', 'Player')}
+                      </div>
                     </div>
-                    <div className="font-semibold">
-                      {entry.player_name || entry.participant_id || tr('Mängija', 'Player')}
+                    <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-300">
+                      {entry.displayPoints.toFixed(1)}p
                     </div>
                   </div>
-                  <div className="font-semibold text-emerald-600">{entry.displayPoints.toFixed(1)}p</div>
                 </div>
               ))}
             </div>
@@ -284,22 +299,24 @@ export default function TrainingSeason() {
         </div>
 
         {canManageTraining && (
-          <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-6 dark:bg-black dark:border-white/10">
-            <div className="flex items-center gap-2 mb-3">
-              <Plus className="w-4 h-4 text-emerald-600" />
-              <div className="text-sm font-semibold text-slate-800">{tr('Lisa treening', 'Add training')}</div>
+          <div className="mb-5 rounded-[28px] border border-white/80 bg-white/90 p-4 shadow-[0_22px_46px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black sm:mb-6 sm:p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 dark:border-white/10 dark:bg-black">
+                <Plus className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{tr('Lisa treening', 'Add training')}</div>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <input
                 type="date"
                 value={newSessionDate}
                 onChange={(event) => setNewSessionDate(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 dark:border-white/10 dark:bg-black dark:text-slate-100"
               />
               <select
                 value={newSessionSlotId}
                 onChange={(event) => setNewSessionSlotId(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 dark:border-white/10 dark:bg-black dark:text-slate-100"
               >
                 {seasonSlots.map((slot) => (
                   <option key={slot.id} value={slot.id}>
@@ -307,19 +324,19 @@ export default function TrainingSeason() {
                   </option>
                 ))}
               </select>
-              <Button onClick={handleCreateSession} disabled={isCreatingSession}>
+              <Button onClick={handleCreateSession} disabled={isCreatingSession} className="h-11 rounded-2xl bg-emerald-600 font-semibold hover:bg-emerald-700">
                 {isCreatingSession ? tr('Lisan...', 'Adding...') : tr('Lisa', 'Add')}
               </Button>
             </div>
           </div>
         )}
 
-        <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
-          <div className="text-sm font-semibold text-slate-800 mb-3">{tr('Treeningud', 'Trainings')}</div>
+        <div className="rounded-[28px] border border-white/80 bg-white/90 p-4 shadow-[0_22px_46px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black sm:p-5">
+          <div className="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-100">{tr('Treeningud', 'Trainings')}</div>
           {sessions.length === 0 ? (
             <div className="text-sm text-slate-400">{tr('Treeninguid pole veel.', 'No trainings yet.')}</div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {sessions.map((session) => {
                 const slot = slots.find((item) => item.id === session.slot_id);
                 return (
@@ -327,12 +344,20 @@ export default function TrainingSeason() {
                     key={session.id}
                     type="button"
                     onClick={() => navigate(`${createPageUrl('TrainingSession')}?sessionId=${session.id}`)}
-                    className="w-full text-left rounded-2xl border border-slate-100 bg-white/80 px-4 py-3 text-sm text-slate-700 transition hover:bg-emerald-50 dark:bg-black dark:border-white/10 dark:text-slate-100"
+                    className="w-full rounded-2xl border border-slate-100 bg-white/95 px-4 py-3 text-left transition hover:bg-emerald-50 dark:border-white/10 dark:bg-black"
                   >
-                    <div className="font-semibold">
-                      {session.date ? format(new Date(session.date), 'MMM d') : tr('Treening', 'Training')}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                          {session.date ? format(new Date(session.date), 'MMM d') : tr('Treening', 'Training')}
+                        </div>
+                        <div className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                          <Clock3 className="h-3 w-3" />
+                          {formatSlotLabel(slot)}
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
                     </div>
-                    <div className="text-xs text-slate-500">{formatSlotLabel(slot)}</div>
                   </button>
                 );
               })}

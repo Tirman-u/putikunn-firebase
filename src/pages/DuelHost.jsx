@@ -9,7 +9,9 @@ import HomeButton from '@/components/ui/home-button';
 import { createPageUrl } from '@/utils';
 import DuelHostView from '@/components/putting/DuelHostView';
 import { createEmptyDuelState } from '@/lib/duel-utils';
+import { createRandomDuelPin } from '@/lib/duel-game-utils';
 import { toast } from 'sonner';
+
 export default function DuelHost() {
   const [gameId, setGameId] = React.useState(null);
   const [creating, setCreating] = React.useState(false);
@@ -17,7 +19,17 @@ export default function DuelHost() {
   const [isNameLocked, setIsNameLocked] = React.useState(false);
   const [discCount, setDiscCount] = React.useState('3');
   const [stationCount, setStationCount] = React.useState(6);
-  const [pin, setPin] = React.useState(() => Math.floor(1000 + Math.random() * 9000).toString());
+  const [pin, setPin] = React.useState(createRandomDuelPin);
+
+  const ensureUniquePin = React.useCallback(async (preferredPin) => {
+    let candidate = preferredPin || createRandomDuelPin();
+    for (let i = 0; i < 40; i += 1) {
+      const matches = await base44.entities.DuelGame.filter({ pin: candidate }, '-created_at', 1);
+      if (!matches?.length) return candidate;
+      candidate = createRandomDuelPin();
+    }
+    throw new Error('Unikaalse PIN-i loomine ebaõnnestus. Proovi uuesti.');
+  }, []);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -41,22 +53,30 @@ export default function DuelHost() {
     try {
       setCreating(true);
       const user = await base44.auth.me();
-      const state = createEmptyDuelState(stationCount);
+      const normalizedStations = Math.min(12, Math.max(1, Number(stationCount) || 1));
+      const uniquePin = await ensureUniquePin(pin);
+      if (uniquePin !== pin) {
+        setPin(uniquePin);
+      }
+      const state = createEmptyDuelState(normalizedStations);
       const game = await base44.entities.DuelGame.create({
         name: gameName || `Sõbraduell ${new Date().toLocaleDateString()}`,
-        pin,
+        pin: uniquePin,
         disc_count: Number(discCount),
-        station_count: Number(stationCount),
+        station_count: normalizedStations,
         mode: 'host',
         status: 'lobby',
         host_user: user?.email,
         created_at: new Date().toISOString(),
+        participant_uids: [],
+        participant_emails: [],
+        participant_names: [],
         state
       });
       setGameId(game.id);
-      window.history.replaceState({}, '', `${createPageUrl('DuelHost')}?id=${game.id}`);
+      window.history.replaceState({}, '', `${createPageUrl('DuelHost')}?id=${game.id}&pin=${uniquePin}`);
     } catch (error) {
-      toast.error('Mängu loomine ebaõnnestus');
+      toast.error(error?.message || 'Mängu loomine ebaõnnestus');
     } finally {
       setCreating(false);
     }
@@ -144,7 +164,14 @@ export default function DuelHost() {
               min={1}
               max={12}
               value={stationCount}
-              onChange={(e) => setStationCount(Number(e.target.value))}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                if (!Number.isFinite(next)) {
+                  setStationCount(1);
+                  return;
+                }
+                setStationCount(Math.min(12, Math.max(1, next)));
+              }}
               className="h-12 rounded-xl border-slate-200"
             />
           </div>

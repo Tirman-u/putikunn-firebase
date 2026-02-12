@@ -38,9 +38,15 @@ import { toast } from 'sonner';
 const getGamePlayers = (game) => {
   const players = new Set();
   (game?.players || []).forEach((name) => players.add(name));
+  Object.keys(game?.player_putts || {}).forEach((name) => players.add(name));
   Object.keys(game?.total_points || {}).forEach((name) => players.add(name));
   Object.keys(game?.player_uids || {}).forEach((name) => players.add(name));
   Object.keys(game?.player_emails || {}).forEach((name) => players.add(name));
+  Object.keys(game?.player_distances || {}).forEach((name) => players.add(name));
+  Object.keys(game?.player_current_streaks || {}).forEach((name) => players.add(name));
+  Object.keys(game?.player_highest_streaks || {}).forEach((name) => players.add(name));
+  Object.keys(game?.player_time_started_at || {}).forEach((name) => players.add(name));
+  Object.keys(game?.player_time_finished_at || {}).forEach((name) => players.add(name));
   Object.keys(game?.live_stats || {}).forEach((name) => players.add(name));
   Object.keys(game?.atw_state || {}).forEach((name) => players.add(name));
   return Array.from(players).filter(Boolean);

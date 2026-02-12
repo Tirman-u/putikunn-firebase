@@ -11,6 +11,7 @@ import {
   getLeaderboardRows,
   startDuelGame
 } from '@/lib/duel-utils';
+import { buildDuelParticipantFields } from '@/lib/duel-game-utils';
 import { cn } from '@/lib/utils';
 import { isTestEnv } from '@/lib/env';
 
@@ -41,8 +42,12 @@ export default function DuelHostView({ gameId }) {
     const current = games?.[0];
     if (!current) throw new Error('Mängu ei leitud');
     const next = updater(current);
-    await base44.entities.DuelGame.update(gameId, next);
-    queryClient.setQueryData(['duel-game', gameId], next);
+    const withParticipants = {
+      ...next,
+      ...buildDuelParticipantFields(next?.state || current?.state)
+    };
+    await base44.entities.DuelGame.update(gameId, withParticipants);
+    queryClient.setQueryData(['duel-game', gameId], withParticipants);
   };
 
   const handleStart = async () => {
@@ -132,7 +137,8 @@ export default function DuelHostView({ gameId }) {
   const stations = state.stations || [];
   const queue = state.queue || [];
 
-  const joinUrl = `${window.location.origin}${createPageUrl('DuelJoin')}?pin=${game.pin}`;
+  const joinUrl = `${window.location.origin}${createPageUrl('DuelJoin')}?id=${gameId}&pin=${game.pin}`;
+  const controlUrl = `${createPageUrl('DuelHostControl')}?id=${gameId}`;
 
   return (
     <div className="space-y-4">
@@ -181,21 +187,20 @@ export default function DuelHostView({ gameId }) {
               Lisa 12 testmängijat
             </Button>
           )}
-          {isTest && (
-            <Button
-              variant="outline"
-              className="rounded-xl"
-              onClick={() =>
-                window.open(
-                  `${createPageUrl('DuelHostControl')}?id=${gameId}`,
-                  '_blank',
-                  'noopener'
-                )
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => {
+              const isMobileViewport = window.matchMedia('(max-width: 767px)').matches;
+              if (isMobileViewport) {
+                window.location.href = controlUrl;
+                return;
               }
-            >
-              Ava võistlusaken
-            </Button>
-          )}
+              window.open(controlUrl, '_blank', 'noopener');
+            }}
+          >
+            Ava võistlusaken
+          </Button>
           <Button
             variant="outline"
             className="rounded-xl"

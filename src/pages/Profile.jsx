@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, Trophy, Target, TrendingUp, Edit2, Save, X, Award, ExternalLink } from 'lucide-react';
+import { Camera, Trophy, Target, TrendingUp, Edit2, Save, X, Award, ExternalLink, Trash2 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
@@ -148,6 +148,18 @@ export default function Profile() {
     },
     onError: (error) => {
       toast.error(error?.message || 'Kustutamine ebaõnnestus');
+    }
+  });
+
+  const deleteDuelGameMutation = useMutation({
+    mutationFn: (duelId) => base44.entities.DuelGame.delete(duelId),
+    onSuccess: () => {
+      toast.success('Duell kustutatud');
+      queryClient.invalidateQueries({ queryKey: ['user-duel-games'] });
+      queryClient.invalidateQueries({ queryKey: ['my-duel-games'] });
+    },
+    onError: (error) => {
+      toast.error(error?.message || 'Duelli kustutamine ebaõnnestus');
     }
   });
 
@@ -1242,6 +1254,18 @@ export default function Profile() {
                       >
                         <ExternalLink className="w-4 h-4" />
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!window.confirm('Kustuta see SOLO duell?')) return;
+                          deleteDuelGameMutation.mutate(duel.id);
+                        }}
+                        className="inline-flex items-center gap-1 text-rose-500 hover:text-rose-700"
+                        disabled={deleteDuelGameMutation.isPending}
+                        aria-label="Kustuta duell"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>

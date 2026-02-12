@@ -9,6 +9,8 @@ import { GAME_FORMATS } from './gameRules';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
 import { useLanguage } from '@/lib/i18n';
+import { createPageUrl } from '@/utils';
+import { pickJoinableDuelGame } from '@/lib/duel-game-utils';
 
 export default function JoinGame({ onJoin, onBack }) {
   const { t } = useLanguage();
@@ -25,15 +27,33 @@ export default function JoinGame({ onJoin, onBack }) {
   const { data: recentGames = [] } = useQuery({
     queryKey: ['recent-games'],
     queryFn: async () => {
-      const activeGames = await base44.entities.Game.filter({
-        status: { $in: ['setup', 'active'] }
-      }, '-date', 10);
-      return activeGames.filter(g =>
-        g.pin !== null &&
-        g.pin !== '0000' &&
-        g.join_closed !== true &&
-        g.status !== 'closed'
-      );
+      const [activeGames, duelGames] = await Promise.all([
+        base44.entities.Game.filter({
+          status: { $in: ['setup', 'active'] }
+        }, '-date', 10),
+        base44.entities.DuelGame.filter({}, '-created_at', 20)
+      ]);
+
+      const regularEntries = activeGames
+        .filter((g) =>
+          g.pin !== null &&
+          g.pin !== '0000' &&
+          g.join_closed !== true &&
+          g.status !== 'closed'
+        )
+        .map((g) => ({ ...g, __kind: 'regular', __sortDate: g.date || g.created_date || null }));
+
+      const duelEntries = duelGames
+        .filter((g) =>
+          g?.pin &&
+          g.pin !== '0000' &&
+          g.status !== 'finished'
+        )
+        .map((g) => ({ ...g, __kind: 'duel', __sortDate: g.created_at || g.started_at || g.date || null }));
+
+      return [...regularEntries, ...duelEntries]
+        .sort((a, b) => new Date(b.__sortDate || 0) - new Date(a.__sortDate || 0))
+        .slice(0, 10);
     },
     enabled: !!user,
     refetchInterval: false
@@ -52,8 +72,18 @@ export default function JoinGame({ onJoin, onBack }) {
     return t(`format.${type}.name`, GAME_FORMATS[type]?.name || 'Classic');
   };
 
+  const getEntryTypeLabel = (game) => {
+    if (game?.__kind === 'duel') {
+      return game?.mode === 'solo' ? 'Sõbraduell SOLO' : 'Sõbraduell HOST';
+    }
+    return getGameTypeName(game?.game_type);
+  };
+
   const getPlayerCount = (game) => {
     if (!game) return 0;
+    if (game.__kind === 'duel') {
+      return Object.keys(game.state?.players || {}).length;
+    }
     return (
       game.players?.length ||
       Object.keys(game.player_putts || {}).length ||
@@ -61,6 +91,8 @@ export default function JoinGame({ onJoin, onBack }) {
       0
     );
   };
+
+  const getEntryDate = (game) => game.__sortDate || game.date || game.created_at || game.created_date || null;
 
   const handleJoin = async () => {
     if (!pin.trim() || !playerName.trim()) {
@@ -76,6 +108,15 @@ export default function JoinGame({ onJoin, onBack }) {
       const games = await base44.entities.Game.filter({ pin: pin.trim() });
       
       if (games.length === 0) {
+        const duelPin = pin.trim().replace(/\D/g, '').slice(0, 4);
+        if (duelPin.length === 4) {
+          const duelMatches = await base44.entities.DuelGame.filter({ pin: duelPin }, '-created_at', 30);
+          const duelGame = pickJoinableDuelGame(duelMatches || []);
+          if (duelGame) {
+            window.location.href = `${createPageUrl('DuelJoin')}?id=${duelGame.id}${duelGame.pin ? `&pin=${duelGame.pin}` : ''}`;
+            return;
+          }
+        }
         setError(t('join.error_not_found', 'Mängu ei leitud. Kontrolli PIN-i.'));
         setLoading(false);
         return;
@@ -231,11 +272,15 @@ export default function JoinGame({ onJoin, onBack }) {
               {recentGames.map((game) => {
                 const playerCount = getPlayerCount(game);
                 return (
-                  <button
-                    key={game.id}
-                    onClick={() => {
+                <button
+                  key={game.id}
+                  onClick={() => {
+                      if (game.__kind === 'duel') {
+                        window.location.href = `${createPageUrl('DuelJoin')}?id=${game.id}${game.pin ? `&pin=${game.pin}` : ''}`;
+                        return;
+                      }
                       setPin(game.pin);
-                      setPlayerName(user?.full_name || '');
+                      setPlayerName(user?.display_name || user?.full_name || '');
                     }}
                     className="w-full rounded-2xl border border-white/70 bg-white/70 p-3 text-left shadow-sm backdrop-blur-sm transition hover:bg-emerald-50/80 dark:bg-black dark:border-white/10 dark:hover:bg-black"
                   >
@@ -244,10 +289,10 @@ export default function JoinGame({ onJoin, onBack }) {
                         <div className="font-semibold text-slate-800 text-sm dark:text-slate-100">{game.name}</div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded dark:bg-emerald-500/10 dark:text-emerald-300">
-                            {getGameTypeName(game.game_type)}
+                            {getEntryTypeLabel(game)}
                           </span>
                           <span className="text-xs text-slate-500 dark:text-slate-400">
-                            {game.date ? format(new Date(game.date), 'MMM d, yyyy') : t('join.no_date', 'Kuupäev puudub')}
+                            {getEntryDate(game) ? format(new Date(getEntryDate(game)), 'MMM d, yyyy') : t('join.no_date', 'Kuupäev puudub')}
                           </span>
                           <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                             <Users className="w-3 h-3" />

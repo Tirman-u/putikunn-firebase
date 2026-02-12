@@ -45,6 +45,20 @@ export default function ManageGames() {
     enabled: !!user
   });
 
+  const { data: duelGames = [] } = useQuery({
+    queryKey: ['my-duel-games', user?.email, user?.app_role],
+    queryFn: async () => {
+      if (!user) return [];
+      const userRole = user?.app_role || 'user';
+      const canSeeAllHosted = ['admin', 'super_admin'].includes(userRole);
+      if (canSeeAllHosted) {
+        return base44.entities.DuelGame.filter({}, '-created_at', 200);
+      }
+      return base44.entities.DuelGame.filter({ host_user: user?.email }, '-created_at', 200);
+    },
+    enabled: !!user
+  });
+
   const { data: groups = [] } = useQuery({
     queryKey: ['game-groups', user?.email],
     queryFn: () => base44.entities.GameGroup.filter({ created_by: user?.email }),
@@ -80,11 +94,35 @@ export default function ManageGames() {
     }
   });
 
+  const completeDuelGameMutation = useMutation({
+    mutationFn: (gameId) => base44.entities.DuelGame.update(gameId, {
+      status: 'finished',
+      ended_at: new Date().toISOString()
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-duel-games'] });
+      queryClient.invalidateQueries({ queryKey: ['user-duel-games'] });
+      toast.success('Mäng märgitud lõpetatuks');
+    }
+  });
+
   const deleteGameMutation = useMutation({
     mutationFn: (gameId) => deleteGameAndLeaderboardEntries(gameId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-games'] });
       queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
+    }
+  });
+
+  const deleteDuelGameMutation = useMutation({
+    mutationFn: (gameId) => base44.entities.DuelGame.delete(gameId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-duel-games'] });
+      queryClient.invalidateQueries({ queryKey: ['user-duel-games'] });
+      toast.success('Duell kustutatud');
+    },
+    onError: (error) => {
+      toast.error(error?.message || 'Duelli kustutamine ebaõnnestus');
     }
   });
 
@@ -483,12 +521,17 @@ export default function ManageGames() {
     return names[type] || type;
   };
 
+  const getDuelModeName = (mode) => (mode === 'solo' ? 'Sõbraduell SOLO' : 'Sõbraduell HOST');
+  const getDuelPlayersCount = (game) => Object.keys(game?.state?.players || {}).length;
+
   const isGameSubmitted = (gameId) => {
     return leaderboardEntries.some(entry => entry.game_id === gameId && entry.leaderboard_type === 'general');
   };
 
   const completedGames = games.filter(g => g.status === 'completed' && g.pin !== '0000');
   const activeGames = games.filter(g => g.status !== 'completed' && g.pin !== '0000');
+  const completedDuelGames = duelGames.filter((g) => g?.status === 'finished' && g?.pin && g.pin !== '0000');
+  const activeDuelGames = duelGames.filter((g) => g?.status !== 'finished' && g?.pin && g.pin !== '0000');
 
   const getMonthKey = (date) => {
     const d = new Date(date);
@@ -515,6 +558,21 @@ export default function ManageGames() {
   const allCompletedSelected =
     filteredCompletedGames.length > 0 &&
     filteredCompletedGames.every((game) => selectedSyncGameIds.includes(game.id));
+
+  const activeEntries = React.useMemo(() => {
+    const regularEntries = activeGames.map((game) => ({
+      kind: 'regular',
+      game,
+      sortDate: game?.date || game?.created_date || null
+    }));
+    const duelEntries = activeDuelGames.map((game) => ({
+      kind: 'duel',
+      game,
+      sortDate: game?.created_at || game?.started_at || game?.date || null
+    }));
+    return [...regularEntries, ...duelEntries]
+      .sort((a, b) => new Date(b.sortDate || 0) - new Date(a.sortDate || 0));
+  }, [activeGames, activeDuelGames]);
 
   const toggleSelectAllCompleted = () => {
     if (allCompletedSelected) {
@@ -598,56 +656,72 @@ export default function ManageGames() {
         {/* Active Games */}
         <div className="mb-8">
           <h2 className="text-lg font-bold text-slate-800 mb-3">Aktiivsed mängud</h2>
-          {activeGames.length === 0 ? (
+          {activeEntries.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center text-slate-400">
               <p>Aktiivseid mänge pole</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {activeGames.map((game) => (
+              {activeEntries.map((entry) => {
+                const game = entry.game;
+                const isDuel = entry.kind === 'duel';
+                const playersCount = isDuel ? getDuelPlayersCount(game) : (game.players?.length || 0);
+                const gameDate = entry.sortDate || game.date || null;
+                const isSelected = !isDuel && selectedGames.includes(game.id);
+                return (
                 <div
-                  key={game.id}
+                  key={`${entry.kind}-${game.id}`}
                   className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-slate-300 transition-all group"
                 >
                   <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedGames.includes(game.id)}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        if (e.target.checked) {
-                          setSelectedGames([...selectedGames, game.id]);
-                        } else {
-                          setSelectedGames(selectedGames.filter(id => id !== game.id));
-                        }
-                      }}
-                      className="mt-1 w-5 h-5 rounded"
-                    />
+                    {isDuel ? (
+                      <div className="mt-1 h-5 w-5 rounded border border-slate-200 bg-slate-50" />
+                    ) : (
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          if (e.target.checked) {
+                            setSelectedGames([...selectedGames, game.id]);
+                          } else {
+                            setSelectedGames(selectedGames.filter((id) => id !== game.id));
+                          }
+                        }}
+                        className="mt-1 w-5 h-5 rounded"
+                      />
+                    )}
                     <Link
-                      to={`${createPageUrl('GameResult')}?id=${game.id}&from=manage`}
+                      to={isDuel
+                        ? `${createPageUrl('DuelHost')}?id=${game.id}${game.pin ? `&pin=${game.pin}` : ''}`
+                        : `${createPageUrl('GameResult')}?id=${game.id}&from=manage`}
                       className="flex-1 min-w-0"
                     >
                       <div className="font-bold text-slate-800 group-hover:text-emerald-600 transition-colors truncate">
                         {game.name}
                       </div>
                       <div className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded inline-block mt-1">
-                        {getGameTypeName(game.game_type)}
+                        {isDuel ? getDuelModeName(game.mode) : getGameTypeName(game.game_type)}
                       </div>
                       <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
                         <Calendar className="w-3 h-3" />
-                        {game.date ? format(new Date(game.date), 'MMM d, yyyy') : 'Kuupäev puudub'}
+                        {gameDate ? format(new Date(gameDate), 'MMM d, yyyy') : 'Kuupäev puudub'}
                       </div>
                       <div className="text-xs text-slate-600 mt-1">
-                        {game.players?.length || 0} mängijat • PIN: {game.pin}
+                        {playersCount} mängijat • PIN: {game.pin}
                       </div>
                     </Link>
                     <div className="flex flex-col gap-2">
                       <Button
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (isDuel) {
+                            completeDuelGameMutation.mutate(game.id);
+                            return;
+                          }
                           completeGameMutation.mutate(game.id);
                         }}
-                        disabled={completeGameMutation.isPending}
+                        disabled={completeGameMutation.isPending || completeDuelGameMutation.isPending}
                         size="sm"
                         className="bg-emerald-600 hover:bg-emerald-700 whitespace-nowrap text-xs"
                       >
@@ -658,6 +732,10 @@ export default function ManageGames() {
                         onClick={(e) => {
                           e.stopPropagation();
                           if (confirm('Kustuta see mäng?')) {
+                            if (isDuel) {
+                              deleteDuelGameMutation.mutate(game.id);
+                              return;
+                            }
                             deleteGameMutation.mutate(game.id);
                           }
                         }}
@@ -670,7 +748,8 @@ export default function ManageGames() {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>
@@ -791,6 +870,55 @@ export default function ManageGames() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Completed Duel Games */}
+        {completedDuelGames.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mt-6">
+            <h2 className="text-lg font-bold text-slate-800 mb-4">Lõpetatud sõbraduellid</h2>
+            <div className="space-y-3">
+              {completedDuelGames.map((game) => {
+                const gameDate = game.ended_at || game.created_at || game.date || null;
+                return (
+                  <div
+                    key={game.id}
+                    className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <Link
+                        to={`${createPageUrl('DuelHost')}?id=${game.id}${game.pin ? `&pin=${game.pin}` : ''}`}
+                        className="min-w-0 flex-1"
+                      >
+                        <div className="font-bold text-slate-800 truncate">{game.name}</div>
+                        <div className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded inline-block mt-1">
+                          {getDuelModeName(game.mode)}
+                        </div>
+                        <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
+                          <Calendar className="w-3 h-3" />
+                          {gameDate ? format(new Date(gameDate), 'MMM d, yyyy') : 'Kuupäev puudub'}
+                        </div>
+                        <div className="text-xs text-slate-600 mt-1">
+                          {getDuelPlayersCount(game)} mängijat • PIN: {game.pin}
+                        </div>
+                      </Link>
+                      <Button
+                        onClick={() => {
+                          if (confirm('Kustuta see duell?')) {
+                            deleteDuelGameMutation.mutate(game.id);
+                          }
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

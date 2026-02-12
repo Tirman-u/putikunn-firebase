@@ -17,6 +17,7 @@ import AIInsights from '@/components/profile/AIInsights';
 import AchievementsList, { getAchievements } from '@/components/profile/AchievementsList';
 import LoadingState from '@/components/ui/loading-state';
 import { deleteGameAndLeaderboardEntries } from '@/lib/leaderboard-utils';
+import { isUserInDuelGame, sortDuelGamesByNewest } from '@/lib/duel-game-utils';
 import { toast } from 'sonner';
 import { FEATURE_FLAGS } from '@/lib/feature-flags';
 
@@ -58,6 +59,41 @@ export default function Profile() {
         if (game?.id && !byId.has(game.id)) byId.set(game.id, game);
       });
       return Array.from(byId.values());
+    },
+    enabled: !!user
+  });
+
+  const { data: duelGames = [], isLoading: duelGamesLoading } = useQuery({
+    queryKey: ['user-duel-games', user?.id, user?.email, user?.display_name, user?.full_name],
+    queryFn: async () => {
+      if (!user) return [];
+      const normalizedEmail = typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
+      const requests = [
+        base44.entities.DuelGame.filter({ mode: 'solo' }, '-created_at', 300)
+      ];
+      if (user?.id) {
+        requests.push(
+          base44.entities.DuelGame.filter({ participant_uids: { $arrayContains: user.id } }, '-created_at', 300)
+        );
+      }
+      if (normalizedEmail) {
+        requests.push(
+          base44.entities.DuelGame.filter({ participant_emails: { $arrayContains: normalizedEmail } }, '-created_at', 300)
+        );
+      }
+
+      const settled = await Promise.allSettled(requests);
+      const merged = new Map();
+      settled.forEach((entry) => {
+        if (entry.status !== 'fulfilled' || !Array.isArray(entry.value)) return;
+        entry.value.forEach((game) => {
+          if (game?.id && !merged.has(game.id)) {
+            merged.set(game.id, game);
+          }
+        });
+      });
+
+      return sortDuelGamesByNewest(Array.from(merged.values())).filter((game) => isUserInDuelGame(game, user));
     },
     enabled: !!user
   });
@@ -145,7 +181,7 @@ export default function Profile() {
     }
   };
 
-  if (userLoading || gamesLoading || (isPuttingKingEnabled && (tournamentPlayersLoading || tournamentsLoading))) {
+  if (userLoading || gamesLoading || duelGamesLoading || (isPuttingKingEnabled && (tournamentPlayersLoading || tournamentsLoading))) {
     return <LoadingState />;
   }
   if (!user) {
@@ -188,6 +224,64 @@ export default function Profile() {
   };
 
   const myGames = games.filter((game) => isPlayerInGame(game));
+  const duelHistoryRows = duelGames.map((game) => {
+    const players = Object.values(game?.state?.players || {});
+    const ownPlayer = players.find((player) => {
+      const playerName = normalize(player?.name);
+      const playerEmail = normalize(player?.email);
+      return (
+        (user?.id && player?.id === user.id) ||
+        (normalizedEmail && playerEmail === normalizedEmail) ||
+        (normalizedDisplayName && playerName === normalizedDisplayName) ||
+        (normalizedFullName && playerName === normalizedFullName)
+      );
+    });
+    const opponents = players.filter((player) => player?.id !== ownPlayer?.id);
+    const fallbackWinner = [...players].sort((a, b) => {
+      if ((b?.points || 0) !== (a?.points || 0)) return (b?.points || 0) - (a?.points || 0);
+      if ((b?.wins || 0) !== (a?.wins || 0)) return (b?.wins || 0) - (a?.wins || 0);
+      return String(a?.id || '').localeCompare(String(b?.id || ''));
+    })[0];
+    const winnerId = game?.winner_id || fallbackWinner?.id || null;
+    const status = game?.status || 'lobby';
+    const isFinished = status === 'finished';
+    const ownPlayerId = ownPlayer?.id || null;
+    let resultLabel = 'Käimas';
+    let resultClass = 'bg-amber-100 text-amber-700';
+    if (isFinished) {
+      if (winnerId && ownPlayerId && winnerId === ownPlayerId) {
+        resultLabel = 'Võit';
+        resultClass = 'bg-emerald-100 text-emerald-700';
+      } else if (winnerId && ownPlayerId && winnerId !== ownPlayerId) {
+        resultLabel = 'Kaotus';
+        resultClass = 'bg-rose-100 text-rose-700';
+      } else {
+        resultLabel = 'Lõpetatud';
+        resultClass = 'bg-slate-100 text-slate-700';
+      }
+    }
+
+    return {
+      id: game.id,
+      pin: game.pin || '',
+      name: game.name || 'Sõbraduell',
+      status,
+      date: game.ended_at || game.created_at || game.date || null,
+      dateLabel: (() => {
+        const dateValue = game.ended_at || game.created_at || game.date || null;
+        if (!dateValue) return '-';
+        const parsed = new Date(dateValue);
+        if (Number.isNaN(parsed.getTime())) return '-';
+        return format(parsed, 'MMM d, yyyy');
+      })(),
+      resultLabel,
+      resultClass,
+      ownPoints: ownPlayer?.points ?? 0,
+      ownWins: ownPlayer?.wins ?? 0,
+      ownLosses: ownPlayer?.losses ?? 0,
+      opponentNames: opponents.map((player) => player?.name || 'Vastane').filter(Boolean).join(', ') || 'Vastane'
+    };
+  });
   const canDeleteGame = (game) => {
     if (!game) return false;
     if (isAdmin) return true;
@@ -1108,6 +1202,53 @@ export default function Profile() {
             </>
           )}
         </div>
+
+        {/* Solo Duel History */}
+        {duelHistoryRows.length > 0 && (
+          <div className={`${cardClass} mt-6`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-800">SOLO sõbraduellid</h3>
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                {duelHistoryRows.length}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {duelHistoryRows.map((duel) => (
+                <div
+                  key={duel.id}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800">{duel.name}</div>
+                      <div className="text-xs text-slate-500">
+                        vs {duel.opponentNames}
+                        {duel.pin ? ` • PIN ${duel.pin}` : ''}
+                      </div>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${duel.resultClass}`}>
+                      {duel.resultLabel}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                    <span>
+                      P {duel.ownPoints} • V {duel.ownWins} • K {duel.ownLosses}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span>{duel.dateLabel}</span>
+                      <Link
+                        to={`${createPageUrl('DuelJoin')}?id=${duel.id}${duel.pin ? `&pin=${duel.pin}` : ''}`}
+                        className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Achievements */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">

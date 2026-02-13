@@ -27,6 +27,9 @@ const ENTITY_COLLECTIONS = {
   Game: 'games',
   GameGroup: 'game_groups',
   LeaderboardEntry: 'leaderboard_entries',
+  AppLog: 'app_logs',
+  AdminAuditLog: 'admin_audit_logs',
+  PresenceHeartbeat: 'presence_heartbeats',
   User: 'users',
   PuttingKingMatch: 'putting_king_matches',
   PuttingKingPlayer: 'putting_king_players',
@@ -689,8 +692,103 @@ const authApi = {
 };
 
 const appLogs = {
-  async logEvent() {},
-  async logUserInApp() {}
+  _lastPresenceWriteByUid: new Map(),
+  _lastUserTouchByUid: new Map(),
+  _sessionId: null,
+  _resolveSessionId() {
+    if (this._sessionId) return this._sessionId;
+    const fallback = `session-${Date.now().toString(36)}`;
+    if (typeof window === 'undefined') {
+      this._sessionId = fallback;
+      return this._sessionId;
+    }
+    try {
+      const key = 'putikunn:session-id:v1';
+      let sessionId = window.sessionStorage.getItem(key);
+      if (!sessionId) {
+        sessionId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+        window.sessionStorage.setItem(key, sessionId);
+      }
+      this._sessionId = sessionId;
+      return this._sessionId;
+    } catch {
+      this._sessionId = fallback;
+      return this._sessionId;
+    }
+  },
+  async logEvent(name, payload = {}) {
+    if (!name) return;
+    try {
+      const nowIso = new Date().toISOString();
+      const currentUser = auth.currentUser;
+      await addDoc(collection(db, ENTITY_COLLECTIONS.AppLog), {
+        name,
+        ...payload,
+        created_at: payload.created_at || nowIso,
+        user_id: currentUser?.uid || null,
+        user_email: normalizeEmail(currentUser?.email),
+        session_id: this._resolveSessionId(),
+        _server_created_at: serverTimestamp()
+      });
+    } catch {
+      // Silent fail - observability must not break gameplay
+    }
+  },
+  async logUserInApp(pageName, context = {}) {
+    const currentUser = auth.currentUser;
+    if (!currentUser?.uid) return;
+
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const reason = context.reason || 'heartbeat';
+    const isForceWrite = reason === 'navigation' || reason === 'visibility' || reason === 'focus';
+
+    try {
+      const lastPresenceWrite = this._lastPresenceWriteByUid.get(currentUser.uid) || 0;
+      if (isForceWrite || (nowMs - lastPresenceWrite) >= 45000) {
+        await setDoc(
+          doc(db, ENTITY_COLLECTIONS.PresenceHeartbeat, currentUser.uid),
+          {
+            user_id: currentUser.uid,
+            user_email: normalizeEmail(currentUser.email),
+            page_name: pageName || '',
+            path: context.path || '',
+            reason,
+            session_id: this._resolveSessionId(),
+            last_seen_at: nowIso,
+            last_seen_ms: nowMs,
+            updated_date: nowIso,
+            _server_updated_at: serverTimestamp(),
+            _server_created_at: serverTimestamp()
+          },
+          { merge: true }
+        );
+        this._lastPresenceWriteByUid.set(currentUser.uid, nowMs);
+      }
+    } catch {
+      // Silent fail - observability must not break gameplay
+    }
+
+    try {
+      const lastUserTouch = this._lastUserTouchByUid.get(currentUser.uid) || 0;
+      if (isForceWrite || (nowMs - lastUserTouch) >= 5 * 60 * 1000) {
+        await setDoc(
+          doc(db, ENTITY_COLLECTIONS.User, currentUser.uid),
+          {
+            last_seen_at: nowIso,
+            last_seen_page: pageName || '',
+            last_seen_path: context.path || '',
+            updated_date: nowIso,
+            _server_updated_at: serverTimestamp()
+          },
+          { merge: true }
+        );
+        this._lastUserTouchByUid.set(currentUser.uid, nowMs);
+      }
+    } catch {
+      // Silent fail - observability must not break gameplay
+    }
+  }
 };
 
 const integrations = {

@@ -5,16 +5,34 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Activity, CalendarClock, Gamepad2, Shield, UserCog, Users, Wrench } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  Bug,
+  CalendarClock,
+  ClipboardList,
+  Gamepad2,
+  RefreshCw,
+  Shield,
+  UserCog,
+  Users,
+  Wrench,
+  Zap
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
 import { createPageUrl } from '@/utils';
+import { repairTimeLadderRecords } from '@/lib/time-records-repair';
 
 const ACTIVITY_WINDOW_DAYS = 30;
 const ACTIVITY_WINDOW_MS = ACTIVITY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+const ACTIVE_NOW_WINDOW_MINUTES = 15;
+const ACTIVE_NOW_WINDOW_MS = ACTIVE_NOW_WINDOW_MINUTES * 60 * 1000;
+const FORCE_CLOSE_STALE_HOURS = 6;
+const FORCE_CLOSE_STALE_MS = FORCE_CLOSE_STALE_HOURS * 60 * 60 * 1000;
 
 const roleLabels = {
   user: 'Kasutaja',
@@ -55,6 +73,28 @@ const formatActivityTime = (millis) => {
   }
 };
 
+const resolveEnvLabel = () => {
+  if (typeof window === 'undefined') return 'app';
+  const host = window.location.hostname;
+  if (host.includes('test.putikunn.ee') || host.includes('putikunn-test')) return 'test';
+  if (host.includes('putikunn.ee') || host.includes('putikunn-migration')) return 'prod';
+  return host || 'app';
+};
+
+const getGameUpdatedTs = (game) => Math.max(
+  toMillis(game?.updated_date),
+  toMillis(game?.date),
+  toMillis(game?.created_date)
+);
+
+const getDuelUpdatedTs = (game) => Math.max(
+  toMillis(game?.updated_date),
+  toMillis(game?.created_at),
+  toMillis(game?.started_at),
+  toMillis(game?.ended_at),
+  toMillis(game?.created_date)
+);
+
 const fetchEntityRows = async (entityApi, { filter = {}, sort = '-created_date', maxRows = 1000 } = {}) => {
   const rows = [];
   const batchSize = 200;
@@ -77,6 +117,15 @@ export default function AdminUsers() {
   const [searchValue, setSearchValue] = React.useState('');
   const [roleFilter, setRoleFilter] = React.useState('all');
   const [activityFilter, setActivityFilter] = React.useState('all');
+  const [nowTs, setNowTs] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => setNowTs(Date.now()), 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const buildVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
+  const buildTime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : null;
 
   const { data: currentUser } = useQuery({
     queryKey: ['user'],
@@ -108,28 +157,59 @@ export default function AdminUsers() {
     enabled: Boolean(currentUser)
   });
 
-  const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, newRole }) => {
-      await base44.entities.User.update(userId, { app_role: newRole });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['all-users'] });
-      toast.success('Kasutaja roll uuendatud');
-    },
-    onError: (error) => {
-      toast.error(error?.message || 'Rolli uuendamine ebaõnnestus');
-    }
+  const { data: presenceHeartbeats = [] } = useQuery({
+    queryKey: ['admin-dashboard-presence'],
+    queryFn: async () => fetchEntityRows(base44.entities.PresenceHeartbeat, {
+      filter: {},
+      sort: '-last_seen_ms',
+      maxRows: 2000
+    }),
+    enabled: Boolean(currentUser),
+    staleTime: 30000,
+    refetchInterval: 60000
   });
 
-  const makeCurrentUserSuperAdmin = useMutation({
-    mutationFn: async () => {
-      await base44.auth.updateMe({ app_role: 'super_admin' });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user'] });
-      toast.success('Sa oled nüüd superadmin!');
-    }
+  const { data: adminAuditLogs = [] } = useQuery({
+    queryKey: ['admin-audit-log'],
+    queryFn: async () => fetchEntityRows(base44.entities.AdminAuditLog, {
+      filter: {},
+      sort: '-created_date',
+      maxRows: 120
+    }),
+    enabled: Boolean(currentUser),
+    staleTime: 30000,
+    refetchInterval: 60000
   });
+
+  const { data: errorLogs = [] } = useQuery({
+    queryKey: ['admin-error-log'],
+    queryFn: async () => fetchEntityRows(base44.entities.ErrorLog, {
+      filter: {},
+      sort: '-occurred_at',
+      maxRows: 200
+    }),
+    enabled: Boolean(currentUser),
+    staleTime: 60000,
+    refetchInterval: 120000
+  });
+
+  const createAuditLog = React.useCallback(async ({ action, status = 'ok', summary = '', details = {} }) => {
+    if (!currentUser) return;
+    try {
+      await base44.entities.AdminAuditLog.create({
+        action,
+        status,
+        summary,
+        details,
+        actor_uid: currentUser.id,
+        actor_email: currentUser.email || '',
+        actor_name: currentUser.full_name || currentUser.display_name || currentUser.email || currentUser.id,
+        created_date: new Date().toISOString()
+      });
+    } catch {
+      // Silent fail - admin action itself is more important than audit write.
+    }
+  }, [currentUser]);
 
   const visibleUsers = React.useMemo(
     () => users.filter((entry) => !entry.merged_into),
@@ -138,7 +218,39 @@ export default function AdminUsers() {
 
   const isSuperAdmin = currentUser?.app_role === 'super_admin';
 
-  const activityCutoffTs = React.useMemo(() => Date.now() - ACTIVITY_WINDOW_MS, []);
+  const activityCutoffTs = nowTs - ACTIVITY_WINDOW_MS;
+  const todayStartTs = React.useMemo(() => {
+    const d = new Date(nowTs);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, [nowTs]);
+  const onlineCutoffTs = nowTs - ACTIVE_NOW_WINDOW_MS;
+
+  const presenceByIdentity = React.useMemo(() => {
+    const byUid = new Map();
+    const byEmail = new Map();
+
+    const registerPresence = ({ uid, email, timestamp }) => {
+      const ts = Number(timestamp) || 0;
+      if (!ts) return;
+      if (uid) {
+        const prev = byUid.get(uid) || 0;
+        if (ts > prev) byUid.set(uid, ts);
+      }
+      const normalizedEmail = normalizeEmail(email);
+      if (normalizedEmail) {
+        const prev = byEmail.get(normalizedEmail) || 0;
+        if (ts > prev) byEmail.set(normalizedEmail, ts);
+      }
+    };
+
+    presenceHeartbeats.forEach((entry) => {
+      const ts = Math.max(toMillis(entry?.last_seen_ms), toMillis(entry?.last_seen_at), toMillis(entry?.updated_date));
+      registerPresence({ uid: entry?.user_id || entry?.id, email: entry?.user_email, timestamp: ts });
+    });
+
+    return { byUid, byEmail };
+  }, [presenceHeartbeats]);
 
   const userActivityByUid = React.useMemo(() => {
     const byUid = new Map();
@@ -169,11 +281,7 @@ export default function AdminUsers() {
     });
 
     hostedGames.forEach((game) => {
-      const gameTs = Math.max(
-        toMillis(game?.updated_date),
-        toMillis(game?.date),
-        toMillis(game?.created_date)
-      );
+      const gameTs = getGameUpdatedTs(game);
       registerActivity({ email: game?.host_user, timestamp: gameTs });
 
       Object.values(game?.player_uids || {}).forEach((uid) => {
@@ -186,14 +294,7 @@ export default function AdminUsers() {
     });
 
     duelGames.forEach((game) => {
-      const duelTs = Math.max(
-        toMillis(game?.updated_date),
-        toMillis(game?.created_at),
-        toMillis(game?.started_at),
-        toMillis(game?.ended_at),
-        toMillis(game?.created_date)
-      );
-
+      const duelTs = getDuelUpdatedTs(game);
       registerActivity({ email: game?.host_user, timestamp: duelTs });
       (game?.participant_uids || []).forEach((uid) => registerActivity({ uid, timestamp: duelTs }));
       (game?.participant_emails || []).forEach((email) => registerActivity({ email, timestamp: duelTs }));
@@ -203,25 +304,37 @@ export default function AdminUsers() {
       });
     });
 
+    presenceHeartbeats.forEach((entry) => {
+      const ts = Math.max(toMillis(entry?.last_seen_ms), toMillis(entry?.last_seen_at), toMillis(entry?.updated_date));
+      registerActivity({ uid: entry?.user_id || entry?.id, email: entry?.user_email, timestamp: ts });
+    });
+
     return { byUid, byEmail };
-  }, [visibleUsers, hostedGames, duelGames]);
+  }, [visibleUsers, hostedGames, duelGames, presenceHeartbeats]);
 
   const usersWithMeta = React.useMemo(() => {
     return visibleUsers
       .map((entry) => {
+        const normalizedEmail = normalizeEmail(entry.email);
         const byUidTs = userActivityByUid.byUid.get(entry.id) || 0;
-        const byEmailTs = userActivityByUid.byEmail.get(normalizeEmail(entry.email)) || 0;
-        const lastActivityTs = Math.max(byUidTs, byEmailTs);
-        const isActive = lastActivityTs >= activityCutoffTs;
+        const byEmailTs = userActivityByUid.byEmail.get(normalizedEmail) || 0;
+        const presenceTs = Math.max(
+          presenceByIdentity.byUid.get(entry.id) || 0,
+          presenceByIdentity.byEmail.get(normalizedEmail) || 0
+        );
+        const lastActivityTs = Math.max(byUidTs, byEmailTs, presenceTs);
 
         return {
           ...entry,
+          presenceTs,
           lastActivityTs,
-          isActive
+          isActive: lastActivityTs >= activityCutoffTs,
+          isOnlineNow: presenceTs >= onlineCutoffTs,
+          isActiveToday: presenceTs >= todayStartTs
         };
       })
       .sort((a, b) => b.lastActivityTs - a.lastActivityTs);
-  }, [visibleUsers, userActivityByUid, activityCutoffTs]);
+  }, [visibleUsers, userActivityByUid, presenceByIdentity, activityCutoffTs, onlineCutoffTs, todayStartTs]);
 
   const filteredUsers = React.useMemo(() => {
     const needle = searchValue.trim().toLowerCase();
@@ -230,6 +343,7 @@ export default function AdminUsers() {
       if (roleFilter !== 'all' && (entry.app_role || 'user') !== roleFilter) return false;
       if (activityFilter === 'active' && !entry.isActive) return false;
       if (activityFilter === 'inactive' && entry.isActive) return false;
+      if (activityFilter === 'online' && !entry.isOnlineNow) return false;
 
       if (!needle) return true;
       const name = String(entry.full_name || entry.display_name || entry.displayName || '').toLowerCase();
@@ -240,6 +354,8 @@ export default function AdminUsers() {
 
   const totalUsers = usersWithMeta.length;
   const activeUsersCount = usersWithMeta.filter((entry) => entry.isActive).length;
+  const activeTodayCount = usersWithMeta.filter((entry) => entry.isActiveToday).length;
+  const onlineNowCount = usersWithMeta.filter((entry) => entry.isOnlineNow).length;
 
   const roleStats = React.useMemo(() => {
     const counts = {
@@ -288,6 +404,16 @@ export default function AdminUsers() {
     [duelGames]
   );
 
+  const staleHostedGames = React.useMemo(
+    () => activeHostedGames.filter((game) => getGameUpdatedTs(game) > 0 && getGameUpdatedTs(game) < nowTs - FORCE_CLOSE_STALE_MS),
+    [activeHostedGames, nowTs]
+  );
+
+  const staleDuelGames = React.useMemo(
+    () => activeDuelGames.filter((game) => getDuelUpdatedTs(game) > 0 && getDuelUpdatedTs(game) < nowTs - FORCE_CLOSE_STALE_MS),
+    [activeDuelGames, nowTs]
+  );
+
   const recentJoinableEntries = React.useMemo(() => {
     const regularEntries = activeHostedGames.map((game) => ({
       id: game.id,
@@ -311,6 +437,152 @@ export default function AdminUsers() {
       .sort((a, b) => b.date - a.date)
       .slice(0, 8);
   }, [activeHostedGames, activeDuelGames]);
+
+  const errorsLast24h = React.useMemo(
+    () => errorLogs.filter((entry) => toMillis(entry?.occurred_at || entry?.created_date) >= nowTs - 24 * 60 * 60 * 1000).length,
+    [errorLogs, nowTs]
+  );
+
+  const errorsLast60m = React.useMemo(
+    () => errorLogs.filter((entry) => toMillis(entry?.occurred_at || entry?.created_date) >= nowTs - 60 * 60 * 1000).length,
+    [errorLogs, nowTs]
+  );
+
+  const lastPresenceAt = React.useMemo(() => {
+    let latest = 0;
+    presenceHeartbeats.forEach((entry) => {
+      const ts = Math.max(toMillis(entry?.last_seen_ms), toMillis(entry?.last_seen_at), toMillis(entry?.updated_date));
+      if (ts > latest) latest = ts;
+    });
+    return latest;
+  }, [presenceHeartbeats]);
+
+  const lastAuditAt = React.useMemo(() => {
+    if (!adminAuditLogs.length) return 0;
+    return Math.max(...adminAuditLogs.map((entry) => toMillis(entry?.created_date)));
+  }, [adminAuditLogs]);
+
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, newRole, previousRole }) => {
+      await base44.entities.User.update(userId, { app_role: newRole });
+      await createAuditLog({
+        action: 'role_update',
+        summary: `Roll ${roleLabels[previousRole] || previousRole || 'Kasutaja'} -> ${roleLabels[newRole] || newRole}`,
+        details: { userId, previousRole: previousRole || 'user', newRole }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-audit-log'] });
+      toast.success('Kasutaja roll uuendatud');
+    },
+    onError: (error) => {
+      toast.error(error?.message || 'Rolli uuendamine ebaõnnestus');
+    }
+  });
+
+  const makeCurrentUserSuperAdmin = useMutation({
+    mutationFn: async () => {
+      await base44.auth.updateMe({ app_role: 'super_admin' });
+      await createAuditLog({
+        action: 'bootstrap_super_admin',
+        summary: 'Kasutaja määras end superadminiks',
+        details: { userId: currentUser?.id || null }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-audit-log'] });
+      toast.success('Sa oled nüüd superadmin!');
+    }
+  });
+
+  const forceCloseMutation = useMutation({
+    mutationFn: async ({ mode }) => {
+      const nowIso = new Date().toISOString();
+      const actor = currentUser?.id || currentUser?.email || 'unknown';
+      const regularTargets = mode === 'all' ? activeHostedGames : staleHostedGames;
+      const duelTargets = mode === 'all' ? activeDuelGames : staleDuelGames;
+
+      let closedRegular = 0;
+      let closedDuel = 0;
+
+      for (const game of regularTargets) {
+        await base44.entities.Game.update(game.id, {
+          status: 'completed',
+          join_closed: true,
+          ended_at: nowIso,
+          admin_force_closed_at: nowIso,
+          admin_force_closed_by: actor
+        });
+        closedRegular += 1;
+      }
+
+      for (const game of duelTargets) {
+        await base44.entities.DuelGame.update(game.id, {
+          status: 'finished',
+          ended_at: nowIso,
+          admin_force_closed_at: nowIso,
+          admin_force_closed_by: actor
+        });
+        closedDuel += 1;
+      }
+
+      await createAuditLog({
+        action: mode === 'all' ? 'force_close_all_games' : 'force_close_stale_games',
+        summary: `Sulgeti ${closedRegular} mängu ja ${closedDuel} duelli`,
+        details: {
+          mode,
+          closedRegular,
+          closedDuel,
+          staleWindowHours: FORCE_CLOSE_STALE_HOURS
+        }
+      });
+
+      return {
+        mode,
+        closedRegular,
+        closedDuel
+      };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard-games'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard-duel-games'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-audit-log'] });
+      queryClient.invalidateQueries({ queryKey: ['manage-games'] });
+      toast.success(`Sulgesin ${result.closedRegular} mängu ja ${result.closedDuel} duelli`);
+    },
+    onError: (error) => {
+      toast.error(error?.message || 'Force close ebaõnnestus');
+    }
+  });
+
+  const repairRecordsMutation = useMutation({
+    mutationFn: async () => repairTimeLadderRecords(),
+    onSuccess: async (result) => {
+      await createAuditLog({
+        action: 'repair_time_records',
+        summary: `Parandus käivitatud: ${result.scannedGames} mängu`,
+        details: result
+      });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-games'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-audit-log'] });
+      toast.success(
+        `Aja rekordid parandatud (${result.scannedGames} mängu, +${result.created} uut, ${result.updated} uuendatud, ${result.fixedDiscs} ketaste fix)`
+      );
+    },
+    onError: async (error) => {
+      await createAuditLog({
+        action: 'repair_time_records',
+        status: 'error',
+        summary: 'Aja rekordite parandus ebaõnnestus',
+        details: { message: error?.message || 'unknown' }
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-audit-log'] });
+      toast.error(error?.message || 'Rekordite parandus ebaõnnestus');
+    }
+  });
 
   if (!isSuperAdmin) {
     const hasSuperAdmin = visibleUsers.some((entry) => entry.app_role === 'super_admin');
@@ -352,6 +624,8 @@ export default function AdminUsers() {
     );
   }
 
+  const healthStatus = errorsLast60m === 0 ? 'OK' : 'Hoiatus';
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_rgba(255,255,255,1)_55%)] dark:bg-black px-4 pb-12">
       <div className="mx-auto max-w-6xl pt-6">
@@ -362,19 +636,23 @@ export default function AdminUsers() {
           </div>
           <div className="flex items-center gap-2">
             <UserCog className="h-6 w-6 text-slate-700 dark:text-slate-100" />
-            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Admin paneel</h1>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Admin paneel v2</h1>
           </div>
           <div className="w-16" />
         </div>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 mb-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6 mb-6">
           <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
             <div className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-300">Kasutajaid kokku</div>
             <div className="mt-1 text-2xl font-bold text-slate-800 dark:text-slate-100">{totalUsers}</div>
           </div>
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm dark:bg-black dark:border-emerald-400/30">
-            <div className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-300">Aktiivsed ({ACTIVITY_WINDOW_DAYS}p)</div>
-            <div className="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-200">{activeUsersCount}</div>
+            <div className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-300">Aktiivsed täna</div>
+            <div className="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-200">{activeTodayCount}</div>
+          </div>
+          <div className="rounded-2xl border border-lime-200 bg-lime-50 p-4 shadow-sm dark:bg-black dark:border-lime-400/30">
+            <div className="text-xs font-semibold uppercase text-lime-700 dark:text-lime-300">Online ({ACTIVE_NOW_WINDOW_MINUTES}min)</div>
+            <div className="mt-1 text-2xl font-bold text-lime-700 dark:text-lime-200">{onlineNowCount}</div>
           </div>
           <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm dark:bg-black dark:border-blue-400/30">
             <div className="text-xs font-semibold uppercase text-blue-700 dark:text-blue-300">Aktiivsed mängud</div>
@@ -383,6 +661,10 @@ export default function AdminUsers() {
           <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4 shadow-sm dark:bg-black dark:border-purple-400/30">
             <div className="text-xs font-semibold uppercase text-purple-700 dark:text-purple-300">Aktiivsed duellid</div>
             <div className="mt-1 text-2xl font-bold text-purple-700 dark:text-purple-200">{activeDuelGames.length}</div>
+          </div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm dark:bg-black dark:border-amber-400/30">
+            <div className="text-xs font-semibold uppercase text-amber-700 dark:text-amber-300">Aktiivsed ({ACTIVITY_WINDOW_DAYS}p)</div>
+            <div className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-200">{activeUsersCount}</div>
           </div>
         </div>
 
@@ -475,6 +757,7 @@ export default function AdminUsers() {
                   <SelectContent>
                     <SelectItem value="all">Kõik</SelectItem>
                     <SelectItem value="active">Aktiivsed ({ACTIVITY_WINDOW_DAYS}p)</SelectItem>
+                    <SelectItem value="online">Online ({ACTIVE_NOW_WINDOW_MINUTES}min)</SelectItem>
                     <SelectItem value="inactive">Mitteaktiivsed</SelectItem>
                   </SelectContent>
                 </Select>
@@ -503,18 +786,24 @@ export default function AdminUsers() {
                           </span>
                         </td>
                         <td className="px-2 py-3">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${entry.isActive
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:text-emerald-300 dark:border dark:border-emerald-400/40'
-                            : 'bg-slate-100 text-slate-600 dark:bg-black dark:text-slate-300 dark:border dark:border-white/10'
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${entry.isOnlineNow
+                            ? 'bg-lime-100 text-lime-700 dark:bg-black dark:text-lime-300 dark:border dark:border-lime-400/40'
+                            : entry.isActive
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:text-emerald-300 dark:border dark:border-emerald-400/40'
+                              : 'bg-slate-100 text-slate-600 dark:bg-black dark:text-slate-300 dark:border dark:border-white/10'
                           }`}>
-                            {entry.isActive ? 'Aktiivne' : 'Mitteaktiivne'}
+                            {entry.isOnlineNow ? 'Online' : entry.isActive ? 'Aktiivne' : 'Mitteaktiivne'}
                           </span>
                         </td>
                         <td className="px-2 py-3 text-xs text-slate-500 dark:text-slate-300">{formatActivityTime(entry.lastActivityTs)}</td>
                         <td className="px-2 py-3">
                           <Select
                             value={entry.app_role || 'user'}
-                            onValueChange={(newRole) => updateRoleMutation.mutate({ userId: entry.id, newRole })}
+                            onValueChange={(newRole) => updateRoleMutation.mutate({
+                              userId: entry.id,
+                              newRole,
+                              previousRole: entry.app_role || 'user'
+                            })}
                             disabled={entry.id === currentUser?.id || updateRoleMutation.isPending}
                           >
                             <SelectTrigger className="h-10 w-40 rounded-xl">
@@ -543,19 +832,137 @@ export default function AdminUsers() {
                 Aktiivsuse loogika
               </div>
               <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                <div>Aktiivne kasutaja = kasutajal on tegevus viimase {ACTIVITY_WINDOW_DAYS} päeva jooksul.</div>
-                <div>Allikad: profiili kuupäevad, hostitud mängud, mängudes osalemine, duellides osalemine.</div>
+                <div>Online ({ACTIVE_NOW_WINDOW_MINUTES} min) ja “Aktiivsed täna” tulevad heartbeat trackingust.</div>
+                <div>Aktiivne ({ACTIVITY_WINDOW_DAYS}p) jääb alles laiema trendi vaatena (heuristic + tegevuslogi).</div>
               </div>
               <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10">
-                  <div className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-300">Andmeaken</div>
-                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{ACTIVITY_WINDOW_DAYS} päeva</div>
+                  <div className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-300">Viimane heartbeat</div>
+                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{formatActivityTime(lastPresenceAt)}</div>
                 </div>
                 <div className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10">
-                  <div className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-300">Viimane uuendus</div>
-                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{formatActivityTime(Date.now())}</div>
+                  <div className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-300">Aktiivsusaken</div>
+                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{ACTIVITY_WINDOW_DAYS} päeva</div>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-[24px] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-100">
+                <Zap className="h-4 w-4 text-emerald-600" />
+                Kiirtegevused
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Button
+                  variant="outline"
+                  className="justify-start rounded-xl"
+                  disabled={forceCloseMutation.isPending || (staleHostedGames.length + staleDuelGames.length === 0)}
+                  onClick={() => {
+                    forceCloseMutation.mutate({ mode: 'stale' });
+                  }}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Force close seisnud &gt; {FORCE_CLOSE_STALE_HOURS}h ({staleHostedGames.length + staleDuelGames.length})
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start rounded-xl border-red-200 text-red-700 hover:bg-red-50 dark:border-red-400/40 dark:text-red-300 dark:hover:bg-black"
+                  disabled={forceCloseMutation.isPending || (activeHostedGames.length + activeDuelGames.length === 0)}
+                  onClick={() => {
+                    const confirmed = window.confirm('Sulgen KÕIK aktiivsed mängud/duellid. Kas jätkan?');
+                    if (!confirmed) return;
+                    forceCloseMutation.mutate({ mode: 'all' });
+                  }}
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Force close kõik aktiivsed ({activeHostedGames.length + activeDuelGames.length})
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start rounded-xl"
+                  disabled={repairRecordsMutation.isPending}
+                  onClick={() => repairRecordsMutation.mutate()}
+                >
+                  <Wrench className="mr-2 h-4 w-4" />
+                  {repairRecordsMutation.isPending ? 'Parandan rekordeid...' : 'Käivita rekordite parandus'}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start rounded-xl"
+                  onClick={() => navigate(createPageUrl('PuttingRecordsPage'))}
+                >
+                  <Gamepad2 className="mr-2 h-4 w-4" />
+                  Ava rekordite vaade
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-100">
+                <Bug className="h-4 w-4 text-emerald-600" />
+                Health / debug
+              </div>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <div className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10">
+                  <div className="text-xs uppercase font-semibold text-slate-500 dark:text-slate-300">Süsteemi seis</div>
+                  <div className={`text-sm font-bold ${healthStatus === 'OK' ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'}`}>
+                    {healthStatus}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10">
+                  <div className="text-xs uppercase font-semibold text-slate-500 dark:text-slate-300">Errorid (60m)</div>
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-100">{errorsLast60m}</div>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10">
+                  <div className="text-xs uppercase font-semibold text-slate-500 dark:text-slate-300">Errorid (24h)</div>
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-100">{errorsLast24h}</div>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10">
+                  <div className="text-xs uppercase font-semibold text-slate-500 dark:text-slate-300">Stale mängud</div>
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-100">{staleHostedGames.length + staleDuelGames.length}</div>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10 text-sm text-slate-600 dark:text-slate-300">
+                  Build: <span className="font-semibold text-slate-800 dark:text-slate-100">v{buildVersion}</span> • {resolveEnvLabel()}
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{buildTime ? `Build time: ${formatActivityTime(toMillis(buildTime))}` : 'Build time puudub'}</div>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10 text-sm text-slate-600 dark:text-slate-300">
+                  Viimane audit kirje: <span className="font-semibold text-slate-800 dark:text-slate-100">{formatActivityTime(lastAuditAt)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-100">
+                <ClipboardList className="h-4 w-4 text-emerald-600" />
+                Audit log (viimased)
+              </div>
+              {adminAuditLogs.length === 0 ? (
+                <div className="text-sm text-slate-500 dark:text-slate-300">Audit kirjeid veel pole.</div>
+              ) : (
+                <div className="space-y-2">
+                  {adminAuditLogs.slice(0, 20).map((entry) => (
+                    <div key={entry.id} className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{entry.action || 'admin_action'}</div>
+                        <div className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${entry.status === 'error'
+                          ? 'bg-red-100 text-red-700 dark:bg-black dark:text-red-300 dark:border dark:border-red-400/40'
+                          : 'bg-emerald-100 text-emerald-700 dark:bg-black dark:text-emerald-300 dark:border dark:border-emerald-400/40'
+                        }`}>
+                          {entry.status === 'error' ? 'ERROR' : 'OK'}
+                        </div>
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                        {entry.actor_name || entry.actor_email || 'admin'} • {formatActivityTime(toMillis(entry.created_date))}
+                      </div>
+                      {entry.summary ? (
+                        <div className="mt-1 text-sm text-slate-700 dark:text-slate-200">{entry.summary}</div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="rounded-[24px] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">

@@ -13,18 +13,18 @@
 - Kui nõue on ebaselge, küsi täpsustusi ja paku parem tehniline alternatiiv, kui see on olemas.
 
 ## 🟡 Open
-- EST/EN keele tugi (praegu app ainult eesti keeles).
 - Putting King: flow + loogika review, parandused, et mäng tööle saada.
-- Treeneri/trennilise vaade: kui trenniline tahab teha 2 trenni järjest, tal on vaba koht olemas ja ta ei ole veel 1x enda kohta vabastanud, siis `Asendan koha` asemel peab nupp olema `Teen teise trenni järjest`.
-- Trenniline ei tohi nimekirja tekkida enne, kui treener on kinnitanud. Kui liitutakse PIN-koodiga ja kasutajal on juba aktiivne grupp, rakendus küsib: "Sul on juba aktiivne grupp olemas. Kas soovid teist püsiaega juurde?"
-- Dropdown UX: minimize vaates peab sektsiooni saama `maximize` teha kogu kasti ulatuses (mitte ainult noolele vajutades). `Minimize` jääb ainult noole nupu kaudu.
-- Host-mänge ei teki: viga avaldub sõbraduelli HOST mängu loomisel.
-- Telefonis, kui teha oma sõbraduelli HOST mäng, ei ole võimalik hosti vaates mängu avada (st “minna mängu sisse” / lahti märkida).
-- Dark Theme nupp läheb vahepeal teiste nuppude peale (nt `Alusta` nupp mängu loomisel). Parandus: väldi overlap'i ja taga korrektne paigutus kõigis vaadetes.
-- Nädala vahetusel peavad `1x` trenni võtmised automaatselt tagasi oma püsikohtadele minema (nt neljapäeval ei tohi eelmise nädala `1x` asendused jääda aktiivseks).
-- SOLO sõbraduell peab pärast mängu salvestamist tekkima mõlema mängija profiili alla; hetkel see teisele osapoolele profiilis ei ilmu.
 
 ## ✅ Done (viimati tehtud)
+- Admin paneel v2:
+  - KPI-d: kasutajad kokku, aktiivsed täna, online viimased 15 min, aktiivsed mängud/duellid, 30p aktiivsus.
+  - Kiirtegevused: force close seisnud/kõik aktiivsed mängud ja duellid.
+  - Rekordite parandus trigger (time ladder fix) otse administ.
+  - Audit log: admin tegevused talletuvad ja on paneelis nähtavad.
+  - Health/debug: errorid 60m/24h, stale mängud, build/env info.
+- Aktiivsuse tracking:
+  - Heartbeat tracker navigeerimisel + perioodiliselt, et "täna" ja "15 min" aktiivsus oleks sisuline.
+  - 30 päeva aktiivsus jäi alles trendivaateks.
 - Treeningu liigapunktid (rank + HC): astmeline 70% boonus töötab korrektselt (`6. koht +0.3`, iga koht üles +0.3); varasemad salvestatud tulemused ja hooaja punktid backfillitud.
 - Uus SOLO mäng: Aja väljakutse (5m → 10m, 5 järjest sees = +1m, ajapõhine edetabel, kettavalik 3/5/7).
 - Treeneri süsteem päriselt tööle (grupid/PIN/UI/permissions).

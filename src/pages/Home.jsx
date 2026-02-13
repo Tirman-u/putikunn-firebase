@@ -196,7 +196,8 @@ export default function Home() {
       icon: Trophy,
       color: 'amber',
       href: createPageUrl('PuttingRecordsPage'),
-      show: true
+      show: true,
+      hideOnMobile: true
     },
     {
       key: 'king',
@@ -214,7 +215,8 @@ export default function Home() {
       icon: User,
       color: 'slate',
       to: createPageUrl('Profile'),
-      show: true
+      show: true,
+      hideOnMobile: true
     },
     {
       key: 'manage',
@@ -262,10 +264,11 @@ export default function Home() {
 
     const className =
       "w-full rounded-[28px] border border-white/70 bg-white/70 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur-sm transition hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 dark:bg-black dark:border-white/10";
+    const tileClassName = className + (tile.hideOnMobile ? ' hidden md:block' : '');
 
     if (tile.to) {
       return (
-        <Link key={tile.key} to={tile.to} className={className}>
+        <Link key={tile.key} to={tile.to} className={tileClassName}>
           {content}
         </Link>
       );
@@ -273,14 +276,14 @@ export default function Home() {
 
     if (tile.href) {
       return (
-        <button key={tile.key} type="button" onClick={() => (window.location.href = tile.href)} className={className}>
+        <button key={tile.key} type="button" onClick={() => (window.location.href = tile.href)} className={tileClassName}>
           {content}
         </button>
       );
     }
 
     return (
-      <button key={tile.key} type="button" onClick={tile.onClick} className={className}>
+      <button key={tile.key} type="button" onClick={tile.onClick} className={tileClassName}>
         {content}
       </button>
     );

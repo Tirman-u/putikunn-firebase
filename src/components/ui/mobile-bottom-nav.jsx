@@ -1,18 +1,21 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Trophy, User, UserPlus, Users2 } from 'lucide-react';
+import { Home, Trophy, User, UserPlus, Users2, GraduationCap } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 
 const TRAINER_ROUTES = new Set([
   '/TrainerGroups',
   '/ManageGames',
+  '/AdminUsers'
+]);
+
+const TRAINING_ROUTES = new Set([
   '/JoinTraining',
   '/TrainingLeague',
   '/TrainingSeason',
-  '/TrainingSession',
-  '/AdminUsers'
+  '/TrainingSession'
 ]);
 
 const BASE_VISIBLE_ROUTES = new Set([
@@ -74,6 +77,13 @@ export default function MobileBottomNav() {
       active: (path === '/' || path === '/Home') && homeMode === 'join'
     },
     {
+      key: 'join-training',
+      label: 'Trenn',
+      to: createPageUrl('JoinTraining'),
+      icon: GraduationCap,
+      active: TRAINING_ROUTES.has(path)
+    },
+    {
       key: 'records',
       label: 'Rekordid',
       to: createPageUrl('PuttingRecordsPage'),
@@ -99,9 +109,11 @@ export default function MobileBottomNav() {
     });
   }
 
+  const gridColsClass = items.length >= 6 ? 'grid-cols-6' : items.length === 5 ? 'grid-cols-5' : 'grid-cols-4';
+
   return (
     <nav className="fixed inset-x-3 bottom-3 z-40 rounded-[24px] border border-white/80 bg-white/90 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-sm md:hidden dark:bg-black dark:border-white/15">
-      <ul className={`grid gap-1 ${items.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
+      <ul className={`grid gap-1 ${gridColsClass}`}>
         {items.map((item) => {
           const Icon = item.icon;
           return (

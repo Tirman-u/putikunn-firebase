@@ -42,17 +42,17 @@
   .dark {
     --background: 0 0% 0%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 6%;
+    --card: 0 0% 0%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 6%;
+    --popover: 0 0% 0%;
     --popover-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
+    --secondary: 0 0% 0%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
+    --muted: 0 0% 0%;
     --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
+    --accent: 0 0% 0%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
@@ -64,7 +64,7 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 0 0% 6%;
+    --sidebar-background: 0 0% 0%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
@@ -87,6 +87,16 @@
   }
 }
 
+@layer components {
+  .pk-surface {
+    @apply rounded-[28px] border border-white/70 bg-white/70 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10;
+  }
+
+  .pk-card {
+    @apply rounded-2xl border border-slate-100 bg-white/80 shadow-sm dark:bg-black dark:border-white/10;
+  }
+}
+
 @layer utilities {
   .dark [class*="bg-gradient-to"] {
     background-image: none !important;
@@ -99,11 +109,11 @@
   }
 
   .dark .bg-white {
-    background-color: #0b0b0b !important;
+    background-color: #000 !important;
   }
 
   .dark .bg-white\/70 {
-    background-color: rgba(11, 11, 11, 0.7) !important;
+    background-color: rgba(0, 0, 0, 0.7) !important;
   }
 
   .dark .bg-slate-50,
@@ -111,7 +121,7 @@
   .dark .bg-amber-50,
   .dark .bg-purple-50,
   .dark .bg-sky-50 {
-    background-color: #0b0b0b !important;
+    background-color: #000 !important;
   }
 
   .dark .bg-slate-100,
@@ -121,7 +131,7 @@
   .dark .bg-sky-100,
   .dark .bg-blue-100,
   .dark .bg-red-100 {
-    background-color: #141414 !important;
+    background-color: #000 !important;
   }
 
   .dark .border-white\/70 {
@@ -156,7 +166,7 @@
   .dark[data-env="test"] .bg-white\/70,
   .dark[data-env="test"] .bg-white\/80,
   .dark[data-env="test"] .bg-white\/90 {
-    background-color: #0b0b0b !important;
+    background-color: #000 !important;
   }
 
   .dark[data-env="test"] .bg-slate-50,
@@ -211,7 +221,7 @@
   .dark[data-env="test"] .bg-red-100,
   .dark[data-env="test"] .bg-red-200,
   .dark[data-env="test"] .bg-red-300 {
-    background-color: #0b0b0b !important;
+    background-color: #000 !important;
   }
 
   .dark[data-env="test"] .border-white,
@@ -243,7 +253,7 @@
   .dark[data-env="test"] .hover\:bg-amber-200:hover,
   .dark[data-env="test"] .hover\:bg-purple-100:hover,
   .dark[data-env="test"] .hover\:bg-purple-200:hover {
-    background-color: #111 !important;
+    background-color: #000 !important;
   }
 
   .dark[data-env="test"] .shadow-sm,

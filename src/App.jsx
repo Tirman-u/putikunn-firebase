@@ -10,6 +10,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ErrorBoundary from '@/lib/ErrorBoundary';
 import VersionBadge from '@/components/VersionBadge';
 import ThemeToggle from '@/components/ui/theme-toggle';
+import MobileBottomNav from '@/components/ui/mobile-bottom-nav';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -28,7 +29,7 @@ const GlobalThemeToggle = () => {
   if (isHome && !homeMode) return null;
 
   return (
-    <div className="fixed bottom-14 right-4 z-50 sm:bottom-auto sm:top-6 sm:right-6">
+    <div className="fixed bottom-24 right-4 z-50 sm:bottom-auto sm:top-6 sm:right-6">
       <ThemeToggle />
     </div>
   );
@@ -94,6 +95,7 @@ function App() {
           <ErrorBoundary>
             <GlobalThemeToggle />
             <AuthenticatedApp />
+            <MobileBottomNav />
           </ErrorBoundary>
         </Router>
         <VersionBadge />

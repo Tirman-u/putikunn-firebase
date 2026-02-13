@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,7 +22,10 @@ export default function PuttingRecords() {
   const [selectedGender, setSelectedGender] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [dgMode, setDgMode] = useState('classic');
+  const [recordDisplayMode, setRecordDisplayMode] = useState('best');
   const [page, setPage] = useState(1);
+  const [queuedRecordDeletes, setQueuedRecordDeletes] = useState({});
+  const recordDeleteTimersRef = useRef({});
   const [hasAutoRepairedTimeRecords, setHasAutoRepairedTimeRecords] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.localStorage.getItem(TIME_REPAIR_STORAGE_KEY) === 'done';
@@ -60,13 +63,20 @@ export default function PuttingRecords() {
 
   useEffect(() => {
     setPage(1);
-  }, [selectedView, selectedGender, selectedMonth, dgMode]);
+  }, [selectedView, selectedGender, selectedMonth, dgMode, recordDisplayMode]);
 
   useEffect(() => {
     if (selectedView === 'discgolf_ee') {
       setDgMode('classic');
     }
   }, [selectedView]);
+
+  useEffect(() => () => {
+    Object.values(recordDeleteTimersRef.current).forEach((timerId) => {
+      window.clearTimeout(timerId);
+    });
+    recordDeleteTimersRef.current = {};
+  }, []);
 
   const fetchLeaderboardRows = async (filter, sortOrder) => {
     const rows = [];
@@ -171,6 +181,56 @@ export default function PuttingRecords() {
       toast.error(error?.message || 'Kustutamine ebaonnestus');
     }
   });
+
+  const cancelQueuedRecordDelete = React.useCallback((entryId, silent = false) => {
+    if (!entryId) return;
+    if (recordDeleteTimersRef.current[entryId]) {
+      window.clearTimeout(recordDeleteTimersRef.current[entryId]);
+      delete recordDeleteTimersRef.current[entryId];
+    }
+    setQueuedRecordDeletes((prev) => {
+      if (!prev[entryId]) return prev;
+      const next = { ...prev };
+      delete next[entryId];
+      return next;
+    });
+    if (!silent) {
+      toast.success('Kustutamine tühistatud');
+    }
+  }, []);
+
+  const queueRecordDelete = React.useCallback((entry) => {
+    if (!entry?.id) return;
+    if (queuedRecordDeletes[entry.id]) {
+      cancelQueuedRecordDelete(entry.id);
+      return;
+    }
+    const player = getResolvedPlayerName(entry) || 'tundmatu';
+    const confirmed = window.confirm('Kustuta "' + player + '" sellest tabelist?');
+    if (!confirmed) return;
+
+    setQueuedRecordDeletes((prev) => ({
+      ...prev,
+      [entry.id]: true
+    }));
+
+    recordDeleteTimersRef.current[entry.id] = window.setTimeout(() => {
+      deleteRecordMutation.mutate(entry, {
+        onSettled: () => {
+          cancelQueuedRecordDelete(entry.id, true);
+        }
+      });
+    }, 5000);
+
+    toast.message('Kirje kustutatakse 5 sekundi pärast', {
+      duration: 5000,
+      action: {
+        label: 'Võta tagasi',
+        onClick: () => cancelQueuedRecordDelete(entry.id)
+      }
+    });
+  }, [queuedRecordDeletes, cancelQueuedRecordDelete, deleteRecordMutation]);
+
 
   const resolveGamePlayers = React.useCallback((game) => {
     const players = new Set();
@@ -493,42 +553,62 @@ export default function PuttingRecords() {
     return playerKey;
   };
 
-  // Group by player + relevant variant (time discs, ATW discs, streak distance) and keep best score per group.
+  const rankEntriesComparator = React.useCallback((a, b) => {
+    const aScore = Number(a?.score || 0);
+    const bScore = Number(b?.score || 0);
+    const aDate = new Date(a?.date || 0).getTime();
+    const bDate = new Date(b?.date || 0).getTime();
+
+    if (isTimeView) {
+      if (aScore !== bScore) return aScore - bScore;
+      const discsDelta = (getTimeDiscsCount(a) || Number.MAX_SAFE_INTEGER) - (getTimeDiscsCount(b) || Number.MAX_SAFE_INTEGER);
+      if (discsDelta !== 0) return discsDelta;
+      return bDate - aDate;
+    }
+
+    if (isStreakView) {
+      if (aScore !== bScore) return bScore - aScore;
+      const distanceDelta = (getStreakDistance(b) || 0) - (getStreakDistance(a) || 0);
+      if (distanceDelta !== 0) return distanceDelta;
+      return bDate - aDate;
+    }
+
+    if (isATWView) {
+      if (aScore !== bScore) return bScore - aScore;
+      const discsDelta = (getAtwDiscsCount(a) || Number.MAX_SAFE_INTEGER) - (getAtwDiscsCount(b) || Number.MAX_SAFE_INTEGER);
+      if (discsDelta !== 0) return discsDelta;
+      return bDate - aDate;
+    }
+
+    if (aScore !== bScore) return bScore - aScore;
+    return bDate - aDate;
+  }, [isTimeView, isStreakView, isATWView, getTimeDiscsCount, getStreakDistance, getAtwDiscsCount]);
+
+  // Best mode keeps one record per player (+variant for time/ATW/streak).
   const bestScoresByPlayer = {};
   filteredEntries.forEach((entry) => {
     const key = getRecordKey(entry);
     const existing = bestScoresByPlayer[key];
     const entryScore = Number(entry.score || 0);
     const existingScore = Number(existing?.score || 0);
+    const entryDate = new Date(entry?.date || 0).getTime();
+    const existingDate = new Date(existing?.date || 0).getTime();
     const isBetter = isTimeView
-      ? (!existing || entryScore < existingScore || (entryScore === existingScore && entry.date > existing.date))
-      : (!existing || entryScore > existingScore || (entryScore === existingScore && entry.date > existing.date));
+      ? (!existing || entryScore < existingScore || (entryScore === existingScore && entryDate > existingDate))
+      : (!existing || entryScore > existingScore || (entryScore === existingScore && entryDate > existingDate));
     if (isBetter) {
       bestScoresByPlayer[key] = entry;
     }
   });
 
-  const uniqueEntries = Object.values(bestScoresByPlayer).sort((a, b) => {
-    const aScore = Number(a.score || 0);
-    const bScore = Number(b.score || 0);
-    if (isTimeView) {
-      if (aScore !== bScore) return aScore - bScore;
-      return (getTimeDiscsCount(a) || Number.MAX_SAFE_INTEGER) - (getTimeDiscsCount(b) || Number.MAX_SAFE_INTEGER);
-    }
-    if (isStreakView) {
-      if (aScore !== bScore) return bScore - aScore;
-      return (getStreakDistance(b) || 0) - (getStreakDistance(a) || 0);
-    }
-    if (isATWView) {
-      if (aScore !== bScore) return bScore - aScore;
-      return (getAtwDiscsCount(a) || Number.MAX_SAFE_INTEGER) - (getAtwDiscsCount(b) || Number.MAX_SAFE_INTEGER);
-    }
-    return bScore - aScore;
-  });
-  const totalPages = Math.max(1, Math.ceil(uniqueEntries.length / PAGE_SIZE));
+  const bestEntries = Object.values(bestScoresByPlayer).sort(rankEntriesComparator);
+  const allEntries = [...filteredEntries].sort(rankEntriesComparator);
+  const rankingEntries = recordDisplayMode === 'all' ? allEntries : bestEntries;
+
+  const totalPages = Math.max(1, Math.ceil(rankingEntries.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageStart = (safePage - 1) * PAGE_SIZE;
-  const sortedEntries = uniqueEntries.slice(pageStart, pageStart + PAGE_SIZE);
+  const sortedEntries = rankingEntries.slice(pageStart, pageStart + PAGE_SIZE);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -537,7 +617,7 @@ export default function PuttingRecords() {
   }, [page, totalPages]);
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+    <div className="pk-surface p-6">
       <div className="flex items-center gap-3 mb-6">
         <Trophy className="w-6 h-6 text-amber-500" />
         <h2 className="text-2xl font-bold text-slate-800">Puttingu rekordid</h2>
@@ -601,6 +681,34 @@ export default function PuttingRecords() {
                     ))}
                   </SelectContent>
                 </Select>
+
+                <div className="inline-flex rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:bg-black dark:border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setRecordDisplayMode('best')}
+                    className={
+                      'rounded-full px-3 py-1 text-xs font-semibold transition ' +
+                      (recordDisplayMode === 'best'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:border dark:border-emerald-400/40 dark:text-emerald-300'
+                        : 'text-slate-500 hover:text-slate-700 dark:text-slate-300')
+                    }
+                  >
+                    Parimad
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecordDisplayMode('all')}
+                    className={
+                      'rounded-full px-3 py-1 text-xs font-semibold transition ' +
+                      (recordDisplayMode === 'all'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:border dark:border-emerald-400/40 dark:text-emerald-300'
+                        : 'text-slate-500 hover:text-slate-700 dark:text-slate-300')
+                    }
+                  >
+                    Kõik katsed
+                  </button>
+                </div>
+
                 {isTimeView && canRepairTimeRecords && (
                   <button
                     type="button"
@@ -733,16 +841,19 @@ export default function PuttingRecords() {
                             <td className="py-3 px-2 text-right">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const player = getResolvedPlayerName(entry) || 'tundmatu';
-                                  if (!confirm(`Kustuta "${player}" sellest tabelist?`)) {
-                                    return;
-                                  }
-                                  deleteRecordMutation.mutate(entry);
+                                onClick={(eventClick) => {
+                                  eventClick.preventDefault();
+                                  eventClick.stopPropagation();
+                                  queueRecordDelete(entry);
                                 }}
                                 disabled={deleteRecordMutation.isPending}
-                                className="inline-flex items-center justify-center w-8 h-8 rounded-md text-red-500 hover:text-red-700 hover:bg-red-50 disabled:opacity-50"
-                                title="Kustuta kirje"
+                                className={
+                                  'inline-flex items-center justify-center w-8 h-8 rounded-md disabled:opacity-50 ' +
+                                  (queuedRecordDeletes[entry.id]
+                                    ? 'text-amber-600 hover:text-amber-800 hover:bg-amber-50 dark:hover:bg-black'
+                                    : 'text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-black')
+                                }
+                                title={queuedRecordDeletes[entry.id] ? 'Võta tagasi' : 'Kustuta kirje'}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>

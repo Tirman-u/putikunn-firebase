@@ -26,6 +26,7 @@ import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
 import { createPageUrl } from '@/utils';
 import { repairTimeLadderRecords } from '@/lib/time-records-repair';
+import { buildJoinableEntries, isJoinableDuelGame, isJoinableRegularGame, toJoinableEntrySummary } from '@/lib/joinable-games';
 
 const ACTIVITY_WINDOW_DAYS = 30;
 const ACTIVITY_WINDOW_MS = ACTIVITY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
@@ -376,31 +377,12 @@ export default function AdminUsers() {
   }, [usersWithMeta]);
 
   const activeHostedGames = React.useMemo(
-    () => hostedGames.filter((game) => {
-      const status = String(game?.status || '').toLowerCase();
-      return Boolean(
-        game?.pin &&
-        game.pin !== '0000' &&
-        game.join_closed !== true &&
-        status !== 'closed' &&
-        status !== 'completed' &&
-        status !== 'finished'
-      );
-    }),
+    () => hostedGames.filter((game) => isJoinableRegularGame(game)),
     [hostedGames]
   );
 
   const activeDuelGames = React.useMemo(
-    () => duelGames.filter((game) => {
-      const status = String(game?.status || '').toLowerCase();
-      return Boolean(
-        game?.pin &&
-        game.pin !== '0000' &&
-        status !== 'finished' &&
-        status !== 'closed' &&
-        status !== 'cancelled'
-      );
-    }),
+    () => duelGames.filter((game) => isJoinableDuelGame(game)),
     [duelGames]
   );
 
@@ -415,27 +397,12 @@ export default function AdminUsers() {
   );
 
   const recentJoinableEntries = React.useMemo(() => {
-    const regularEntries = activeHostedGames.map((game) => ({
-      id: game.id,
-      name: game.name || 'Mäng',
-      pin: game.pin,
-      kind: 'regular',
-      status: game.status,
-      date: toMillis(game?.date || game?.created_date)
-    }));
-
-    const duelEntries = activeDuelGames.map((game) => ({
-      id: game.id,
-      name: game.name || (game.mode === 'solo' ? 'SOLO duell' : 'HOST duell'),
-      pin: game.pin,
-      kind: 'duel',
-      status: game.status,
-      date: toMillis(game?.created_at || game?.started_at || game?.created_date)
-    }));
-
-    return [...regularEntries, ...duelEntries]
-      .sort((a, b) => b.date - a.date)
-      .slice(0, 8);
+    const joinableRows = buildJoinableEntries({
+      hostedGames: activeHostedGames,
+      duelGames: activeDuelGames,
+      limit: 8
+    });
+    return joinableRows.map((entry) => toJoinableEntrySummary(entry));
   }, [activeHostedGames, activeDuelGames]);
 
   const errorsLast24h = React.useMemo(
@@ -665,6 +632,24 @@ export default function AdminUsers() {
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm dark:bg-black dark:border-amber-400/30">
             <div className="text-xs font-semibold uppercase text-amber-700 dark:text-amber-300">Aktiivsed ({ACTIVITY_WINDOW_DAYS}p)</div>
             <div className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-200">{activeUsersCount}</div>
+          </div>
+        </div>
+
+        <div className="mb-6 rounded-[24px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
+          <div className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-100">Aktiivsuse definitsioonid</div>
+          <div className="grid grid-cols-1 gap-2 text-xs text-slate-600 dark:text-slate-300 md:grid-cols-3">
+            <div className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10">
+              <div className="font-semibold text-emerald-700 dark:text-emerald-300">Aktiivsed täna</div>
+              <div>Heartbeat vähemalt 1x tänase kuupäeva jooksul.</div>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10">
+              <div className="font-semibold text-lime-700 dark:text-lime-300">Online ({ACTIVE_NOW_WINDOW_MINUTES}min)</div>
+              <div>Heartbeat viimase {ACTIVE_NOW_WINDOW_MINUTES} minuti jooksul.</div>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-white/10">
+              <div className="font-semibold text-amber-700 dark:text-amber-300">Aktiivsed ({ACTIVITY_WINDOW_DAYS}p)</div>
+              <div>Koondaktiivsus (login + mängud + heartbeat) viimase {ACTIVITY_WINDOW_DAYS} päeva jooksul.</div>
+            </div>
           </div>
         </div>
 

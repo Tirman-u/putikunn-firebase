@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LogIn, Clock, Users } from 'lucide-react';
+import { LogIn, Clock, Users, RefreshCw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -11,6 +11,7 @@ import HomeButton from '@/components/ui/home-button';
 import { useLanguage } from '@/lib/i18n';
 import { createPageUrl } from '@/utils';
 import { pickJoinableDuelGame } from '@/lib/duel-game-utils';
+import { buildJoinableEntries } from '@/lib/joinable-games';
 
 export default function JoinGame({ onJoin, onBack }) {
   const { t } = useLanguage();
@@ -24,44 +25,19 @@ export default function JoinGame({ onJoin, onBack }) {
     queryFn: () => base44.auth.me()
   });
 
-  const { data: recentGames = [] } = useQuery({
+  const {
+    data: recentGames = [],
+    isLoading: isLoadingRecentGames,
+    isError: isRecentGamesError,
+    refetch: refetchRecentGames
+  } = useQuery({
     queryKey: ['recent-games-v2'],
     queryFn: async () => {
       const [hostedGames, duelGames] = await Promise.all([
         base44.entities.Game.filter({ pin: { $ne: '0000' } }, '-date', 80),
         base44.entities.DuelGame.filter({}, '-created_at', 50)
       ]);
-
-      const regularEntries = (hostedGames || [])
-        .filter((g) => {
-          const status = String(g?.status || '').toLowerCase();
-          return Boolean(
-            g?.pin &&
-            g.pin !== '0000' &&
-            g.join_closed !== true &&
-            status !== 'closed' &&
-            status !== 'completed' &&
-            status !== 'finished'
-          );
-        })
-        .map((g) => ({ ...g, __kind: 'regular', __sortDate: g.date || g.created_date || null }));
-
-      const duelEntries = (duelGames || [])
-        .filter((g) => {
-          const status = String(g?.status || '').toLowerCase();
-          return Boolean(
-            g?.pin &&
-            g.pin !== '0000' &&
-            status !== 'finished' &&
-            status !== 'closed' &&
-            status !== 'cancelled'
-          );
-        })
-        .map((g) => ({ ...g, __kind: 'duel', __sortDate: g.created_at || g.started_at || g.date || null }));
-
-      return [...regularEntries, ...duelEntries]
-        .sort((a, b) => new Date(b.__sortDate || 0) - new Date(a.__sortDate || 0))
-        .slice(0, 10);
+      return buildJoinableEntries({ hostedGames, duelGames, limit: 10 });
     },
     enabled: true,
     staleTime: 5000,
@@ -116,7 +92,7 @@ export default function JoinGame({ onJoin, onBack }) {
     try {
       // Find game by PIN
       const games = await base44.entities.Game.filter({ pin: pin.trim() });
-      
+
       if (games.length === 0) {
         const duelPin = pin.trim().replace(/\D/g, '').slice(0, 4);
         if (duelPin.length === 4) {
@@ -229,7 +205,7 @@ export default function JoinGame({ onJoin, onBack }) {
           <HomeButton />
         </div>
 
-        <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm space-y-4 dark:bg-black dark:border-white/10">
+        <div className="pk-surface p-5 space-y-4">
           <div>
             <label className="text-xs font-semibold text-slate-500 uppercase">
               {t('join.name_label', 'Sinu nimi')}
@@ -271,20 +247,41 @@ export default function JoinGame({ onJoin, onBack }) {
           </Button>
         </div>
 
-        {/* Recent Games */}
-        {recentGames.length > 0 && (
-          <div className="mt-8">
-            <h3 className="text-xs font-semibold text-slate-500 uppercase mb-3 flex items-center gap-2 dark:text-slate-200">
+        <div className="mt-8">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-2 dark:text-slate-200">
               <Clock className="w-4 h-4" />
               {t('join.active_games', 'Aktiivsed mängud')}
             </h3>
+            <button
+              type="button"
+              onClick={() => refetchRecentGames()}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 dark:bg-black dark:border-white/10 dark:text-slate-200"
+            >
+              <RefreshCw className={`w-3 h-3 ${isLoadingRecentGames ? 'animate-spin' : ''}`} />
+              Uuenda
+            </button>
+          </div>
+          {isLoadingRecentGames ? (
+            <div className="pk-card px-4 py-3 text-sm text-slate-500 dark:text-slate-300">
+              Laen aktiivseid mänge...
+            </div>
+          ) : isRecentGamesError ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 shadow-sm dark:bg-black dark:border-red-400/40 dark:text-red-300">
+              Aktiivsete mängude laadimine ebaõnnestus.
+            </div>
+          ) : recentGames.length === 0 ? (
+            <div className="pk-card px-4 py-3 text-sm text-slate-500 dark:text-slate-300">
+              Hetkel pole ühtegi avatud mängu. Sisesta PIN käsitsi või proovi hetke pärast uuesti.
+            </div>
+          ) : (
             <div className="space-y-2">
               {recentGames.map((game) => {
                 const playerCount = getPlayerCount(game);
                 return (
-                <button
-                  key={game.id}
-                  onClick={() => {
+                  <button
+                    key={game.__entryKey || game.id}
+                    onClick={() => {
                       if (game.__kind === 'duel') {
                         window.location.href = `${createPageUrl('DuelJoin')}?id=${game.id}${game.pin ? `&pin=${game.pin}` : ''}`;
                         return;
@@ -292,13 +289,13 @@ export default function JoinGame({ onJoin, onBack }) {
                       setPin(game.pin);
                       setPlayerName(user?.display_name || user?.full_name || '');
                     }}
-                    className="w-full rounded-2xl border border-white/70 bg-white/70 p-3 text-left shadow-sm backdrop-blur-sm transition hover:bg-emerald-50/80 dark:bg-black dark:border-white/10 dark:hover:bg-black"
+                    className="w-full pk-card p-3 text-left transition hover:bg-emerald-50/80 dark:hover:bg-black"
                   >
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="font-semibold text-slate-800 text-sm dark:text-slate-100">{game.name}</div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded dark:bg-emerald-500/10 dark:text-emerald-300">
+                          <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded dark:bg-black dark:border dark:border-emerald-400/40 dark:text-emerald-300">
                             {getEntryTypeLabel(game)}
                           </span>
                           <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -318,8 +315,8 @@ export default function JoinGame({ onJoin, onBack }) {
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

@@ -75,6 +75,10 @@ export default function TrainingSession() {
   const [editingEventName, setEditingEventName] = React.useState('');
   const [mode, setMode] = React.useState('app');
   const [applyAppToSameDate, setApplyAppToSameDate] = React.useState(true);
+  const [pendingAppGame, setPendingAppGame] = React.useState(null);
+  const [isResolvingAppPin, setIsResolvingAppPin] = React.useState(false);
+  const [queuedDeleteEvents, setQueuedDeleteEvents] = React.useState({});
+  const deleteEventTimersRef = React.useRef({});
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -83,6 +87,13 @@ export default function TrainingSession() {
 
   const userRole = user?.app_role || 'user';
   const canManageTraining = ['trainer', 'admin', 'super_admin'].includes(userRole);
+
+  React.useEffect(() => () => {
+    Object.values(deleteEventTimersRef.current).forEach((timerId) => {
+      window.clearTimeout(timerId);
+    });
+    deleteEventTimersRef.current = {};
+  }, []);
 
   const { data: session } = useQuery({
     queryKey: ['training-session', sessionId],
@@ -326,6 +337,61 @@ export default function TrainingSession() {
       });
   }, [seasonEvents, visibleSessionIds]);
 
+  const refreshSeasonData = React.useCallback(async () => {
+    if (!season?.id) return;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['training-events-season', season.id] }),
+      queryClient.invalidateQueries({ queryKey: ['training-event-results-season', season.id] }),
+      queryClient.invalidateQueries({ queryKey: ['training-season-stats', season.id] })
+    ]);
+  }, [queryClient, season?.id]);
+
+  const appTargetsWithMeta = React.useMemo(() => {
+    return appTargetSessions.map((targetSession) => {
+      const slotLabel = formatSlotLabel(slotById[targetSession.slot_id]);
+      const targetEvents = seasonEvents.filter((entry) => entry.session_id === targetSession.id && entry.type === 'app');
+      const isAlreadyLinked = Boolean(pendingAppGame?.id) && targetEvents.some((entry) => entry.source_game_id === pendingAppGame.id);
+      return {
+        sessionId: targetSession.id,
+        slotLabel,
+        appEventCount: targetEvents.length,
+        isAlreadyLinked
+      };
+    });
+  }, [appTargetSessions, slotById, seasonEvents, pendingAppGame?.id]);
+
+  const selectPendingAppGame = React.useCallback((game) => {
+    if (!game?.id) {
+      toast.error('Mäng puudub');
+      return;
+    }
+    setPendingAppGame(game);
+    toast.success('Valitud: ' + (game.name || game.game_type || 'Mäng'));
+  }, []);
+
+  const clearPendingAppGame = React.useCallback(() => {
+    setPendingAppGame(null);
+  }, []);
+
+  const resolveGameByPin = React.useCallback(async (cleanedPin) => {
+    const normalizedPin = String(cleanedPin || '').trim();
+    if (!normalizedPin) return null;
+
+    const fromGroup = groupGames.find((entry) => String(entry?.pin || '').trim() === normalizedPin);
+    if (fromGroup) return fromGroup;
+
+    const games = await base44.entities.Game.filter({ pin: normalizedPin }, '-date', 20);
+    if (!games?.length) return null;
+
+    const preferred = games.find((entry) => {
+      if (season?.group_id && entry?.training_group_id === season.group_id) return true;
+      const status = String(entry?.status || '').toLowerCase();
+      return status === 'active' && entry?.join_closed !== true;
+    });
+
+    return preferred || games[0] || null;
+  }, [groupGames, season?.group_id]);
+
   const createAppEventFromGame = async (game, options = {}) => {
     const targetSession = options.session || session;
     const targetSlotId = targetSession?.slot_id || null;
@@ -505,62 +571,52 @@ export default function TrainingSession() {
     return { added, skipped, outcomes };
   };
 
-  const handleCreateAppEvent = async () => {
+  const handleFindAppGameByPin = async () => {
     const cleanedPin = appPin.replace(/\D/g, '').slice(0, 4);
     if (cleanedPin.length !== 4) {
       toast.error('Sisesta 4-kohaline PIN');
       return;
     }
-    if (!session || !season || !group) return;
-    setIsSavingApp(true);
+    setIsResolvingAppPin(true);
     try {
-      const games = await base44.entities.Game.filter({ pin: cleanedPin }, '-date', 1);
-      if (!games?.length) {
+      const game = await resolveGameByPin(cleanedPin);
+      if (!game) {
         toast.error('Mängu ei leitud');
         return;
       }
-      const summary = await applyAppGameToTargetSessions(games[0]);
-      if (summary.added === 0) {
-        const firstError = summary.outcomes.find((entry) => !entry.ok)?.message;
-        toast.error(firstError || 'Eventi lisamine ebaõnnestus');
-        return;
-      }
-      setAppPin('');
-      setAppName('');
-      setAppLowerIsBetter(false);
-      queryClient.invalidateQueries({ queryKey: ['training-events-season', season?.id] });
-      queryClient.invalidateQueries({ queryKey: ['training-event-results-season', season?.id] });
-      queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
-      if (summary.skipped > 0) {
-        toast.success(`Event lisatud ${summary.added} trenni, vahele jäetud ${summary.skipped}`);
-      } else {
-        toast.success(summary.added > 1 ? `Event lisatud ${summary.added} trenni` : 'Event lisatud');
-      }
+      selectPendingAppGame(game);
     } catch (error) {
-      toast.error(error?.message || 'Eventi lisamine ebaõnnestus');
+      toast.error(error?.message || 'Mängu leidmine ebaõnnestus');
     } finally {
-      setIsSavingApp(false);
+      setIsResolvingAppPin(false);
     }
   };
 
-  const handleAddGroupGame = async (game) => {
+  const handleCreateAppEvent = async () => {
+    if (!pendingAppGame?.id) {
+      toast.error('Vali enne mäng, mida lisada');
+      return;
+    }
     if (!session || !season || !group) return;
     setIsSavingApp(true);
     try {
-      const summary = await applyAppGameToTargetSessions(game);
+      const summary = await applyAppGameToTargetSessions(pendingAppGame);
       if (summary.added === 0) {
         const firstError = summary.outcomes.find((entry) => !entry.ok)?.message;
         toast.error(firstError || 'Eventi lisamine ebaõnnestus');
         return;
       }
+
+      setAppPin('');
       setAppName('');
-      queryClient.invalidateQueries({ queryKey: ['training-events-season', season?.id] });
-      queryClient.invalidateQueries({ queryKey: ['training-event-results-season', season?.id] });
-      queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
+      setAppLowerIsBetter(false);
+      setPendingAppGame(null);
+      await refreshSeasonData();
+
       if (summary.skipped > 0) {
-        toast.success(`Event lisatud ${summary.added} trenni, vahele jäetud ${summary.skipped}`);
+        toast.success('Event lisatud ' + summary.added + ' trenni, vahele jäetud ' + summary.skipped);
       } else {
-        toast.success(summary.added > 1 ? `Event lisatud ${summary.added} trenni` : 'Event lisatud');
+        toast.success(summary.added > 1 ? ('Event lisatud ' + summary.added + ' trenni') : 'Event lisatud');
       }
     } catch (error) {
       toast.error(error?.message || 'Eventi lisamine ebaõnnestus');
@@ -569,6 +625,9 @@ export default function TrainingSession() {
     }
   };
 
+  const handleAddGroupGame = (game) => {
+    selectPendingAppGame(game);
+  };
   const handleCreateOfflineEvent = async () => {
     if (!session || !season) return;
     setIsSavingOffline(true);
@@ -722,9 +781,7 @@ export default function TrainingSession() {
         setOfflineName('');
         setOfflinePoints({});
       }
-      queryClient.invalidateQueries({ queryKey: ['training-events-season', season?.id] });
-      queryClient.invalidateQueries({ queryKey: ['training-event-results-season', season?.id] });
-      queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
+      await refreshSeasonData();
       toast.success('Offline event lisatud');
     } catch (error) {
       toast.error(error?.message || 'Offline eventi lisamine ebaõnnestus');
@@ -782,14 +839,13 @@ export default function TrainingSession() {
     }
   };
 
-  const handleDeleteEvent = async (event) => {
+  const performDeleteEvent = React.useCallback(async (event) => {
     if (!event?.id || !season?.id) return;
     if (!canManageTraining) {
       toast.error('Pole treeneri õigusi');
       return;
     }
-    const confirmed = window.confirm(`Kustuta event "${event.name}"?`);
-    if (!confirmed) return;
+
     setIsDeletingEvent((prev) => ({ ...prev, [event.id]: true }));
     try {
       const eventResults = resultsByEvent[event.id] || [];
@@ -833,16 +889,80 @@ export default function TrainingSession() {
           .commit();
       }
 
-      queryClient.invalidateQueries({ queryKey: ['training-events-season', season?.id] });
-      queryClient.invalidateQueries({ queryKey: ['training-event-results-season', season?.id] });
-      queryClient.invalidateQueries({ queryKey: ['training-season-stats', season?.id] });
+      await refreshSeasonData();
       toast.success('Event kustutatud');
     } catch (error) {
       toast.error(error?.message || 'Eventi kustutamine ebaõnnestus');
     } finally {
       setIsDeletingEvent((prev) => ({ ...prev, [event.id]: false }));
+      setQueuedDeleteEvents((prev) => {
+        if (!prev[event.id]) return prev;
+        const next = { ...prev };
+        delete next[event.id];
+        return next;
+      });
+      if (deleteEventTimersRef.current[event.id]) {
+        window.clearTimeout(deleteEventTimersRef.current[event.id]);
+        delete deleteEventTimersRef.current[event.id];
+      }
     }
-  };
+  }, [
+    season?.id,
+    canManageTraining,
+    resultsByEvent,
+    statsByParticipant,
+    session?.slot_id,
+    refreshSeasonData
+  ]);
+
+  const cancelQueuedDeleteEvent = React.useCallback((eventId) => {
+    if (!eventId) return;
+    if (deleteEventTimersRef.current[eventId]) {
+      window.clearTimeout(deleteEventTimersRef.current[eventId]);
+      delete deleteEventTimersRef.current[eventId];
+    }
+    setQueuedDeleteEvents((prev) => {
+      if (!prev[eventId]) return prev;
+      const next = { ...prev };
+      delete next[eventId];
+      return next;
+    });
+    toast.success('Kustutamine tühistatud');
+  }, []);
+
+  const handleDeleteEvent = React.useCallback((event) => {
+    if (!event?.id) return;
+    if (!canManageTraining) {
+      toast.error('Pole treeneri õigusi');
+      return;
+    }
+
+    if (queuedDeleteEvents[event.id]) {
+      cancelQueuedDeleteEvent(event.id);
+      return;
+    }
+
+    const confirmed = window.confirm('Kustuta event "' + (event.name || 'Event') + '"?');
+    if (!confirmed) return;
+
+    setQueuedDeleteEvents((prev) => ({
+      ...prev,
+      [event.id]: event
+    }));
+
+    deleteEventTimersRef.current[event.id] = window.setTimeout(() => {
+      performDeleteEvent(event);
+    }, 5000);
+
+    toast.message('Event kustutatakse 5 sekundi pärast', {
+      duration: 5000,
+      action: {
+        label: 'Võta tagasi',
+        onClick: () => cancelQueuedDeleteEvent(event.id)
+      }
+    });
+  }, [canManageTraining, queuedDeleteEvents, cancelQueuedDeleteEvent, performDeleteEvent]);
+
 
   if (!session || !season || !group) {
     return <div className="min-h-screen bg-black" />;
@@ -872,7 +992,7 @@ export default function TrainingSession() {
         </div>
 
         {canManageTraining && (
-          <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-6 dark:bg-black dark:border-white/10">
+          <div className="pk-surface p-5 mb-6 dark:bg-black dark:border-white/10">
             <div className="flex items-center gap-2 mb-3">
               <Plus className="w-4 h-4 text-emerald-600" />
               <div className="text-sm font-semibold text-slate-800">Lisa event</div>
@@ -909,33 +1029,15 @@ export default function TrainingSession() {
                   value={appName}
                   onChange={(event) => setAppName(event.target.value)}
                 />
-                {isDayGroupedView ? (
-                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
-                    <div className="text-xs font-semibold uppercase text-emerald-700 mb-2">Trenni grupid (sama päev)</div>
-                    <div className="overflow-hidden rounded-xl border border-emerald-100 bg-white">
-                      {daySessions.map((daySession, index) => {
-                        const slotLabel = formatSlotLabel(slotById[daySession.slot_id]);
-                        const appEventCount = seasonEvents.filter(
-                          (entry) => entry.session_id === daySession.id && entry.type === 'app'
-                        ).length;
-                        return (
-                          <div
-                            key={daySession.id}
-                            className={`grid grid-cols-[1fr_auto] items-center gap-2 px-3 py-2 text-xs ${
-                              index % 2 === 0 ? 'bg-white' : 'bg-emerald-50/40'
-                            }`}
-                          >
-                            <div className="font-semibold text-slate-700">{slotLabel}</div>
-                            <div className="text-slate-500">{appEventCount} eventi</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-2 text-[11px] text-emerald-700">
-                      Sisesta PIN üks kord ja event lisatakse automaatselt kõigile ülalolevatele gruppidele.
-                    </div>
-                  </div>
-                ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-black dark:border-emerald-400/40 dark:text-emerald-300">
+                    1. Vali mäng
+                  </span>
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-black dark:border-white/10 dark:text-slate-200">
+                    2. Kinnita lisamine
+                  </span>
+                </div>
+                {!isDayGroupedView && (
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
@@ -947,51 +1049,73 @@ export default function TrainingSession() {
                       } dark:bg-black dark:border-white/10 dark:text-emerald-300`}
                     >
                       {applyAppToSameDate
-                        ? `Rakenda kõigile sama päeva trennidele (${appTargetSessions.length})`
+                        ? 'Rakenda kõigile sama päeva trennidele (' + appTargetSessions.length + ')'
                         : 'Rakenda ainult sellele trennile'}
                     </button>
-                    <div className="text-xs text-slate-500">
-                      Sisesta PIN 1x ja sama app-event lisatakse valitud päeva kõikidele gruppidele/aegadele.
-                    </div>
                   </div>
                 )}
-                <div className="rounded-2xl border border-white/70 bg-white/70 p-3 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
-                  <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Trenni mängud</div>
-                  <div className="mb-2 text-[11px] text-slate-500">
-                    See nimekiri on allikas. Vajuta <span className="font-semibold">Lisa event</span>, et mäng ilmuks all Eventid plokis.
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 dark:bg-black dark:border-emerald-400/30">
+                  <div className="text-xs font-semibold uppercase text-emerald-700 mb-2 dark:text-emerald-300">Kuhu lisatakse</div>
+                  <div className="overflow-hidden rounded-xl border border-emerald-100 bg-white dark:bg-black dark:border-emerald-400/30">
+                    {appTargetsWithMeta.map((target, index) => (
+                      <div
+                        key={target.sessionId}
+                        className={`grid grid-cols-[1fr_auto] items-center gap-2 px-3 py-2 text-xs ${
+                          index % 2 === 0 ? 'bg-white dark:bg-black' : 'bg-emerald-50/40 dark:bg-black'
+                        }`}
+                      >
+                        <div className="font-semibold text-slate-700 dark:text-slate-100">{target.slotLabel}</div>
+                        <div className="text-slate-500 dark:text-slate-300">
+                          {target.isAlreadyLinked ? 'juba seotud' : target.appEventCount + ' eventi'}
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                  <div className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-300">
+                    Lisa allikast või PINiga mäng, siis kinnita lisamine. Selles vaates lisatakse event kõikidele ülalolevatele gruppidele.
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-white/70 bg-white/70 p-3 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
+                  <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Trenni mängud (allikas)</div>
                   {isLoadingGroupGames ? (
                     <div className="text-xs text-slate-400">Laen...</div>
                   ) : groupGames.length === 0 ? (
                     <div className="text-xs text-slate-400">Treeneri mänge ei leitud.</div>
                   ) : (
                     <div className="space-y-2">
-                      {groupGames.map((game) => (
-                        <div
-                          key={game.id}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-white/80 px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
-                        >
-                          <div>
-                            <div className="font-semibold">{game.name || game.game_type || 'Mäng'}</div>
-                            <div className="text-[11px] text-slate-500">
-                              {game.pin ? `PIN ${game.pin}` : 'PIN puudub'}
-                              {game.date ? ` • ${format(new Date(game.date), 'MMM d')}` : ''}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleAddGroupGame(game)}
-                            disabled={isSavingApp}
-                            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-emerald-300"
+                      {groupGames.map((game) => {
+                        const isSelectedGame = pendingAppGame?.id === game.id;
+                        return (
+                          <div
+                            key={game.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-white/80 px-3 py-2 text-xs text-slate-700 dark:bg-black dark:border-white/10 dark:text-slate-100"
                           >
-                            Lisa event
-                          </button>
-                        </div>
-                      ))}
+                            <div>
+                              <div className="font-semibold">{game.name || game.game_type || 'Mäng'}</div>
+                              <div className="text-[11px] text-slate-500">
+                                {game.pin ? 'PIN ' + game.pin : 'PIN puudub'}
+                                {game.date ? ' • ' + format(new Date(game.date), 'MMM d') : ''}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleAddGroupGame(game)}
+                              disabled={isSavingApp}
+                              className={`rounded-full border px-3 py-1 text-[11px] font-semibold shadow-sm transition disabled:opacity-60 ${
+                                isSelectedGame
+                                  ? 'border-emerald-300 bg-emerald-100 text-emerald-700 dark:bg-black dark:border-emerald-400/40 dark:text-emerald-300'
+                                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-black dark:border-white/10 dark:text-emerald-300'
+                              }`}
+                            >
+                              {isSelectedGame ? 'Valitud' : 'Vali'}
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_auto]">
                   <Input
                     placeholder="Mängu PIN"
                     value={appPin}
@@ -1003,13 +1127,46 @@ export default function TrainingSession() {
                     className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 dark:bg-black dark:border-white/10 dark:text-slate-100"
                   >
                     <Timer className="w-3 h-3" />
-                    {appLowerIsBetter ? 'Ajamäng (kiirem parem)' : 'Skoor (kõrgem parem)'}
+                    {appLowerIsBetter ? 'Ajamäng' : 'Skoor'}
                   </button>
+                  <Button
+                    type="button"
+                    onClick={handleFindAppGameByPin}
+                    disabled={isResolvingAppPin || isSavingApp}
+                    className="h-10 rounded-2xl"
+                  >
+                    {isResolvingAppPin ? 'Otsin...' : 'Leia mäng'}
+                  </Button>
                 </div>
-                <Button onClick={handleCreateAppEvent} disabled={isSavingApp}>
-                  {isSavingApp ? 'Salvestan...' : 'Lisa app event'}
-                </Button>
+                {pendingAppGame ? (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 dark:bg-black dark:border-emerald-400/30">
+                    <div className="text-xs text-emerald-700 dark:text-emerald-300">Valitud mäng</div>
+                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{pendingAppGame.name || pendingAppGame.game_type || 'Mäng'}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-300">
+                      {pendingAppGame.pin ? 'PIN ' + pendingAppGame.pin : 'PIN puudub'}
+                      {pendingAppGame.date ? ' • ' + format(new Date(pendingAppGame.date), 'MMM d') : ''}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button onClick={handleCreateAppEvent} disabled={isSavingApp}>
+                        {isSavingApp ? 'Lisan eventi...' : 'Kinnita ja lisa event'}
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={clearPendingAppGame}
+                        disabled={isSavingApp}
+                        className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-slate-200"
+                      >
+                        Tühista valik
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-slate-200 bg-white/70 px-3 py-2 text-xs text-slate-500 dark:bg-black dark:border-white/10 dark:text-slate-300">
+                    Vali kõigepealt allikast mäng või otsi PINiga, siis kinnita lisamine.
+                  </div>
+                )}
               </div>
+
             ) : (
               <div className="space-y-3">
                 <Input
@@ -1131,7 +1288,7 @@ export default function TrainingSession() {
           </div>
         )}
 
-        <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
+        <div className="pk-surface p-5 dark:bg-black dark:border-white/10">
           <div className="flex items-center gap-2 mb-3">
             <ClipboardList className="w-4 h-4 text-emerald-600" />
             <div className="text-sm font-semibold text-slate-800">Eventid</div>
@@ -1145,7 +1302,7 @@ export default function TrainingSession() {
                 const isEditingThisEvent = editingEventId === event.id;
                 const slotLabel = formatSlotLabel(slotById[event.slot_id]);
                 return (
-                  <div key={event.id} className="rounded-2xl border border-slate-100 bg-white/80 p-4 dark:bg-black dark:border-white/10">
+                  <div key={event.id} className="pk-card p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         {isEditingThisEvent ? (
@@ -1197,9 +1354,18 @@ export default function TrainingSession() {
                               type="button"
                               onClick={() => handleDeleteEvent(event)}
                               disabled={Boolean(isDeletingEvent[event.id])}
-                              className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-600 shadow-sm transition hover:bg-red-100 disabled:opacity-60 dark:bg-black dark:border-white/10 dark:text-red-300"
+                              className={
+                                'rounded-full border px-3 py-1 text-[11px] font-semibold shadow-sm transition disabled:opacity-60 ' +
+                                (queuedDeleteEvents[event.id]
+                                  ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-black dark:border-amber-400/40 dark:text-amber-300'
+                                  : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-black dark:border-white/10 dark:text-red-300')
+                              }
                             >
-                              {isDeletingEvent[event.id] ? 'Kustutan...' : 'Kustuta'}
+                              {isDeletingEvent[event.id]
+                                ? 'Kustutan...'
+                                : queuedDeleteEvents[event.id]
+                                  ? 'Võta tagasi'
+                                  : 'Kustuta'}
                             </button>
                           </>
                         )}

@@ -164,7 +164,14 @@ export default function PuttingRecords() {
 
   const userRole = user?.app_role || 'user';
   const canDelete = ['admin', 'super_admin'].includes(userRole);
+  const canViewAllAttempts = ['admin', 'super_admin'].includes(userRole);
   const canRepairTimeRecords = ['trainer', 'admin', 'super_admin'].includes(userRole);
+
+  useEffect(() => {
+    if (!canViewAllAttempts && recordDisplayMode !== 'best') {
+      setRecordDisplayMode('best');
+    }
+  }, [canViewAllAttempts, recordDisplayMode]);
 
   const deleteRecordMutation = useMutation({
     mutationFn: async (entry) => {
@@ -603,7 +610,7 @@ export default function PuttingRecords() {
 
   const bestEntries = Object.values(bestScoresByPlayer).sort(rankEntriesComparator);
   const allEntries = [...filteredEntries].sort(rankEntriesComparator);
-  const rankingEntries = recordDisplayMode === 'all' ? allEntries : bestEntries;
+  const rankingEntries = recordDisplayMode === 'all' && canViewAllAttempts ? allEntries : bestEntries;
 
   const totalPages = Math.max(1, Math.ceil(rankingEntries.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -682,32 +689,34 @@ export default function PuttingRecords() {
                   </SelectContent>
                 </Select>
 
-                <div className="inline-flex rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:bg-black dark:border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => setRecordDisplayMode('best')}
-                    className={
-                      'rounded-full px-3 py-1 text-xs font-semibold transition ' +
-                      (recordDisplayMode === 'best'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:border dark:border-emerald-400/40 dark:text-emerald-300'
-                        : 'text-slate-500 hover:text-slate-700 dark:text-slate-300')
-                    }
-                  >
-                    Parimad
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRecordDisplayMode('all')}
-                    className={
-                      'rounded-full px-3 py-1 text-xs font-semibold transition ' +
-                      (recordDisplayMode === 'all'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:border dark:border-emerald-400/40 dark:text-emerald-300'
-                        : 'text-slate-500 hover:text-slate-700 dark:text-slate-300')
-                    }
-                  >
-                    Kõik katsed
-                  </button>
-                </div>
+                {canViewAllAttempts && (
+                  <div className="inline-flex rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:bg-black dark:border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setRecordDisplayMode('best')}
+                      className={
+                        'rounded-full px-3 py-1 text-xs font-semibold transition ' +
+                        (recordDisplayMode === 'best'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:border dark:border-emerald-400/40 dark:text-emerald-300'
+                          : 'text-slate-500 hover:text-slate-700 dark:text-slate-300')
+                      }
+                    >
+                      Parimad
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecordDisplayMode('all')}
+                      className={
+                        'rounded-full px-3 py-1 text-xs font-semibold transition ' +
+                        (recordDisplayMode === 'all'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:border dark:border-emerald-400/40 dark:text-emerald-300'
+                          : 'text-slate-500 hover:text-slate-700 dark:text-slate-300')
+                      }
+                    >
+                      Kõik katsed
+                    </button>
+                  </div>
+                )}
 
                 {isTimeView && canRepairTimeRecords && (
                   <button

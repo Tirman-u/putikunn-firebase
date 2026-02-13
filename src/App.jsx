@@ -8,7 +8,6 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ErrorBoundary from '@/lib/ErrorBoundary';
-import VersionBadge from '@/components/VersionBadge';
 import ThemeToggle from '@/components/ui/theme-toggle';
 import MobileBottomNav from '@/components/ui/mobile-bottom-nav';
 
@@ -98,7 +97,6 @@ function App() {
             <MobileBottomNav />
           </ErrorBoundary>
         </Router>
-        <VersionBadge />
         <Toaster />
       </QueryClientProvider>
     </AuthProvider>

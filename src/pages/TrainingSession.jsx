@@ -77,6 +77,7 @@ export default function TrainingSession() {
   const [applyAppToSameDate, setApplyAppToSameDate] = React.useState(true);
   const [pendingAppGame, setPendingAppGame] = React.useState(null);
   const [isResolvingAppPin, setIsResolvingAppPin] = React.useState(false);
+  const [offlineTargetSessionId, setOfflineTargetSessionId] = React.useState(sessionId || '');
   const [queuedDeleteEvents, setQueuedDeleteEvents] = React.useState({});
   const deleteEventTimersRef = React.useRef({});
 
@@ -233,22 +234,6 @@ export default function TrainingSession() {
     return getWeekKey();
   }, [session?.date]);
 
-  const slotAttendance = React.useMemo(() => {
-    if (!group || !session?.slot_id) return {};
-    return getSlotAttendance(group, sessionWeekKey, session.slot_id) || {};
-  }, [group, session?.slot_id, sessionWeekKey]);
-
-  const slotMemberIds = React.useMemo(() => {
-    const roster = Array.isArray(slot?.roster_uids) ? slot.roster_uids : [];
-    const claimed = Array.isArray(slotAttendance?.claimed_uids) ? slotAttendance.claimed_uids : [];
-    return Array.from(new Set([...roster, ...claimed]));
-  }, [slot?.roster_uids, slotAttendance?.claimed_uids]);
-
-  const filteredMembers = React.useMemo(() => {
-    if (!slotMemberIds.length) return members;
-    return members.filter((member) => slotMemberIds.includes(member.uid));
-  }, [members, slotMemberIds]);
-
   const { data: groupGames = [], isLoading: isLoadingGroupGames } = useQuery({
     queryKey: ['training-group-games-list', season?.group_id],
     enabled: Boolean(season?.group_id && canManageTraining),
@@ -282,6 +267,44 @@ export default function TrainingSession() {
 
   const isDayGroupedView = daySessions.length > 1 || Boolean(dateKeyParam);
 
+  React.useEffect(() => {
+    if (!daySessions.length) return;
+    const hasSelected = daySessions.some((entry) => entry.id === offlineTargetSessionId);
+    if (!hasSelected) {
+      setOfflineTargetSessionId(daySessions[0].id);
+    }
+  }, [daySessions, offlineTargetSessionId]);
+
+  const offlineTargetSession = React.useMemo(() => {
+    if (!daySessions.length) return session;
+    return daySessions.find((entry) => entry.id === offlineTargetSessionId) || daySessions[0] || session;
+  }, [daySessions, offlineTargetSessionId, session]);
+
+  const offlineTargetSlot = React.useMemo(() => {
+    if (!offlineTargetSession?.slot_id) return slot;
+    return slotById[offlineTargetSession.slot_id] || null;
+  }, [offlineTargetSession?.slot_id, slotById, slot]);
+
+  const offlineSlotAttendance = React.useMemo(() => {
+    if (!group || !offlineTargetSession?.slot_id) return {};
+    return getSlotAttendance(group, sessionWeekKey, offlineTargetSession.slot_id) || {};
+  }, [group, sessionWeekKey, offlineTargetSession?.slot_id]);
+
+  const offlineSlotMemberIds = React.useMemo(() => {
+    const roster = Array.isArray(offlineTargetSlot?.roster_uids) ? offlineTargetSlot.roster_uids : [];
+    const claimed = Array.isArray(offlineSlotAttendance?.claimed_uids) ? offlineSlotAttendance.claimed_uids : [];
+    return Array.from(new Set([...roster, ...claimed]));
+  }, [offlineTargetSlot?.roster_uids, offlineSlotAttendance?.claimed_uids]);
+
+  const offlineFilteredMembers = React.useMemo(() => {
+    if (!offlineSlotMemberIds.length) return members;
+    return members.filter((member) => offlineSlotMemberIds.includes(member.uid));
+  }, [members, offlineSlotMemberIds]);
+
+  const offlineMemberIdSet = React.useMemo(() => (
+    new Set(offlineFilteredMembers.map((member) => member.uid))
+  ), [offlineFilteredMembers]);
+
   const appTargetSessions = React.useMemo(() => {
     if (!session?.id) return [];
     if (isDayGroupedView) {
@@ -303,8 +326,8 @@ export default function TrainingSession() {
   const offlineRankEntries = React.useMemo(() => (
     Object.entries(offlineRanks)
       .map(([uid, value]) => ({ uid, rank: Number(value) }))
-      .filter((entry) => Number.isFinite(entry.rank) && entry.rank > 0)
-  ), [offlineRanks]);
+      .filter((entry) => Number.isFinite(entry.rank) && entry.rank > 0 && offlineMemberIdSet.has(entry.uid))
+  ), [offlineRanks, offlineMemberIdSet]);
 
   const offlineParticipantsCount = offlineRankEntries.length;
   const offlineCutPercentValue = Math.min(100, Math.max(0, Number(offlineCutPercent) || 0));
@@ -630,11 +653,18 @@ export default function TrainingSession() {
   };
   const handleCreateOfflineEvent = async () => {
     if (!session || !season) return;
+    const targetSession = offlineTargetSession || session;
+    const targetSlotId = targetSession?.slot_id || session?.slot_id || null;
+    if (!targetSession?.id || !targetSlotId) {
+      toast.error('Vali trennigrupp');
+      return;
+    }
+
     setIsSavingOffline(true);
     try {
       const eventName = offlineName.trim() || 'Offline';
       if (offlineMode === 'rank_hc') {
-        const entries = offlineRankEntries;
+        const entries = offlineRankEntries.filter((entry) => offlineMemberIdSet.has(entry.uid));
         if (entries.length === 0) {
           toast.error('Sisesta vähemalt üks koht');
           return;
@@ -648,10 +678,10 @@ export default function TrainingSession() {
         const batch = writeBatch(db);
         const eventRef = doc(collection(db, 'training_events'));
         batch.set(eventRef, {
-          session_id: session.id,
+          session_id: targetSession.id,
           season_id: season.id,
           group_id: season.group_id,
-          slot_id: session.slot_id,
+          slot_id: targetSlotId,
           type: 'offline',
           name: eventName,
           metric_key: 'offline',
@@ -677,7 +707,7 @@ export default function TrainingSession() {
           });
           const nextPointsBySlot = {
             ...(existing?.points_by_slot || {}),
-            [session.slot_id]: round1((existing?.points_by_slot?.[session.slot_id] || 0) + points)
+            [targetSlotId]: round1((existing?.points_by_slot?.[targetSlotId] || 0) + points)
           };
           const nextStats = {
             season_id: season.id,
@@ -693,10 +723,10 @@ export default function TrainingSession() {
           const resultRef = doc(collection(db, 'training_event_results'));
           batch.set(resultRef, {
             event_id: eventRef.id,
-            session_id: session.id,
+            session_id: targetSession.id,
             season_id: season.id,
             group_id: season.group_id,
-            slot_id: session.slot_id,
+            slot_id: targetSlotId,
             participant_id: participantId,
             user_id: uid,
             player_name: displayName,
@@ -716,7 +746,7 @@ export default function TrainingSession() {
       } else {
         const entries = Object.entries(offlinePoints)
           .map(([uid, value]) => ({ uid, points: Number(value) }))
-          .filter((entry) => Number.isFinite(entry.points));
+          .filter((entry) => Number.isFinite(entry.points) && offlineMemberIdSet.has(entry.uid));
         if (entries.length === 0) {
           toast.error('Sisesta vähemalt üks punktisumma');
           return;
@@ -725,10 +755,10 @@ export default function TrainingSession() {
         const batch = writeBatch(db);
         const eventRef = doc(collection(db, 'training_events'));
         batch.set(eventRef, {
-          session_id: session.id,
+          session_id: targetSession.id,
           season_id: season.id,
           group_id: season.group_id,
-          slot_id: session.slot_id,
+          slot_id: targetSlotId,
           type: 'offline',
           name: eventName,
           metric_key: 'offline',
@@ -746,7 +776,7 @@ export default function TrainingSession() {
           const existing = statsByParticipant[participantId];
           const nextPointsBySlot = {
             ...(existing?.points_by_slot || {}),
-            [session.slot_id]: round1((existing?.points_by_slot?.[session.slot_id] || 0) + points)
+            [targetSlotId]: round1((existing?.points_by_slot?.[targetSlotId] || 0) + points)
           };
           const nextStats = {
             season_id: season.id,
@@ -762,10 +792,10 @@ export default function TrainingSession() {
           const resultRef = doc(collection(db, 'training_event_results'));
           batch.set(resultRef, {
             event_id: eventRef.id,
-            session_id: session.id,
+            session_id: targetSession.id,
             season_id: season.id,
             group_id: season.group_id,
-            slot_id: session.slot_id,
+            slot_id: targetSlotId,
             participant_id: participantId,
             user_id: uid,
             player_name: displayName,
@@ -782,7 +812,7 @@ export default function TrainingSession() {
         setOfflinePoints({});
       }
       await refreshSeasonData();
-      toast.success('Offline event lisatud');
+      toast.success('Offline event lisatud (' + formatSlotLabel(offlineTargetSlot) + ')');
     } catch (error) {
       toast.error(error?.message || 'Offline eventi lisamine ebaõnnestus');
     } finally {
@@ -1174,9 +1204,33 @@ export default function TrainingSession() {
                   value={offlineName}
                   onChange={(event) => setOfflineName(event.target.value)}
                 />
+                {isDayGroupedView && daySessions.length > 1 && (
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 dark:bg-black dark:border-emerald-400/30">
+                    <div className="mb-2 text-[11px] font-semibold uppercase text-emerald-700 dark:text-emerald-300">Vali trennigrupp</div>
+                    <div className="flex flex-wrap gap-2">
+                      {daySessions.map((entry) => {
+                        const isActive = entry.id === offlineTargetSession?.id;
+                        return (
+                          <button
+                            key={entry.id}
+                            type="button"
+                            onClick={() => setOfflineTargetSessionId(entry.id)}
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                              isActive
+                                ? 'border-emerald-300 bg-emerald-100 text-emerald-700'
+                                : 'border-slate-200 bg-white text-slate-600'
+                            } dark:bg-black dark:border-white/10 dark:text-emerald-300`}
+                          >
+                            {formatSlotLabel(slotById[entry.slot_id])}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="text-xs text-slate-500">
-                  Trenn: {formatSlotLabel(slot)} • Mängijaid: {filteredMembers.length}/{members.length}
-                  {slotMemberIds.length === 0 && ' (pole püsikohti, näitan kõiki)'}
+                  Trenn: {formatSlotLabel(offlineTargetSlot)} • Mängijaid: {offlineFilteredMembers.length}/{members.length}
+                  {offlineSlotMemberIds.length === 0 && ' (pole püsikohti, näitan kõiki)'}
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -1231,7 +1285,7 @@ export default function TrainingSession() {
                       {` ${offlineCutCount}. koht saab +${round1(offlineCutBonusValue).toFixed(1)}p, iga koht ülespoole +${round1(offlineCutBonusValue).toFixed(1)}p juurde.`}
                     </div>
                     <div className="space-y-2">
-                      {filteredMembers.map((member) => {
+                      {offlineFilteredMembers.map((member) => {
                         const rankValue = Number(offlineRanks[member.uid]) || 0;
                         const { points } = computeRankCutPoints({
                           rank: rankValue,
@@ -1263,7 +1317,7 @@ export default function TrainingSession() {
                   </div>
                 ) : (
                 <div className="space-y-2">
-                  {filteredMembers.map((member) => (
+                  {offlineFilteredMembers.map((member) => (
                     <div key={member.uid} className="flex items-center gap-2">
                       <div className="text-xs text-slate-600 w-32">{member.name || member.email}</div>
                       <input

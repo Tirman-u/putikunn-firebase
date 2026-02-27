@@ -371,8 +371,20 @@ export default function Home() {
   // Initial selection screen
   if (!mode) {
     return (
-      <div className="fp-page px-4">
-        <div className="max-w-2xl mx-auto pt-10 pb-12">
+      <div className="fp-page relative overflow-hidden px-4">
+        <img
+          src="/wisedisc-owl-light.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-10 -right-8 h-44 w-44 opacity-[0.12] sm:h-56 sm:w-56 md:h-64 md:w-64 dark:hidden"
+        />
+        <img
+          src="/wisedisc-owl-dark.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-10 -right-8 hidden h-44 w-44 opacity-[0.18] sm:h-56 sm:w-56 md:h-64 md:w-64 dark:block"
+        />
+        <div className="relative z-10 max-w-2xl mx-auto pt-10 pb-12">
           <div className="mb-4 flex justify-end">
             <div className="flex flex-col items-end gap-1">
               <div className="flex gap-2">

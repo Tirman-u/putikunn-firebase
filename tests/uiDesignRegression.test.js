@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const read = (file) => readFileSync(file, 'utf8');
+const readBin = (file) => readFileSync(file);
 
 describe('UI design regressions', () => {
   it('applies dark:bg-black only under .dark theme root', () => {
@@ -28,13 +29,21 @@ describe('UI design regressions', () => {
     }
   });
 
-
   it('uses compact icon-only HomeButton by default', () => {
     const source = read('src/components/ui/home-button.jsx');
 
     expect(source).toContain('showLabel = false');
     expect(source).toContain("const compactClasses = 'h-12 w-12 justify-center p-0';");
     expect(source).toContain('aria-label={label}');
+  });
+
+  it('renders a subtle owl watermark on Home screen background', () => {
+    const source = read('src/pages/Home.jsx');
+
+    expect(source).toContain('src="/wisedisc-owl-light.png"');
+    expect(source).toContain('src="/wisedisc-owl-dark.png"');
+    expect(source).toContain('opacity-[0.12]');
+    expect(source).toContain('opacity-[0.18]');
   });
 
   it('uses Wisedisc branding in metadata and login', () => {
@@ -50,5 +59,14 @@ describe('UI design regressions', () => {
     expect(html).not.toContain('Putikunn');
     expect(manifest).not.toContain('Putikunn');
     expect(login).not.toContain('>Putikunn<');
+  });
+
+  it('ships Wisedisc favicon files', () => {
+    const files = ['public/favicon-16x16.png', 'public/favicon-32x32.png', 'public/favicon.ico'];
+
+    for (const file of files) {
+      expect(existsSync(file)).toBe(true);
+      expect(readBin(file).byteLength).toBeGreaterThan(32);
+    }
   });
 });

@@ -797,7 +797,7 @@ export default function PuttingRecords() {
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span>{getResolvedPlayerName(entry)}</span>
                                 {isHostedEntry(entry) && (
-                                  <span className="text-xs px-2 py-1 rounded-full border border-[#A5C7FF] bg-[#EDF4FF] text-[#3B6CC7] flex items-center gap-1">
+                                  <span className="text-xs px-2 py-1 rounded-full border border-[#97D6CD] bg-[#E7F7F2] text-[#007377] dark:border-[#2E6D67] dark:bg-[#183134] dark:text-[#5EEAD4] flex items-center gap-1">
                                     <Award className="w-3 h-3" />
                                     DG.ee
                                   </span>

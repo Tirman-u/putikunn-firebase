@@ -10,12 +10,10 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-[#0FAAA6]",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-red-700",
-        outline:
-          "border border-[#7D878B]/50 bg-transparent text-foreground hover:bg-[#EBF5F3] dark:border-[#3A464D] dark:hover:bg-[#20292D]",
-        secondary:
-          "bg-[#1A2B2E] text-[#F7F7F5] hover:bg-[#152326] dark:bg-[#222D33] dark:hover:bg-[#2A363D]",
-        ghost: "text-foreground hover:bg-[#EBF5F3] dark:hover:bg-[#20292D]",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-[#B54148]",
+        outline: "border border-border bg-transparent text-foreground hover:bg-[#EBF5F3] dark:hover:bg-[#0A0F12]",
+        secondary: "bg-[#1A2B2E] text-[#F7F7F5] hover:bg-[#152326] dark:border dark:border-border dark:bg-black dark:hover:bg-[#0A0F12]",
+        ghost: "text-foreground hover:bg-[#EBF5F3] dark:hover:bg-[#0A0F12]",
         link: "text-[#007377] underline-offset-4 hover:underline dark:text-[#5EEAD4]",
         warm: "bg-[#F59E0B] text-[#1A2B2E] hover:bg-[#E18E08]",
         pill: "rounded-full bg-primary text-primary-foreground hover:bg-[#0FAAA6]"

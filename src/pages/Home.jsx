@@ -163,16 +163,16 @@ export default function Home() {
       glow: "shadow-[0_8px_20px_rgba(245,158,11,0.18)]"
     },
     purple: {
-      bg: "bg-[#EEF2FF] dark:bg-[#2A3043]",
-      icon: "text-[#4F46E5] dark:text-[#A5B4FC]",
-      ring: "ring-[#C7D2FE] dark:ring-[#495077]",
-      glow: "shadow-[0_8px_20px_rgba(79,70,229,0.14)]"
+      bg: "bg-[#EBF5F3] dark:bg-[#183134]",
+      icon: "text-[#007377] dark:text-[#5EEAD4]",
+      ring: "ring-[#B6D7D3] dark:ring-[#2E6D67]",
+      glow: "shadow-[0_8px_20px_rgba(0,115,119,0.12)]"
     },
     blue: {
-      bg: "bg-[#EDF4FF] dark:bg-[#21324A]",
-      icon: "text-[#2663C7] dark:text-[#9DC2FF]",
-      ring: "ring-[#B9D2FF] dark:ring-[#3E5580]",
-      glow: "shadow-[0_8px_20px_rgba(38,99,199,0.14)]"
+      bg: "bg-[#E7F7F2] dark:bg-[#183134]",
+      icon: "text-[#007377] dark:text-[#5EEAD4]",
+      ring: "ring-[#97D6CD] dark:ring-[#2E6D67]",
+      glow: "shadow-[0_8px_20px_rgba(20,184,166,0.14)]"
     },
     slate: {
       bg: "bg-[#F1F4F3] dark:bg-[#2A3236]",

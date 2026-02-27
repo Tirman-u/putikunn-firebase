@@ -42,6 +42,8 @@ describe('UI design regressions', () => {
 
     expect(source).toContain('src="/wisedisc-owl-light.png"');
     expect(source).toContain('src="/wisedisc-owl-dark.png"');
+    expect(source).toContain('fixed bottom-20 right-2');
+    expect(source).toContain('sm:absolute sm:-bottom-10 sm:-right-8');
     expect(source).toContain('opacity-[0.12]');
     expect(source).toContain('opacity-[0.18]');
   });

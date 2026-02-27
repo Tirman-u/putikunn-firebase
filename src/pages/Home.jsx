@@ -376,13 +376,13 @@ export default function Home() {
           src="/wisedisc-owl-light.png"
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-10 -right-8 h-44 w-44 opacity-[0.12] sm:h-56 sm:w-56 md:h-64 md:w-64 dark:hidden"
+          className="pointer-events-none fixed bottom-20 right-2 z-0 h-28 w-28 opacity-[0.12] sm:absolute sm:-bottom-10 sm:-right-8 sm:h-56 sm:w-56 md:h-64 md:w-64 dark:hidden"
         />
         <img
           src="/wisedisc-owl-dark.png"
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-10 -right-8 hidden h-44 w-44 opacity-[0.18] sm:h-56 sm:w-56 md:h-64 md:w-64 dark:block"
+          className="pointer-events-none fixed bottom-20 right-2 z-0 hidden h-28 w-28 opacity-[0.18] sm:absolute sm:-bottom-10 sm:-right-8 sm:h-56 sm:w-56 md:h-64 md:w-64 dark:block"
         />
         <div className="relative z-10 max-w-2xl mx-auto pt-10 pb-12">
           <div className="mb-4 flex justify-end">

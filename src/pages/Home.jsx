@@ -144,13 +144,48 @@ export default function Home() {
   const trainingSub = trainingGroups.length ? t('home.training', 'Trenn') : t('home.join_sub', 'Sisesta PIN');
 
   const tileThemes = {
-    emerald: { bg: 'bg-emerald-100 dark:bg-black', icon: 'text-emerald-600', ring: 'ring-emerald-200 dark:ring-emerald-500/40', glow: 'shadow-emerald-100/60 dark:shadow-emerald-500/10' },
-    sky: { bg: 'bg-sky-100 dark:bg-black', icon: 'text-sky-600', ring: 'ring-sky-200 dark:ring-sky-500/40', glow: 'shadow-sky-100/60 dark:shadow-sky-500/10' },
-    amber: { bg: 'bg-amber-100 dark:bg-black', icon: 'text-amber-600', ring: 'ring-amber-200 dark:ring-amber-500/40', glow: 'shadow-amber-100/60 dark:shadow-amber-500/10' },
-    purple: { bg: 'bg-purple-100 dark:bg-black', icon: 'text-purple-600', ring: 'ring-purple-200 dark:ring-purple-500/40', glow: 'shadow-purple-100/60 dark:shadow-purple-500/10' },
-    blue: { bg: 'bg-blue-100 dark:bg-black', icon: 'text-blue-600', ring: 'ring-blue-200 dark:ring-blue-500/40', glow: 'shadow-blue-100/60 dark:shadow-blue-500/10' },
-    slate: { bg: 'bg-slate-100 dark:bg-black', icon: 'text-slate-600', ring: 'ring-slate-200 dark:ring-white/20', glow: 'shadow-slate-100/60 dark:shadow-white/5' },
-    red: { bg: 'bg-red-100 dark:bg-black', icon: 'text-red-600', ring: 'ring-red-200 dark:ring-red-500/40', glow: 'shadow-red-100/60 dark:shadow-red-500/10' }
+    emerald: {
+      bg: "bg-[#E7F7F2] dark:bg-[#183134]",
+      icon: "text-[#007377] dark:text-[#5EEAD4]",
+      ring: "ring-[#97D6CD] dark:ring-[#2E6D67]",
+      glow: "shadow-[0_8px_20px_rgba(20,184,166,0.14)]"
+    },
+    sky: {
+      bg: "bg-[#EBF5F3] dark:bg-[#21373B]",
+      icon: "text-[#007377] dark:text-[#5EEAD4]",
+      ring: "ring-[#B6D7D3] dark:ring-[#3A5F64]",
+      glow: "shadow-[0_8px_20px_rgba(0,115,119,0.12)]"
+    },
+    amber: {
+      bg: "bg-[#FFF4DB] dark:bg-[#443E1E]",
+      icon: "text-[#A86B02] dark:text-[#FBBF24]",
+      ring: "ring-[#F1D48F] dark:ring-[#6E5E1E]",
+      glow: "shadow-[0_8px_20px_rgba(245,158,11,0.18)]"
+    },
+    purple: {
+      bg: "bg-[#EEF2FF] dark:bg-[#2A3043]",
+      icon: "text-[#4F46E5] dark:text-[#A5B4FC]",
+      ring: "ring-[#C7D2FE] dark:ring-[#495077]",
+      glow: "shadow-[0_8px_20px_rgba(79,70,229,0.14)]"
+    },
+    blue: {
+      bg: "bg-[#EDF4FF] dark:bg-[#21324A]",
+      icon: "text-[#2663C7] dark:text-[#9DC2FF]",
+      ring: "ring-[#B9D2FF] dark:ring-[#3E5580]",
+      glow: "shadow-[0_8px_20px_rgba(38,99,199,0.14)]"
+    },
+    slate: {
+      bg: "bg-[#F1F4F3] dark:bg-[#2A3236]",
+      icon: "text-[#1A2B2E] dark:text-[#E7EEEC]",
+      ring: "ring-[#DDE3E1] dark:ring-[#445057]",
+      glow: "shadow-[0_8px_20px_rgba(26,43,46,0.12)]"
+    },
+    red: {
+      bg: "bg-[#FEECEC] dark:bg-[#4A2427]",
+      icon: "text-[#B54148] dark:text-[#F4B8BE]",
+      ring: "ring-[#E9ACAF] dark:ring-[#6F3A3F]",
+      glow: "shadow-[0_8px_20px_rgba(181,65,72,0.16)]"
+    }
   };
 
   const homeTiles = [
@@ -257,14 +292,14 @@ export default function Home() {
           <Icon className={`h-7 w-7 ${theme.icon}`} />
         </div>
         <div className="text-center">
-          <div className="text-[12px] font-semibold text-slate-800 leading-tight dark:text-slate-100">{tile.label}</div>
-          <div className="text-[10px] text-slate-500 leading-tight dark:text-slate-400">{tile.sub}</div>
+          <div className="text-[12px] font-semibold text-foreground leading-tight">{tile.label}</div>
+          <div className="text-[10px] text-muted-foreground leading-tight">{tile.sub}</div>
         </div>
       </div>
     );
 
     const className =
-      "w-full rounded-[28px] border border-white/70 bg-white/70 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur-sm transition hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 dark:bg-black dark:border-white/10";
+      "w-full rounded-2xl border border-border bg-card p-3 shadow-[0_8px_24px_rgba(26,43,46,0.08)] transition hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(26,43,46,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
     const tileClassName = className + (tile.hideOnMobile ? ' hidden md:block' : '');
 
     if (tile.to) {
@@ -336,7 +371,7 @@ export default function Home() {
   // Initial selection screen
   if (!mode) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
+      <div className="fp-page px-4">
         <div className="max-w-2xl mx-auto pt-10 pb-12">
           <div className="mb-4 flex justify-end">
             <div className="flex flex-col items-end gap-1">
@@ -346,7 +381,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition hover:bg-white"
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-[0_6px_18px_rgba(26,43,46,0.12)] transition hover:bg-secondary"
                 >
                   <LogOut className="w-4 h-4" />
                   {t('home.logout', 'Logi välja')}
@@ -356,12 +391,12 @@ export default function Home() {
             </div>
           </div>
           <div className="text-center mb-8">
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-2">
+            <h1 className="fp-display text-4xl sm:text-5xl font-bold text-foreground mb-2">
               {t('home.welcome', 'Tere tulemast, {name}!', {
                 name: user?.display_name || user?.full_name || t('home.guest', 'Külaline')
               })}
             </h1>
-            <p className="text-slate-600 text-base sm:text-lg">{t('home.ready', 'Valmis puttama?')}</p>
+            <p className="text-muted-foreground text-base sm:text-lg">{t('home.ready', 'Valmis puttama?')}</p>
           </div>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-5">

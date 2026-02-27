@@ -112,7 +112,7 @@ export default function MobileBottomNav() {
   const gridColsClass = items.length >= 6 ? 'grid-cols-6' : items.length === 5 ? 'grid-cols-5' : 'grid-cols-4';
 
   return (
-    <nav className="fixed inset-x-3 bottom-3 z-40 rounded-[24px] border border-white/80 bg-white/90 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-sm md:hidden dark:bg-black dark:border-white/15">
+    <nav className="fixed inset-x-3 bottom-3 z-40 rounded-2xl border border-border bg-card/95 p-1.5 shadow-[0_14px_34px_rgba(26,43,46,0.22)] backdrop-blur md:hidden">
       <ul className={`grid gap-1 ${gridColsClass}`}>
         {items.map((item) => {
           const Icon = item.icon;
@@ -121,10 +121,10 @@ export default function MobileBottomNav() {
               <Link
                 to={item.to}
                 className={
-                  'flex flex-col items-center justify-center gap-1 rounded-[16px] px-2 py-2 text-[10px] font-semibold transition ' +
+                  'flex flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2 text-[10px] font-semibold transition ' +
                   (item.active
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:border dark:border-emerald-400/40 dark:text-emerald-300'
-                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-black')
+                    ? 'border-[#97D6CD] bg-[#E7F7F2] text-[#007377] dark:border-[#2E6D67] dark:bg-[#183134] dark:text-[#5EEAD4]'
+                    : 'border-transparent text-muted-foreground hover:border-border hover:bg-secondary hover:text-foreground')
                 }
               >
                 <Icon className="h-4 w-4" />

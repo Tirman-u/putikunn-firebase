@@ -624,14 +624,14 @@ export default function PuttingRecords() {
   }, [page, totalPages]);
 
   return (
-    <div className="pk-surface p-6">
+    <div className="pk-surface p-6 md:p-7">
       <div className="flex items-center gap-3 mb-6">
-        <Trophy className="w-6 h-6 text-amber-500" />
-        <h2 className="text-2xl font-bold text-slate-800">Puttingu rekordid</h2>
+        <Trophy className="w-6 h-6 text-[#F59E0B]" />
+        <h2 className="fp-display text-3xl font-bold text-foreground">Puttingu rekordid</h2>
       </div>
 
       <Tabs value={selectedView} onValueChange={setSelectedView}>
-        <TabsList className="grid grid-cols-3 md:grid-cols-4 w-full mb-6 h-auto gap-1">
+        <TabsList className="grid grid-cols-3 md:grid-cols-4 w-full mb-6 h-auto gap-1 rounded-2xl p-1.5">
           {viewTypes.map(type => (
             <TabsTrigger key={type.id} value={type.id}>
               {type.label}
@@ -644,7 +644,7 @@ export default function PuttingRecords() {
             <div className="space-y-4">
               {type.id === 'discgolf_ee' && (
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="inline-flex rounded-full bg-slate-100 p-1 shadow-sm">
+                  <div className="inline-flex rounded-full border border-border bg-card p-1 shadow-[0_6px_16px_rgba(26,43,46,0.08)]">
                     {[
                       { id: 'classic', label: 'Classic' },
                       { id: 'short', label: 'Short' }
@@ -655,8 +655,8 @@ export default function PuttingRecords() {
                         onClick={() => setDgMode(option.id)}
                         className={`px-3 py-1.5 text-xs font-semibold rounded-full transition ${
                           dgMode === option.id
-                            ? 'bg-white text-slate-800 shadow'
-                            : 'text-slate-500 hover:text-slate-700'
+                            ? 'bg-card text-foreground shadow-[0_4px_14px_rgba(26,43,46,0.12)]'
+                            : 'text-muted-foreground hover:text-foreground'
                         }`}
                       >
                         {option.label}
@@ -690,15 +690,15 @@ export default function PuttingRecords() {
                 </Select>
 
                 {canViewAllAttempts && (
-                  <div className="inline-flex rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:bg-black dark:border-white/10">
+                  <div className="inline-flex rounded-full border border-border bg-card p-1 shadow-[0_6px_16px_rgba(26,43,46,0.08)]">
                     <button
                       type="button"
                       onClick={() => setRecordDisplayMode('best')}
                       className={
                         'rounded-full px-3 py-1 text-xs font-semibold transition ' +
                         (recordDisplayMode === 'best'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:border dark:border-emerald-400/40 dark:text-emerald-300'
-                          : 'text-slate-500 hover:text-slate-700 dark:text-slate-300')
+                          ? 'bg-[#E7F7F2] text-[#007377] dark:bg-[#183134] dark:text-[#5EEAD4] dark:border dark:border-[#2E6D67]'
+                          : 'text-muted-foreground hover:text-foreground')
                       }
                     >
                       Parimad
@@ -709,8 +709,8 @@ export default function PuttingRecords() {
                       className={
                         'rounded-full px-3 py-1 text-xs font-semibold transition ' +
                         (recordDisplayMode === 'all'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:border dark:border-emerald-400/40 dark:text-emerald-300'
-                          : 'text-slate-500 hover:text-slate-700 dark:text-slate-300')
+                          ? 'bg-[#E7F7F2] text-[#007377] dark:bg-[#183134] dark:text-[#5EEAD4] dark:border dark:border-[#2E6D67]'
+                          : 'text-muted-foreground hover:text-foreground')
                       }
                     >
                       Kõik katsed
@@ -723,7 +723,7 @@ export default function PuttingRecords() {
                     type="button"
                     onClick={() => repairTimeLadderMutation.mutate()}
                     disabled={repairTimeLadderMutation.isPending}
-                    className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+                    className="inline-flex items-center rounded-xl border border-[#97D6CD] bg-[#E7F7F2] px-3 py-2 text-xs font-semibold text-[#007377] transition hover:bg-[#D8F3ED] disabled:opacity-60 dark:border-[#2E6D67] dark:bg-[#183134] dark:text-[#5EEAD4]"
                   >
                     {repairTimeLadderMutation.isPending ? 'Parandan...' : 'Paranda vanad time kirjed'}
                   </button>
@@ -732,38 +732,38 @@ export default function PuttingRecords() {
 
               {sortedEntries.length === 0 ? (
                 isGamesLoading && leaderboardEntries.length > 0 ? (
-                  <div className="text-center py-12 text-slate-400">
+                  <div className="text-center py-12 text-muted-foreground">
                     <Target className="w-12 h-12 mx-auto mb-3 opacity-50 animate-pulse" />
                     <p>Laen mänge...</p>
                   </div>
                 ) : (
-                  <div className="text-center py-12 text-slate-400">
+                  <div className="text-center py-12 text-muted-foreground">
                     <Target className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p>Rekordeid veel pole. Ole esimene!</p>
                   </div>
                 )
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-2xl border border-border bg-card/60">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b-2 border-slate-200">
-                        <th className="text-left py-3 px-2 text-slate-600 font-semibold">#</th>
-                        <th className="text-left py-3 px-2 text-slate-600 font-semibold">Mängija</th>
-                        <th className="text-center py-3 px-2 text-slate-600 font-semibold">Tulemus</th>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 px-2 text-muted-foreground font-semibold uppercase tracking-[0.2em] text-[11px]">#</th>
+                        <th className="text-left py-3 px-2 text-muted-foreground font-semibold uppercase tracking-[0.2em] text-[11px]">Mängija</th>
+                        <th className="text-center py-3 px-2 text-muted-foreground font-semibold uppercase tracking-[0.2em] text-[11px]">Tulemus</th>
                         {isTimeView && (
-                          <th className="text-center py-3 px-2 text-slate-600 font-semibold">Kettad</th>
+                          <th className="text-center py-3 px-2 text-muted-foreground font-semibold uppercase tracking-[0.2em] text-[11px]">Kettad</th>
                         )}
                         {!isATWView && !isTimeView && (
-                          <th className="text-center py-3 px-2 text-slate-600 font-semibold">
+                          <th className="text-center py-3 px-2 text-muted-foreground font-semibold uppercase tracking-[0.2em] text-[11px]">
                             {effectiveView?.gameType === 'streak_challenge' ? 'Distants' : 'Täpsus'}
                           </th>
                         )}
                         {!isATWView && !isTimeView && (
-                          <th className="text-center py-3 px-2 text-slate-600 font-semibold">Putid</th>
+                          <th className="text-center py-3 px-2 text-muted-foreground font-semibold uppercase tracking-[0.2em] text-[11px]">Putid</th>
                         )}
-                        <th className="text-right py-3 px-2 text-slate-600 font-semibold">Kuupäev</th>
+                        <th className="text-right py-3 px-2 text-muted-foreground font-semibold uppercase tracking-[0.2em] text-[11px]">Kuupäev</th>
                         {canDelete && (
-                          <th className="text-right py-3 px-2 text-slate-600 font-semibold">Kustuta</th>
+                          <th className="text-right py-3 px-2 text-muted-foreground font-semibold uppercase tracking-[0.2em] text-[11px]">Kustuta</th>
                         )}
                       </tr>
                     </thead>
@@ -772,38 +772,38 @@ export default function PuttingRecords() {
                         const absoluteRank = pageStart + idx + 1;
                         const isCurrentUser = isCurrentUserEntry(entry);
                         const isTopRank = absoluteRank <= 3;
-                        const rowBase = isTopRank ? 'bg-amber-50' : (isCurrentUser ? 'bg-emerald-50/70' : '');
-                        const rowHover = isCurrentUser ? 'hover:bg-emerald-100/70' : 'hover:bg-slate-50';
-                        const rowHighlight = isCurrentUser ? 'ring-1 ring-emerald-200/70' : '';
+                        const rowBase = isTopRank ? 'bg-[#FFF4DB]/80 dark:bg-[#443E1E]/45' : (isCurrentUser ? 'bg-[#E7F7F2]/70 dark:bg-[#183134]/55' : '');
+                        const rowHover = isCurrentUser ? 'hover:bg-[#D8F3ED]/80 dark:hover:bg-[#224043]/70' : 'hover:bg-secondary/70 dark:hover:bg-[#1F282C]/80';
+                        const rowHighlight = isCurrentUser ? 'ring-1 ring-[#97D6CD]/70 dark:ring-[#2E6D67]/80' : '';
                         return (
                         <tr
                           key={entry.id}
-                          className={`border-b border-slate-100 ${rowBase} ${rowHover} ${rowHighlight} cursor-pointer transition-colors`}
+                          className={`border-b border-border/70 ${rowBase} ${rowHover} ${rowHighlight} cursor-pointer transition-colors`}
                         >
                           <td className="py-3 px-2">
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                                absoluteRank === 1 ? 'bg-yellow-400 text-yellow-900' :
-                                absoluteRank === 2 ? 'bg-slate-300 text-slate-700' :
-                                absoluteRank === 3 ? 'bg-orange-300 text-orange-800' :
-                                'bg-slate-100 text-slate-600'
+                                absoluteRank === 1 ? 'bg-[#FBBF24] text-[#6B3F00]' :
+                                absoluteRank === 2 ? 'bg-[#D8DFDD] text-[#1A2B2E]' :
+                                absoluteRank === 3 ? 'bg-[#F59E0B]/70 text-[#6B3F00]' :
+                                'bg-[#EBF5F3] text-[#1A2B2E]'
                               }`}>
                                 {absoluteRank}
                               </div>
                             </Link>
                           </td>
-                          <td className="py-3 px-2 font-medium text-slate-700">
+                          <td className="py-3 px-2 font-medium text-foreground">
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span>{getResolvedPlayerName(entry)}</span>
                                 {isHostedEntry(entry) && (
-                                  <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
+                                  <span className="text-xs px-2 py-1 rounded-full border border-[#A5C7FF] bg-[#EDF4FF] text-[#3B6CC7] flex items-center gap-1">
                                     <Award className="w-3 h-3" />
                                     DG.ee
                                   </span>
                                 )}
                                 {getAtwDiscsLabel(entry) && (
-                                  <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded">
+                                  <span className="text-xs px-2 py-1 rounded-full border border-border bg-secondary text-muted-foreground">
                                     {getAtwDiscsLabel(entry)}
                                   </span>
                                 )}
@@ -812,20 +812,20 @@ export default function PuttingRecords() {
                           </td>
                           <td className="py-3 px-2 text-center">
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
-                              <span className="text-lg font-bold text-emerald-600">
+                              <span className="text-lg font-bold text-[#007377] dark:text-[#5EEAD4]">
                                 {isTimeView ? formatDuration(entry.score) : entry.score}
                               </span>
                             </Link>
                           </td>
                           {isTimeView && (
-                            <td className="py-3 px-2 text-center text-slate-700">
+                            <td className="py-3 px-2 text-center text-foreground">
                               <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                                 {getTimeDiscsLabel(entry)}
                               </Link>
                             </td>
                           )}
                           {!isATWView && !isTimeView && (
-                            <td className="py-3 px-2 text-center text-slate-700">
+                            <td className="py-3 px-2 text-center text-foreground">
                               <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                                 {effectiveView?.gameType === 'streak_challenge' 
                                   ? `${entry.streak_distance || 0}m` 
@@ -835,13 +835,13 @@ export default function PuttingRecords() {
                             </td>
                           )}
                           {!isATWView && !isTimeView && (
-                            <td className="py-3 px-2 text-center text-slate-600">
+                            <td className="py-3 px-2 text-center text-muted-foreground">
                               <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                                 {entry.made_putts}/{entry.total_putts}
                               </Link>
                             </td>
                           )}
-                          <td className="py-3 px-2 text-right text-slate-500 text-xs">
+                          <td className="py-3 px-2 text-right text-muted-foreground text-xs">
                             <Link to={`${createPageUrl('GameResult')}?id=${entry.game_id}&from=leaderboard`} className="block">
                               {entry.date ? format(new Date(entry.date), 'MMM d, yyyy') : '-'}
                             </Link>
@@ -859,8 +859,8 @@ export default function PuttingRecords() {
                                 className={
                                   'inline-flex items-center justify-center w-8 h-8 rounded-md disabled:opacity-50 ' +
                                   (queuedRecordDeletes[entry.id]
-                                    ? 'text-amber-600 hover:text-amber-800 hover:bg-amber-50 dark:hover:bg-black'
-                                    : 'text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-black')
+                                    ? 'text-[#A86B02] hover:text-[#7A4E00] hover:bg-[#FFF4DB]'
+                                    : 'text-[#B54148] hover:text-[#8D3036] hover:bg-[#FEECEC]')
                                 }
                                 title={queuedRecordDeletes[entry.id] ? 'Võta tagasi' : 'Kustuta kirje'}
                               >
@@ -881,18 +881,18 @@ export default function PuttingRecords() {
                     type="button"
                     onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
                     disabled={safePage === 1}
-                    className="px-3 py-2 rounded-md text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                    className="px-3 py-2 rounded-xl text-sm font-semibold border border-border bg-card text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
                   >
                     Eelmine
                   </button>
-                  <span className="text-sm text-slate-600 min-w-[90px] text-center">
+                  <span className="text-sm text-muted-foreground min-w-[90px] text-center">
                     Leht {safePage}/{totalPages}
                   </span>
                   <button
                     type="button"
                     onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
                     disabled={safePage === totalPages}
-                    className="px-3 py-2 rounded-md text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                    className="px-3 py-2 rounded-xl text-sm font-semibold border border-border bg-card text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
                   >
                     Järgmine
                   </button>

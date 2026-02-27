@@ -147,7 +147,7 @@
     background-image: none !important;
   }
 
-  .min-h-screen.dark\:bg-black {
+  .dark .min-h-screen.dark\:bg-black {
     background-color: #000 !important;
   }
 

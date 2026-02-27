@@ -771,8 +771,7 @@ export default function PuttingRecords() {
                       {sortedEntries.map((entry, idx) => {
                         const absoluteRank = pageStart + idx + 1;
                         const isCurrentUser = isCurrentUserEntry(entry);
-                        const isTopRank = absoluteRank <= 3;
-                        const rowBase = isTopRank ? 'bg-[#FFF4DB]/80 dark:bg-[#443E1E]/45' : (isCurrentUser ? 'bg-[#E7F7F2]/70 dark:bg-[#183134]/55' : '');
+                        const rowBase = isCurrentUser ? 'bg-[#E7F7F2]/70 dark:bg-[#183134]/55' : '';
                         const rowHover = isCurrentUser ? 'hover:bg-[#D8F3ED]/80 dark:hover:bg-[#224043]/70' : 'hover:bg-secondary/70 dark:hover:bg-[#1F282C]/80';
                         const rowHighlight = isCurrentUser ? 'ring-1 ring-[#97D6CD]/70 dark:ring-[#2E6D67]/80' : '';
                         return (

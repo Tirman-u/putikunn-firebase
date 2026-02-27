@@ -28,6 +28,15 @@ describe('UI design regressions', () => {
     }
   });
 
+
+  it('uses compact icon-only HomeButton by default', () => {
+    const source = read('src/components/ui/home-button.jsx');
+
+    expect(source).toContain('showLabel = false');
+    expect(source).toContain("const compactClasses = 'h-12 w-12 justify-center p-0';");
+    expect(source).toContain('aria-label={label}');
+  });
+
   it('uses Wisedisc branding in metadata and login', () => {
     const html = read('index.html');
     const manifest = read('public/manifest.json');

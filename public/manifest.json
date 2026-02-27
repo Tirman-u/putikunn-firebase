@@ -1,7 +1,7 @@
 {
-  "name": "Putikunn",
-  "short_name": "Putikunn",
-  "description": "Putikunn app",
+  "name": "Wisedisc",
+  "short_name": "Wisedisc",
+  "description": "Wisedisc app",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#EAF8F2",

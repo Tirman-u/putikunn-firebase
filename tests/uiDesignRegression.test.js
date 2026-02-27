@@ -27,4 +27,19 @@ describe('UI design regressions', () => {
       expect(css).toContain(token);
     }
   });
+
+  it('uses Wisedisc branding in metadata and login', () => {
+    const html = read('index.html');
+    const manifest = read('public/manifest.json');
+    const login = read('src/pages/Login.jsx');
+
+    expect(html).toContain('Wisedisc');
+    expect(manifest).toContain('"name": "Wisedisc"');
+    expect(login).toContain("import BrandLogo from '@/components/ui/brand-logo';");
+    expect(login).toContain('<BrandLogo className="justify-center" heightClass="h-9 sm:h-10" />');
+
+    expect(html).not.toContain('Putikunn');
+    expect(manifest).not.toContain('Putikunn');
+    expect(login).not.toContain('>Putikunn<');
+  });
 });

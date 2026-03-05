@@ -666,20 +666,20 @@ export default function Profile() {
     deleteGamesMutation.mutate(deletableIds);
   };
 
-  const cardClass = "bg-white/80 rounded-[28px] p-5 shadow-[0_12px_28px_rgba(15,23,42,0.08)] border border-white/80 backdrop-blur";
+  const cardClass = "pk-surface p-5";
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)]">
-      <div className="max-w-4xl mx-auto p-4">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black dark:text-slate-100">
+      <div className="max-w-5xl mx-auto p-4 pb-10">
         {/* Header */}
-        <div className="mb-5 pt-2">
-          <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3">
+        <div className="mb-6 pt-2">
+          <div className="pk-surface flex items-center justify-between gap-3 px-4 py-3">
             <div className="flex items-center gap-2">
-              <BackButton onClick={() => navigate(-1)} showLabel={false} className="h-9 w-9 justify-center px-0" />
-              <HomeButton showLabel={false} className="h-9 w-9 justify-center px-0" />
+              <BackButton onClick={() => navigate(-1)} showLabel={false} className="h-10 w-10 justify-center px-0" />
+              <HomeButton showLabel={false} className="h-10 w-10 justify-center px-0" />
             </div>
-            <div className="text-center text-sm font-semibold text-slate-800">Minu profiil</div>
-            <div className="h-9 w-9" />
+            <div className="text-center text-sm font-semibold text-slate-800 dark:text-slate-100">Minu profiil</div>
+            <div className="h-10 w-10" />
           </div>
         </div>
 

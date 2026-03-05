@@ -622,9 +622,7 @@ export default function Home() {
           <header className="border-b border-[#e5e9ec] bg-white px-4 py-3 sm:px-6 dark:border-[#14363f] dark:bg-black">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
-                  <Sparkles className="h-4 w-4" />
-                </div>
+                <img src="/wisedisc-mark.svg" alt="Wisedisc logo" className="h-10 w-10 shrink-0" />
                 <div className="text-[30px] font-semibold leading-none text-[#1b2639] dark:text-slate-100">Wisedisc</div>
                 <nav className="ml-4 hidden items-center gap-1 lg:flex">
                   {dashboardLinks.map((item) => {

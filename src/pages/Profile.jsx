@@ -5,12 +5,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, Trophy, Target, TrendingUp, Edit2, Save, X, Award, ExternalLink, Trash2 } from 'lucide-react';
+import {
+  Camera,
+  Trophy,
+  Target,
+  TrendingUp,
+  Edit2,
+  Save,
+  X,
+  Award,
+  ExternalLink,
+  Trash2,
+  Bell,
+  ChevronDown,
+  Sparkles,
+  BookOpen,
+  Gamepad2,
+  LogOut,
+  GraduationCap
+} from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
-import BackButton from '@/components/ui/back-button';
-import HomeButton from '@/components/ui/home-button';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import { formatDuration } from '@/lib/time-format';
 import AIInsights from '@/components/profile/AIInsights';
@@ -20,6 +36,17 @@ import { deleteGameAndLeaderboardEntries } from '@/lib/leaderboard-utils';
 import { isUserInDuelGame, sortDuelGamesByNewest } from '@/lib/duel-game-utils';
 import { toast } from 'sonner';
 import { FEATURE_FLAGS } from '@/lib/feature-flags';
+import ThemeToggle from '@/components/ui/theme-toggle';
+import LanguageToggle from '@/components/ui/language-toggle';
+import VersionBadge from '@/components/VersionBadge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -198,8 +225,8 @@ export default function Profile() {
   }
   if (!user) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 text-center">
+      <div className="min-h-screen bg-[#17191b] dark:bg-black flex items-center justify-center p-4">
+        <div className="rounded-[24px] border border-[#d7e4e8] bg-white p-6 text-center shadow-fp-card dark:border-[#14363f] dark:bg-black">
           <p className="text-slate-700 mb-4">Kasutaja profiili ei õnnestu laadida.</p>
           <Button onClick={() => navigate(createPageUrl('Login'))}>Logi uuesti sisse</Button>
         </div>
@@ -209,6 +236,27 @@ export default function Profile() {
 
   const myDisplayName = user?.display_name || user?.full_name || user?.email || 'Mängija';
   const userRole = user?.app_role || 'user';
+  const roleLabels = {
+    super_admin: 'Superadmin',
+    admin: 'Admin',
+    trainer: 'Treener',
+    user: 'Mängija'
+  };
+  const roleLabel = roleLabels[userRole] || roleLabels.user;
+  const firstName = myDisplayName.split(' ')[0];
+  const canManageGames = ['trainer', 'admin', 'super_admin'].includes(userRole);
+  const canManageTraining = ['trainer', 'admin', 'super_admin'].includes(userRole);
+  const dashboardLinks = [
+    { label: 'Dashboard', to: createPageUrl('Home'), icon: Sparkles },
+    { label: 'Games', to: canManageGames ? createPageUrl('ManageGames') : `${createPageUrl('Home')}?mode=join`, icon: Gamepad2 },
+    { label: 'Training', to: createPageUrl('JoinTraining'), icon: GraduationCap },
+    { label: 'Records', to: createPageUrl('PuttingRecordsPage'), icon: Trophy },
+    { label: 'Courses', to: canManageTraining ? createPageUrl('TrainerGroups') : createPageUrl('Profile'), icon: BookOpen },
+    { label: 'Profile', to: createPageUrl('Profile'), icon: Award, active: true }
+  ];
+  const handleLogout = async () => {
+    await base44.auth.logout(true);
+  };
   const isAdmin = ['admin', 'super_admin'].includes(userRole);
   const normalize = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
   const normalizedDisplayName = normalize(myDisplayName);
@@ -666,24 +714,122 @@ export default function Profile() {
     deleteGamesMutation.mutate(deletableIds);
   };
 
-  const cardClass = "pk-surface p-5";
+  const cardClass = 'rounded-[24px] border border-[#d7e4e8] bg-white p-5 shadow-fp-card dark:border-[#14363f] dark:bg-black';
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black dark:text-slate-100">
-      <div className="max-w-5xl mx-auto p-4 pb-10">
-        {/* Header */}
-        <div className="mb-6 pt-2">
-          <div className="pk-surface flex items-center justify-between gap-3 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <BackButton onClick={() => navigate(-1)} showLabel={false} className="h-10 w-10 justify-center px-0" />
-              <HomeButton showLabel={false} className="h-10 w-10 justify-center px-0" />
+    <div className="min-h-screen bg-[#17191b] px-2 py-3 sm:px-4 sm:py-7 dark:bg-black">
+      <div className="mx-auto w-full max-w-[1220px] overflow-hidden rounded-[18px] border border-[#d9dee2] bg-[#f3f4f5] shadow-[0_30px_80px_rgba(0,0,0,0.35)] dark:border-[#14363f] dark:bg-black dark:text-slate-100">
+        <header className="border-b border-[#e5e9ec] bg-white px-4 py-3 sm:px-6 dark:border-[#14363f] dark:bg-black">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <img src="/wisedisc-mark.svg" alt="Wisedisc logo" className="h-10 w-10 shrink-0" />
+              <div className="text-[30px] font-semibold leading-none text-[#1b2639] dark:text-slate-100">Wisedisc</div>
+              <nav className="ml-4 hidden items-center gap-1 lg:flex">
+                {dashboardLinks.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.label}
+                      to={item.to}
+                      className={`inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-medium transition ${
+                        item.active
+                          ? 'bg-[#d8f3ef] text-[#1f9c8d]'
+                          : 'text-slate-600 hover:bg-[#edf2f4] hover:text-slate-800 dark:text-slate-300 dark:hover:bg-[#07161b] dark:hover:text-slate-100'
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
             </div>
-            <div className="text-center text-sm font-semibold text-slate-800 dark:text-slate-100">Minu profiil</div>
-            <div className="h-10 w-10" />
-          </div>
-        </div>
 
-        {/* Profile Card */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#e3e8eb] text-slate-500 transition hover:bg-[#eef4f5] hover:text-slate-700 dark:border-[#14363f] dark:text-slate-300 dark:hover:bg-[#07161b] dark:hover:text-slate-100"
+              >
+                <Bell className="h-4 w-4" />
+              </button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#e3e8eb] bg-white px-2.5 py-1.5 text-left transition hover:bg-[#f6f9fa] dark:border-[#14363f] dark:bg-black dark:hover:bg-[#07161b]"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-md bg-gradient-to-br from-[#28b39a] to-[#1f9c8d] text-xs font-semibold text-white">
+                      {firstName?.slice(0, 2)?.toUpperCase()}
+                    </div>
+                    <div className="hidden sm:block">
+                      <div className="text-xs font-semibold leading-4 text-slate-800 dark:text-slate-100">{myDisplayName}</div>
+                      <div className="text-[11px] leading-4 text-slate-500 dark:text-slate-400">{roleLabel}</div>
+                    </div>
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-500 dark:text-slate-300" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[250px] p-1.5">
+                  <DropdownMenuLabel className="normal-case">
+                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{myDisplayName}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">{roleLabel}</div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => navigate(createPageUrl('Home'))}>
+                    <Sparkles className="h-4 w-4 text-slate-500" />
+                    <span>Dashboard</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => navigate(createPageUrl('PuttingRecordsPage'))}>
+                    <Trophy className="h-4 w-4 text-slate-500" />
+                    <span>Rekordid</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <div className="flex items-center justify-between px-2 py-2">
+                    <LanguageToggle />
+                    <ThemeToggle />
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={handleLogout} className="text-red-600 dark:text-red-400">
+                    <LogOut className="h-4 w-4" />
+                    <span>Logi välja</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center gap-1 overflow-auto pb-1 lg:hidden">
+            {dashboardLinks.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.label}
+                  to={item.to}
+                  className={`inline-flex items-center gap-1 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-medium ${
+                    item.active
+                      ? 'bg-[#d8f3ef] text-[#1f9c8d]'
+                      : 'text-slate-600 hover:bg-[#edf2f4] dark:text-slate-300 dark:hover:bg-[#07161b]'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </header>
+
+        <main className="px-4 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8">
+          <section className="mb-6">
+            <h1 className="text-3xl font-bold tracking-tight text-[#1b2639] sm:text-[50px] sm:leading-[56px] dark:text-slate-100">
+              Profile overview, {firstName}!
+            </h1>
+            <p className="mt-2 text-sm text-slate-500 sm:text-xl dark:text-slate-300">
+              Kõik sinu tulemused, areng ja mängude ajalugu ühes vaates.
+            </p>
+          </section>
+
+          {/* Profile Card */}
         <div className={`${cardClass} mb-6`}>
           {!isEditing ? (
             <div className="flex items-start gap-4">
@@ -1128,7 +1274,7 @@ export default function Profile() {
                    Kustuta valitud ({selectedGameIds.length})
                  </Button>
                )}
-               <Select value={filterFormat} onValueChange={() => { setFilterFormat(arguments[0]); setCurrentPage(1); }}>
+               <Select value={filterFormat} onValueChange={(value) => { setFilterFormat(value); setCurrentPage(1); }}>
                  <SelectTrigger className="w-32">
                    <SelectValue />
                  </SelectTrigger>
@@ -1144,7 +1290,7 @@ export default function Profile() {
                    <SelectItem value="around_the_world">Around The World</SelectItem>
                    </SelectContent>
                    </Select>
-               <Select value={filterPuttType} onValueChange={() => { setFilterPuttType(arguments[0]); setCurrentPage(1); }}>
+               <Select value={filterPuttType} onValueChange={(value) => { setFilterPuttType(value); setCurrentPage(1); }}>
                  <SelectTrigger className="w-32">
                    <SelectValue />
                  </SelectTrigger>
@@ -1388,15 +1534,20 @@ export default function Profile() {
         )}
 
         {/* Achievements */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className={`${cardClass} mt-6`}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-slate-800">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">
               Saavutused ({unlockedAchievements.length}/{achievements.length})
             </h3>
           </div>
           <AchievementsList achievements={achievements} />
         </div>
-      </div>
+
+        <div className="mt-5 flex justify-end">
+          <VersionBadge inline />
+        </div>
+      </main>
     </div>
+   </div>
   );
 }

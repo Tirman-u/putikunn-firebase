@@ -528,24 +528,33 @@ export default function ManageGames() {
     return leaderboardEntries.some(entry => entry.game_id === gameId && entry.leaderboard_type === 'general');
   };
 
-  const completedGames = games.filter(g => g.status === 'completed' && g.pin !== '0000');
+  const getGameSortTimestamp = (game) => {
+    const raw = game?.date || game?.created_date || game?.updated_date || null;
+    const ts = raw ? new Date(raw).getTime() : 0;
+    return Number.isFinite(ts) ? ts : 0;
+  };
+
+  const completedGames = games
+    .filter((g) => g.status === 'completed' && g.pin !== '0000')
+    .sort((a, b) => getGameSortTimestamp(b) - getGameSortTimestamp(a));
   const activeGames = games.filter(g => g.status !== 'completed' && g.pin !== '0000');
   const completedDuelGames = duelGames.filter((g) => g?.status === 'finished' && g?.pin && g.pin !== '0000');
   const activeDuelGames = duelGames.filter((g) => g?.status !== 'finished' && g?.pin && g.pin !== '0000');
 
-  const getMonthKey = (date) => {
-    const d = new Date(date);
+  const getMonthKey = (value) => {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return 'unknown';
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   };
 
   const groupedByMonth = completedGames.reduce((acc, game) => {
-    const monthKey = getMonthKey(game.date);
+    const monthKey = getMonthKey(game?.date || game?.created_date || game?.updated_date);
     if (!acc[monthKey]) acc[monthKey] = [];
     acc[monthKey].push(game);
     return acc;
   }, {});
 
-  const sortedMonths = Object.keys(groupedByMonth).sort().reverse();
+  const sortedMonths = Object.keys(groupedByMonth).filter((month) => month !== 'unknown').sort().reverse();
   
   const filteredCompletedGames = selectedMonth === 'all' 
     ? completedGames 

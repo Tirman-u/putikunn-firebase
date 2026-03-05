@@ -722,8 +722,14 @@ export default function Profile() {
         <header className="border-b border-[#e5e9ec] bg-white px-4 py-3 sm:px-6 dark:border-[#14363f] dark:bg-black">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <img src="/wisedisc-mark.svg" alt="Wisedisc logo" className="h-10 w-10 shrink-0" />
-              <div className="text-[30px] font-semibold leading-none text-[#1b2639] dark:text-slate-100">Wisedisc</div>
+              <Link
+                to={createPageUrl('Home')}
+                className="inline-flex items-center gap-3 rounded-xl px-1 py-0.5 transition hover:bg-[#edf2f4] dark:hover:bg-[#07161b]"
+                aria-label="Ava avaleht"
+              >
+                <img src="/wisedisc-mark.svg" alt="Wisedisc logo" className="h-10 w-10 shrink-0" />
+                <div className="text-[30px] font-semibold leading-none text-[#1b2639] dark:text-slate-100">Wisedisc</div>
+              </Link>
               <nav className="ml-4 hidden items-center gap-1 lg:flex">
                 {dashboardLinks.map((item) => {
                   const Icon = item.icon;

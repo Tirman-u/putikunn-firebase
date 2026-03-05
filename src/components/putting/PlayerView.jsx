@@ -105,20 +105,6 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     return patch;
   }, [playerName]);
 
-  const mergeWithLatest = React.useCallback((latestGame, patch) => {
-    if (!latestGame) return patch;
-    const merged = { ...patch };
-    PLAYER_STATE_KEYS.forEach((key) => {
-      if (patch?.[key]) {
-        merged[key] = {
-          ...(latestGame[key] || {}),
-          ...(patch[key] || {})
-        };
-      }
-    });
-    return merged;
-  }, []);
-
   React.useEffect(() => {
     setStreakComplete(false);
   }, [gameId, playerName]);
@@ -263,29 +249,6 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     }
   }, [game, isSoloGame]);
 
-  const updateGameMutation = useMutation({
-    mutationFn: async ({ id, data }) => {
-      const startedAt = performance.now();
-      const latestGame = queryClient.getQueryData(['game', id]) || game;
-      const payload = mergeWithLatest(latestGame, data);
-      const updated = await base44.entities.Game.update(id, payload, {
-        returnSnapshot: false,
-        mergeWith: latestGame
-      });
-      logSyncMetric('player_sync', performance.now() - startedAt, {
-        game_id: id,
-        game_type: game?.game_type || 'unknown'
-      });
-      return updated;
-    },
-    onSuccess: (updatedGame) => {
-      const merged = mergeIncomingGame(updatedGame);
-      setLocalGameState(merged);
-      localGameStateRef.current = merged;
-      queryClient.setQueryData(['game', gameId], merged);
-    }
-  });
-
   const flushPending = React.useCallback(async (idOverride, payloadOverride) => {
     if (isSoloGame) return;
     const id = idOverride || game?.id;
@@ -300,7 +263,40 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     syncInFlightRef.current = true;
     pendingUpdateRef.current = null;
     try {
-      await updateGameMutation.mutateAsync({ id, data: payload });
+      const updates = [];
+      PLAYER_STATE_KEYS.forEach((key) => {
+        const playerMap = payload?.[key];
+        if (!playerMap || playerMap[playerName] === undefined) return;
+        updates.push(new FieldPath(key, playerName), playerMap[playerName]);
+      });
+
+      const topLevelPatch = { ...payload };
+      PLAYER_STATE_KEYS.forEach((key) => {
+        delete topLevelPatch[key];
+      });
+
+      Object.entries(topLevelPatch).forEach(([key, value]) => {
+        if (value === undefined) return;
+        updates.push(key, value);
+      });
+
+      if (updates.length > 0) {
+        const startedAt = performance.now();
+        const gameRef = doc(db, 'games', id);
+        await updateDoc(
+          gameRef,
+          ...updates,
+          'updated_date',
+          new Date().toISOString(),
+          '_server_updated_at',
+          serverTimestamp()
+        );
+        logSyncMetric('player_sync', performance.now() - startedAt, {
+          game_id: id,
+          game_type: game?.game_type || 'unknown'
+        });
+      }
+
       lastSyncAtRef.current = Date.now();
       turnsSinceSyncRef.current = 0;
     } catch (error) {
@@ -317,7 +313,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         flushLivePendingRef.current?.(id, queued);
       }
     }
-  }, [game?.id, isSoloGame, updateGameMutation]);
+  }, [game?.game_type, game?.id, isSoloGame, playerName]);
 
   const flushLivePending = React.useCallback(async (idOverride, payloadOverride) => {
     if (isSoloGame) return;

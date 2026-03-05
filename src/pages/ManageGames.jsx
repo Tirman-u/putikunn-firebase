@@ -534,10 +534,14 @@ export default function ManageGames() {
     return Number.isFinite(ts) ? ts : 0;
   };
 
+  const isVisibleStandaloneGame = (game) => (
+    game?.pin !== '0000' && !game?.merged_into_game_id
+  );
+
   const completedGames = games
-    .filter((g) => g.status === 'completed' && g.pin !== '0000')
+    .filter((g) => g.status === 'completed' && isVisibleStandaloneGame(g))
     .sort((a, b) => getGameSortTimestamp(b) - getGameSortTimestamp(a));
-  const activeGames = games.filter(g => g.status !== 'completed' && g.pin !== '0000');
+  const activeGames = games.filter((g) => g.status !== 'completed' && isVisibleStandaloneGame(g));
   const completedDuelGames = duelGames.filter((g) => g?.status === 'finished' && g?.pin && g.pin !== '0000');
   const activeDuelGames = duelGames.filter((g) => g?.status !== 'finished' && g?.pin && g.pin !== '0000');
 

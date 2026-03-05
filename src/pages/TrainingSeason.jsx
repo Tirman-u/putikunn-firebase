@@ -13,7 +13,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { Calendar, Trophy, Plus, Clock3, ChevronRight } from 'lucide-react';
+import { Calendar, Trophy, Plus, Clock3, ChevronRight, Trash2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -37,6 +37,7 @@ export default function TrainingSeason() {
   const [addSessionToAllSlots, setAddSessionToAllSlots] = React.useState(true);
   const [isCreatingSession, setIsCreatingSession] = React.useState(false);
   const [isDeletingSeason, setIsDeletingSeason] = React.useState(false);
+  const [deletingSessionGroupKey, setDeletingSessionGroupKey] = React.useState('');
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -292,6 +293,135 @@ export default function TrainingSeason() {
     }
   };
 
+  const handleDeleteSessionGroup = async (groupEntry) => {
+    if (!season?.id || !groupEntry?.sessionIds?.length) return;
+    if (!canManageTraining) {
+      toast.error(tr('Pole treeneri õigusi', 'No trainer permissions'));
+      return;
+    }
+
+    const confirmed = window.confirm(
+      tr(
+        `Kustuta treening "${groupEntry.date ? format(new Date(groupEntry.date), 'MMM d') : groupEntry.dateKey}"? See eemaldab ka selle päeva eventid ja tulemused.`,
+        `Delete training "${groupEntry.date ? format(new Date(groupEntry.date), 'MMM d') : groupEntry.dateKey}"? This also removes events and results for that day.`
+      )
+    );
+    if (!confirmed) return;
+
+    setDeletingSessionGroupKey(groupEntry.dateKey);
+    try {
+      const sessionIdSet = new Set(groupEntry.sessionIds || []);
+
+      const seasonEventsSnap = await getDocs(
+        query(collection(db, 'training_events'), where('season_id', '==', season.id))
+      );
+      const seasonEvents = seasonEventsSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      const targetEvents = seasonEvents.filter((entry) => sessionIdSet.has(entry.session_id));
+      const eventById = targetEvents.reduce((acc, event) => {
+        acc[event.id] = event;
+        return acc;
+      }, {});
+      const eventIdSet = new Set(targetEvents.map((entry) => entry.id));
+
+      const seasonResultsSnap = await getDocs(
+        query(collection(db, 'training_event_results'), where('season_id', '==', season.id))
+      );
+      const seasonResults = seasonResultsSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      const targetResults = seasonResults.filter((entry) => eventIdSet.has(entry.event_id));
+
+      const adjustmentsByParticipant = {};
+      targetResults.forEach((entry) => {
+        const participantId = entry.participant_id;
+        if (!participantId) return;
+        if (!adjustmentsByParticipant[participantId]) {
+          adjustmentsByParticipant[participantId] = {
+            totalPoints: 0,
+            attendance: 0,
+            bySlot: {}
+          };
+        }
+        const slotId = entry.slot_id || eventById[entry.event_id]?.slot_id || null;
+        const points = Number(entry.points || 0);
+        adjustmentsByParticipant[participantId].totalPoints += points;
+        adjustmentsByParticipant[participantId].attendance += 1;
+        if (slotId) {
+          adjustmentsByParticipant[participantId].bySlot[slotId] =
+            Number(adjustmentsByParticipant[participantId].bySlot[slotId] || 0) + points;
+        }
+      });
+
+      const statDocsByParticipant = {};
+      const participantIds = Object.keys(adjustmentsByParticipant);
+      for (const participantId of participantIds) {
+        const ref = doc(db, 'training_season_stats', `${season.id}_${participantId}`);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          statDocsByParticipant[participantId] = { ref, data: snap.data() };
+        }
+      }
+
+      const ops = [];
+      targetResults.forEach((entry) => {
+        ops.push({ type: 'delete', ref: doc(db, 'training_event_results', entry.id) });
+      });
+      targetEvents.forEach((event) => {
+        ops.push({ type: 'delete', ref: doc(db, 'training_events', event.id) });
+      });
+      groupEntry.sessionIds.forEach((sessionId) => {
+        ops.push({ type: 'delete', ref: doc(db, 'training_sessions', sessionId) });
+      });
+
+      Object.entries(adjustmentsByParticipant).forEach(([participantId, adjustment]) => {
+        const statDoc = statDocsByParticipant[participantId];
+        if (!statDoc?.data) return;
+        const existing = statDoc.data;
+        const nextPointsBySlot = { ...(existing.points_by_slot || {}) };
+        Object.entries(adjustment.bySlot).forEach(([slotId, deduction]) => {
+          const current = Number(nextPointsBySlot[slotId] || 0);
+          nextPointsBySlot[slotId] = round1(Math.max(0, current - Number(deduction || 0)));
+        });
+
+        ops.push({
+          type: 'set',
+          ref: statDoc.ref,
+          data: {
+            points_total: round1(Math.max(0, Number(existing.points_total || 0) - Number(adjustment.totalPoints || 0))),
+            attendance_count: Math.max(0, Number(existing.attendance_count || 0) - Number(adjustment.attendance || 0)),
+            points_by_slot: nextPointsBySlot,
+            updated_at: new Date().toISOString()
+          },
+          merge: true
+        });
+      });
+
+      const commitOps = async (items) => {
+        const chunkSize = 350;
+        for (let i = 0; i < items.length; i += chunkSize) {
+          const chunk = items.slice(i, i + chunkSize);
+          const batch = writeBatch(db);
+          chunk.forEach((item) => {
+            if (item.type === 'delete') {
+              batch.delete(item.ref);
+              return;
+            }
+            batch.set(item.ref, item.data, { merge: item.merge !== false });
+          });
+          await batch.commit();
+        }
+      };
+
+      await commitOps(ops);
+
+      queryClient.invalidateQueries({ queryKey: ['training-sessions', seasonId] });
+      queryClient.invalidateQueries({ queryKey: ['training-season-stats', seasonId] });
+      toast.success(tr('Treening kustutatud', 'Training deleted'));
+    } catch (error) {
+      toast.error(error?.message || tr('Treeningu kustutamine ebaõnnestus', 'Failed to delete training'));
+    } finally {
+      setDeletingSessionGroupKey('');
+    }
+  };
+
   if (!season) {
     return (
       <div className="min-h-screen bg-black" />
@@ -460,32 +590,47 @@ export default function TrainingSeason() {
             <div className="space-y-2.5">
               {sessionGroups.map((groupEntry) => {
                 return (
-                  <button
+                  <div
                     key={groupEntry.dateKey}
-                    type="button"
-                    onClick={() =>
-                      navigate(
-                        `${createPageUrl('TrainingSession')}?sessionId=${groupEntry.primarySessionId}&dateKey=${groupEntry.dateKey}`
-                      )
-                    }
-                    className="w-full rounded-2xl border border-slate-100 bg-white/95 px-4 py-3 text-left transition hover:bg-emerald-50 dark:border-white/10 dark:bg-black"
+                    className="flex items-stretch gap-2"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                          {groupEntry.date ? format(new Date(groupEntry.date), 'MMM d') : tr('Treening', 'Training')}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `${createPageUrl('TrainingSession')}?sessionId=${groupEntry.primarySessionId}&dateKey=${groupEntry.dateKey}`
+                        )
+                      }
+                      className="w-full rounded-2xl border border-slate-100 bg-white/95 px-4 py-3 text-left transition hover:bg-emerald-50 dark:border-white/10 dark:bg-black"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                            {groupEntry.date ? format(new Date(groupEntry.date), 'MMM d') : tr('Treening', 'Training')}
+                          </div>
+                          <div className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                            <Clock3 className="h-3 w-3" />
+                            {groupEntry.slotLabels.join(' • ')}
+                          </div>
+                          <div className="mt-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-300">
+                            {tr('Ajagruppe', 'Time groups')}: {groupEntry.count}
+                          </div>
                         </div>
-                        <div className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                          <Clock3 className="h-3 w-3" />
-                          {groupEntry.slotLabels.join(' • ')}
-                        </div>
-                        <div className="mt-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-300">
-                          {tr('Ajagruppe', 'Time groups')}: {groupEntry.count}
-                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
                       </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
-                    </div>
-                  </button>
+                    </button>
+                    {canManageTraining && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSessionGroup(groupEntry)}
+                        disabled={deletingSessionGroupKey === groupEntry.dateKey}
+                        className="shrink-0 rounded-2xl border border-red-200 bg-red-50 px-3 text-red-600 transition hover:bg-red-100 disabled:opacity-60 dark:border-white/10 dark:bg-black dark:text-red-300"
+                        aria-label={tr('Kustuta treening', 'Delete training')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>

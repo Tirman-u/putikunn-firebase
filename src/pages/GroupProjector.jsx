@@ -5,7 +5,6 @@ import { db } from '@/lib/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import LoadingState from '@/components/ui/loading-state';
-import { createPageUrl } from '@/utils';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
 import { useLanguage } from '@/lib/i18n';
@@ -14,16 +13,22 @@ const TOP_N = 10;
 
 const buildPlayerStats = (game) => {
   if (!game) return [];
-  const players = Array.isArray(game.players)
+  const basePlayers = Array.isArray(game.players)
     ? game.players
     : Object.keys(game.total_points || {});
-  return players
+  const playerSet = new Set(basePlayers);
+  Object.keys(game.total_points || {}).forEach((name) => playerSet.add(name));
+  Object.keys(game.live_stats || {}).forEach((name) => playerSet.add(name));
+  return Array.from(playerSet)
     .map((name) => {
-      const score = game.total_points?.[name] ?? 0;
+      const score = game.live_stats?.[name]?.total_points ?? game.total_points?.[name] ?? 0;
       const putts = game.player_putts?.[name] || [];
+      const liveTotal = Number(game.live_stats?.[name]?.total_putts || 0);
+      const liveMade = Number(game.live_stats?.[name]?.made_putts || 0);
+      const liveAccuracy = liveTotal > 0 ? Math.round((liveMade / liveTotal) * 1000) / 10 : 0;
       const accuracy = putts.length
         ? Math.round((putts.filter((p) => p.result === 'made').length / putts.length) * 1000) / 10
-        : 0;
+        : liveAccuracy;
       return { name, score, accuracy };
     })
     .sort((a, b) => b.score - a.score)

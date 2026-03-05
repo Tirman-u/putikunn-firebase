@@ -214,6 +214,110 @@ export default function Profile() {
   const normalizedDisplayName = normalize(myDisplayName);
   const normalizedFullName = normalize(user?.full_name);
   const normalizedEmail = normalize(user?.email);
+  const dedupeKeys = (items) => Array.from(new Set((items || []).filter((item) => typeof item === 'string' && item.trim())));
+  const pickNumericValue = (values, { lowerIsBetter = false } = {}) => {
+    const numeric = (values || []).map((value) => Number(value)).filter((value) => Number.isFinite(value));
+    if (numeric.length === 0) return 0;
+    if (lowerIsBetter) {
+      const positive = numeric.filter((value) => value > 0);
+      return positive.length > 0 ? Math.min(...positive) : Math.min(...numeric);
+    }
+    return Math.max(...numeric);
+  };
+
+  const getPlayerKeysForGame = (game) => {
+    if (!game) return [];
+    const keys = [];
+
+    const knownKeys = [myDisplayName, user?.full_name, user?.email];
+    knownKeys.forEach((key) => {
+      if (!key) return;
+      if (
+        game?.total_points?.[key] !== undefined ||
+        game?.player_putts?.[key] ||
+        game?.atw_state?.[key] ||
+        game?.live_stats?.[key]
+      ) {
+        keys.push(key);
+      }
+    });
+
+    const normalizedCandidates = new Set(
+      [normalizedDisplayName, normalizedFullName, normalizedEmail].filter(Boolean)
+    );
+
+    (game.players || []).forEach((name) => {
+      if (!name) return;
+      if (normalizedCandidates.has(normalize(name))) {
+        keys.push(name);
+      }
+    });
+
+    Object.keys(game.total_points || {}).forEach((name) => {
+      if (!name) return;
+      if (normalizedCandidates.has(normalize(name))) {
+        keys.push(name);
+      }
+    });
+
+    Object.entries(game.player_emails || {}).forEach(([name, email]) => {
+      if (normalizedEmail && normalize(email) === normalizedEmail) {
+        keys.push(name);
+      }
+    });
+
+    Object.entries(game.player_uids || {}).forEach(([name, uid]) => {
+      if (user?.id && uid === user.id) {
+        keys.push(name);
+      }
+    });
+
+    return dedupeKeys(keys);
+  };
+
+  const getPlayerScoreForGame = (game) => {
+    const keys = getPlayerKeysForGame(game);
+    const values = [];
+    keys.forEach((key) => {
+      values.push(game?.total_points?.[key]);
+      values.push(game?.live_stats?.[key]?.total_points);
+      if (game?.game_type === 'around_the_world') {
+        values.push(game?.atw_state?.[key]?.best_score);
+      }
+    });
+    return pickNumericValue(values, { lowerIsBetter: game?.game_type === 'time_ladder' });
+  };
+
+  const getPlayerPuttsForGame = (game) => {
+    const keys = getPlayerKeysForGame(game);
+    let best = [];
+    keys.forEach((key) => {
+      const putts = Array.isArray(game?.player_putts?.[key]) ? game.player_putts[key] : [];
+      if (putts.length > best.length) {
+        best = putts;
+      }
+    });
+    return best;
+  };
+
+  const getPlayerATWStateForGame = (game) => {
+    const keys = getPlayerKeysForGame(game);
+    let bestState = null;
+    keys.forEach((key) => {
+      const state = game?.atw_state?.[key];
+      if (!state) return;
+      if (!bestState) {
+        bestState = state;
+        return;
+      }
+      const stateScore = Number(state?.best_score || 0);
+      const bestScore = Number(bestState?.best_score || 0);
+      if (stateScore > bestScore) {
+        bestState = state;
+      }
+    });
+    return bestState;
+  };
 
   const isPlayerInGame = (game) => {
     if (!game) return false;
@@ -222,6 +326,15 @@ export default function Profile() {
       (normalizedDisplayName && players.includes(normalizedDisplayName)) ||
       (normalizedFullName && players.includes(normalizedFullName)) ||
       (normalizedEmail && players.includes(normalizedEmail))
+    ) {
+      return true;
+    }
+
+    const scoreKeys = Object.keys(game.total_points || {}).map(normalize);
+    if (
+      (normalizedDisplayName && scoreKeys.includes(normalizedDisplayName)) ||
+      (normalizedFullName && scoreKeys.includes(normalizedFullName)) ||
+      (normalizedEmail && scoreKeys.includes(normalizedEmail))
     ) {
       return true;
     }
@@ -312,20 +425,20 @@ export default function Profile() {
   };
 
   atwGames.forEach(game => {
-    const playerState = game.atw_state?.[myDisplayName] || game.atw_state?.[user?.full_name] || game.atw_state?.[user?.email];
+    const playerState = getPlayerATWStateForGame(game);
     if (playerState) {
       const difficulty = game.atw_config?.difficulty || 'medium';
-      const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+      const score = getPlayerScoreForGame(game);
       atwStatsByDifficulty[difficulty] = Math.max(atwStatsByDifficulty[difficulty], score);
     }
   });
 
   const atwStats = atwGames.reduce((acc, game) => {
-    const playerState = game.atw_state?.[myDisplayName] || game.atw_state?.[user?.full_name] || game.atw_state?.[user?.email];
+    const playerState = getPlayerATWStateForGame(game);
     if (playerState) {
       acc.totalLaps += playerState.laps_completed || 0;
       acc.totalTurns += playerState.turns_played || 0;
-      const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+      const score = getPlayerScoreForGame(game);
       acc.bestScore = Math.max(acc.bestScore, score);
     }
     return acc;
@@ -333,7 +446,7 @@ export default function Profile() {
 
   // Calculate statistics
   const totalGames = myGames.length;
-  const allPutts = myGames.flatMap(g => g.player_putts?.[myDisplayName] || g.player_putts?.[user?.full_name] || g.player_putts?.[user?.email] || []);
+  const allPutts = myGames.flatMap((game) => getPlayerPuttsForGame(game));
   const totalPutts = allPutts.length;
   const madePutts = allPutts.filter(p => p.result === 'made').length;
   const puttingPercentage = totalPutts > 0 ? ((madePutts / totalPutts) * 100).toFixed(1) : 0;
@@ -341,7 +454,7 @@ export default function Profile() {
   let totalPoints = 0;
   let bestScore = 0;
   myGames.forEach(game => {
-    const points = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+    const points = getPlayerScoreForGame(game);
     totalPoints += points;
     if (game.game_type !== 'time_ladder' && points > bestScore) bestScore = points;
   });
@@ -349,7 +462,7 @@ export default function Profile() {
 
   const trendGames = myGames
     .map((game) => {
-      const putts = game.player_putts?.[myDisplayName] || game.player_putts?.[user?.full_name] || game.player_putts?.[user?.email] || [];
+      const putts = getPlayerPuttsForGame(game);
       const total = putts.length;
       if (total === 0) return null;
       const made = putts.filter(p => p.result === 'made').length;
@@ -439,8 +552,8 @@ export default function Profile() {
   // Group game stats
   const groupGames = games.filter(g => g.group_id);
   const groupScores = groupGames
-    .filter(g => g.players?.includes(myDisplayName) || g.players?.includes(user?.full_name))
-    .map(g => g.total_points?.[myDisplayName] || g.total_points?.[user?.full_name] || 0);
+    .filter((game) => isPlayerInGame(game))
+    .map((game) => getPlayerScoreForGame(game));
   const avgGroupScore = groupScores.length > 0
     ? (groupScores.reduce((sum, s) => sum + s, 0) / groupScores.length).toFixed(1)
     : 0;
@@ -470,9 +583,9 @@ export default function Profile() {
   
   myGames.forEach(game => {
     const puttType = game.putt_type || 'regular';
-    const putts = game.player_putts?.[myDisplayName] || game.player_putts?.[user?.full_name] || game.player_putts?.[user?.email] || [];
+    const putts = getPlayerPuttsForGame(game);
     const made = putts.filter(p => p.result === 'made').length;
-    const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+    const score = getPlayerScoreForGame(game);
     
     puttTypeStats[puttType].made += made;
     puttTypeStats[puttType].total += putts.length;
@@ -494,7 +607,7 @@ export default function Profile() {
 
   myGames.forEach(game => {
     const gameType = game.game_type || 'classic';
-    const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+    const score = getPlayerScoreForGame(game);
     gameFormatStats[gameType] = Math.max(gameFormatStats[gameType], score);
   });
 
@@ -513,8 +626,8 @@ export default function Profile() {
     if (sortBy === 'date') {
       return new Date(b.date || 0) - new Date(a.date || 0);
     } else if (sortBy === 'score') {
-      const scoreA = a.total_points?.[myDisplayName] || a.total_points?.[user?.full_name] || 0;
-      const scoreB = b.total_points?.[myDisplayName] || b.total_points?.[user?.full_name] || 0;
+      const scoreA = getPlayerScoreForGame(a);
+      const scoreB = getPlayerScoreForGame(b);
       return scoreB - scoreA;
     } else if (sortBy === 'format') {
       return (a.game_type || 'classic').localeCompare(b.game_type || 'classic');
@@ -1086,10 +1199,10 @@ export default function Profile() {
                    </thead>
                   <tbody>
                     {pageGames.map((game) => {
-                      const putts = game.player_putts?.[myDisplayName] || game.player_putts?.[user?.full_name] || game.player_putts?.[user?.email] || [];
+                      const putts = getPlayerPuttsForGame(game);
                       const made = putts.filter(p => p.result === 'made').length;
                       const percentage = putts.length > 0 ? ((made / putts.length) * 100).toFixed(0) : 0;
-                      const score = game.total_points?.[myDisplayName] || game.total_points?.[user?.full_name] || game.total_points?.[user?.email] || 0;
+                      const score = getPlayerScoreForGame(game);
                       const isTimeLadder = game.game_type === 'time_ladder';
                       const scoreLabel = isTimeLadder ? formatDuration(score) : score;
                       const percentageLabel = isTimeLadder ? '—' : `${percentage}%`;

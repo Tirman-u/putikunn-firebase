@@ -39,6 +39,7 @@ import { FEATURE_FLAGS } from '@/lib/feature-flags';
 import ThemeToggle from '@/components/ui/theme-toggle';
 import LanguageToggle from '@/components/ui/language-toggle';
 import VersionBadge from '@/components/VersionBadge';
+import BrandWordmark from '@/components/BrandWordmark';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -727,8 +728,7 @@ export default function Profile() {
                 className="inline-flex items-center gap-3 rounded-xl px-1 py-0.5 transition hover:bg-[#edf2f4] dark:hover:bg-[#07161b]"
                 aria-label="Ava avaleht"
               >
-                <img src="/wisedisc-mark.svg" alt="Wisedisc logo" className="h-10 w-10 shrink-0" />
-                <div className="text-[30px] font-semibold leading-none text-[#1b2639] dark:text-slate-100">Wisedisc</div>
+                <BrandWordmark />
               </Link>
               <nav className="ml-4 hidden items-center gap-1 lg:flex">
                 {dashboardLinks.map((item) => {

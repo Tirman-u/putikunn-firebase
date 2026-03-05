@@ -144,13 +144,13 @@ export default function Home() {
   const trainingSub = trainingGroups.length ? t('home.training', 'Trenn') : t('home.join_sub', 'Sisesta PIN');
 
   const tileThemes = {
-    emerald: { bg: 'bg-emerald-100 dark:bg-black', icon: 'text-emerald-600', ring: 'ring-emerald-200 dark:ring-emerald-500/40', glow: 'shadow-emerald-100/60 dark:shadow-emerald-500/10' },
-    sky: { bg: 'bg-sky-100 dark:bg-black', icon: 'text-sky-600', ring: 'ring-sky-200 dark:ring-sky-500/40', glow: 'shadow-sky-100/60 dark:shadow-sky-500/10' },
-    amber: { bg: 'bg-amber-100 dark:bg-black', icon: 'text-amber-600', ring: 'ring-amber-200 dark:ring-amber-500/40', glow: 'shadow-amber-100/60 dark:shadow-amber-500/10' },
-    purple: { bg: 'bg-purple-100 dark:bg-black', icon: 'text-purple-600', ring: 'ring-purple-200 dark:ring-purple-500/40', glow: 'shadow-purple-100/60 dark:shadow-purple-500/10' },
-    blue: { bg: 'bg-blue-100 dark:bg-black', icon: 'text-blue-600', ring: 'ring-blue-200 dark:ring-blue-500/40', glow: 'shadow-blue-100/60 dark:shadow-blue-500/10' },
-    slate: { bg: 'bg-slate-100 dark:bg-black', icon: 'text-slate-600', ring: 'ring-slate-200 dark:ring-white/20', glow: 'shadow-slate-100/60 dark:shadow-white/5' },
-    red: { bg: 'bg-red-100 dark:bg-black', icon: 'text-red-600', ring: 'ring-red-200 dark:ring-red-500/40', glow: 'shadow-red-100/60 dark:shadow-red-500/10' }
+    emerald: { bg: 'bg-emerald-100 dark:bg-black', icon: 'text-emerald-600', ring: 'ring-emerald-200 dark:ring-[#1f4b56]', glow: 'shadow-emerald-100/60 dark:shadow-emerald-500/10' },
+    sky: { bg: 'bg-sky-100 dark:bg-black', icon: 'text-sky-600', ring: 'ring-sky-200 dark:ring-[#1f4b56]', glow: 'shadow-sky-100/60 dark:shadow-sky-500/10' },
+    amber: { bg: 'bg-amber-100 dark:bg-black', icon: 'text-amber-600', ring: 'ring-amber-200 dark:ring-[#1f4b56]', glow: 'shadow-amber-100/60 dark:shadow-amber-500/10' },
+    purple: { bg: 'bg-purple-100 dark:bg-black', icon: 'text-purple-600', ring: 'ring-purple-200 dark:ring-[#1f4b56]', glow: 'shadow-purple-100/60 dark:shadow-purple-500/10' },
+    blue: { bg: 'bg-blue-100 dark:bg-black', icon: 'text-blue-600', ring: 'ring-blue-200 dark:ring-[#1f4b56]', glow: 'shadow-blue-100/60 dark:shadow-blue-500/10' },
+    slate: { bg: 'bg-slate-100 dark:bg-black', icon: 'text-slate-600', ring: 'ring-slate-200 dark:ring-[#1f4b56]', glow: 'shadow-slate-100/60 dark:shadow-white/5' },
+    red: { bg: 'bg-red-100 dark:bg-black', icon: 'text-red-600', ring: 'ring-red-200 dark:ring-[#1f4b56]', glow: 'shadow-red-100/60 dark:shadow-red-500/10' }
   };
 
   const homeTiles = [
@@ -264,7 +264,7 @@ export default function Home() {
     );
 
     const className =
-      "w-full rounded-[28px] border border-white/70 bg-white/70 p-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur-sm transition hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 dark:bg-black dark:border-white/10";
+      "w-full rounded-[28px] border border-[#d7e4e8] bg-white/90 p-3 shadow-fp-card backdrop-blur-sm transition hover:-translate-y-1 hover:shadow-fp-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 dark:bg-black dark:border-[#14363f]";
     const tileClassName = className + (tile.hideOnMobile ? ' hidden md:block' : '');
 
     if (tile.to) {
@@ -336,7 +336,7 @@ export default function Home() {
   // Initial selection screen
   if (!mode) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
         <div className="max-w-2xl mx-auto pt-10 pb-12">
           <div className="mb-4 flex justify-end">
             <div className="flex flex-col items-end gap-1">
@@ -346,7 +346,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition hover:bg-white"
+                  className="inline-flex items-center gap-2 rounded-full border border-[#d7e4e8] bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-fp-card backdrop-blur-sm transition hover:bg-secondary dark:border-[#14363f] dark:bg-black dark:text-slate-200 dark:hover:bg-[#07161b]"
                 >
                   <LogOut className="w-4 h-4" />
                   {t('home.logout', 'Logi välja')}

@@ -155,7 +155,7 @@ export default function MobileBottomNav() {
   return (
     <nav
       ref={navRef}
-      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-40 rounded-[24px] border border-white/80 bg-white/90 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-sm md:hidden dark:bg-black dark:border-white/15"
+      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-40 rounded-[24px] border border-[#d7e4e8] bg-white/95 p-1.5 shadow-fp-soft backdrop-blur-sm md:hidden dark:bg-black dark:border-[#14363f]"
     >
       <ul className={`grid gap-1 ${gridColsClass}`}>
         {items.map((item) => {
@@ -167,8 +167,8 @@ export default function MobileBottomNav() {
                 className={
                   'flex flex-col items-center justify-center gap-1 rounded-[16px] px-2 py-2 text-[10px] font-semibold transition ' +
                   (item.active
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:border dark:border-emerald-400/40 dark:text-emerald-300'
-                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-black')
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-black dark:border dark:border-[#1f4b56] dark:text-emerald-300'
+                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-[#07161b]')
                 }
               >
                 <Icon className="h-4 w-4" />

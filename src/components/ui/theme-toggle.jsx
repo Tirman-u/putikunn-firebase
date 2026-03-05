@@ -21,7 +21,7 @@ export default function ThemeToggle({ className = '' }) {
     <button
       type="button"
       onClick={handleToggle}
-      className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/70 text-slate-700 shadow-sm backdrop-blur-sm transition hover:bg-white dark:bg-black dark:border-white/10 dark:text-slate-200 ${className}`}
+      className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d7e4e8] bg-white text-slate-700 shadow-fp-card backdrop-blur-sm transition hover:bg-secondary dark:bg-black dark:border-[#14363f] dark:text-slate-200 dark:hover:bg-[#07161b] ${className}`}
       aria-label="Vaheta teemat"
     >
       {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}

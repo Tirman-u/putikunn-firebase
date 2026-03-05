@@ -7,8 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { db } from '@/lib/firebase';
 import { createPageUrl } from '@/utils';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
-import BackButton from '@/components/ui/back-button';
-import HomeButton from '@/components/ui/home-button';
+import DashboardShell from '@/components/dashboard/DashboardShell';
 import { useLanguage } from '@/lib/i18n';
 import {
   collection,
@@ -311,17 +310,12 @@ export default function TrainerGroups() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
-      <div className="max-w-4xl mx-auto pt-6 pb-16">
-        <div className="mb-6 flex items-center gap-2">
-          <BackButton fallbackTo={createPageUrl('Home')} forceFallback label={tr('Tagasi', 'Back')} />
-          <HomeButton label={tr('Avaleht', 'Home')} />
-        </div>
-
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-800">{tr('Treener', 'Coach')}</h1>
-          <p className="text-slate-500">{tr('Halda gruppe, mänge ja projektori vaadet.', 'Manage groups, games, and the projector view.')}</p>
-        </div>
+    <DashboardShell
+      activeNav="courses"
+      title={tr('Courses', 'Courses')}
+      subtitle={tr('Halda gruppe, mänge ja projektori vaadet.', 'Manage groups, games, and the projector view.')}
+    >
+      <div className="mx-auto w-full max-w-[1060px] pb-8">
 
         <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-6 dark:bg-black dark:border-white/10">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -514,6 +508,6 @@ export default function TrainerGroups() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardShell>
   );
 }

@@ -8,8 +8,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import BackButton from '@/components/ui/back-button';
-import HomeButton from '@/components/ui/home-button';
+import DashboardShell from '@/components/dashboard/DashboardShell';
 import {
   deleteGameAndLeaderboardEntries,
   getLeaderboardEmail,
@@ -596,20 +595,14 @@ export default function ManageGames() {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black">
-      <div className="max-w-4xl mx-auto p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6 pt-4">
-          <div className="flex items-center gap-2">
-            <BackButton fallbackTo={createPageUrl('Home')} />
-            <HomeButton />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-800">Halda mänge</h1>
-          <div className="w-16" />
-        </div>
-
+    <DashboardShell
+      activeNav="games"
+      title="Games"
+      subtitle="Halda aktiivseid mänge, gruppe ja tulemustabeli sünkrooni."
+    >
+      <div className="mx-auto w-full max-w-[1060px]">
         {/* Actions */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-6">
+        <div className="pk-surface mb-6 p-4">
           <div className="flex flex-col gap-3">
             <Button
               onClick={() => setShowGroupDialog(true)}
@@ -966,6 +959,6 @@ export default function ManageGames() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardShell>
   );
 }

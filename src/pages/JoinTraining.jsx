@@ -7,8 +7,7 @@ import { toast } from 'sonner';
 import { db } from '@/lib/firebase';
 import { createPageUrl } from '@/utils';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
-import BackButton from '@/components/ui/back-button';
-import HomeButton from '@/components/ui/home-button';
+import DashboardShell from '@/components/dashboard/DashboardShell';
 import { getDayFullLabel, getEffectiveSlotAttendance, getSlotAvailability, getWeekKey } from '@/lib/training-utils';
 import { cn } from '@/lib/utils';
 import {
@@ -491,17 +490,12 @@ export default function JoinTraining() {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
-      <div className="max-w-xl mx-auto pt-6 pb-12">
-        <div className="mb-6 flex items-center gap-2">
-          <BackButton fallbackTo={createPageUrl('Home')} forceFallback />
-          <HomeButton />
-        </div>
-
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-800">Liitu trenniga</h1>
-          <p className="text-slate-500">Sisesta treeneri PIN, et liituda grupiga.</p>
-        </div>
+    <DashboardShell
+      activeNav="training"
+      title="Training"
+      subtitle="Sisesta treeneri PIN, halda trenniaegu ja liitu aktiivsete trennimängudega."
+    >
+      <div className="mx-auto w-full max-w-[980px] pb-4">
 
         {trainingGroupEntries.length > 0 && (
           <div className="mb-6 rounded-3xl border border-white/70 bg-white/70 p-4 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
@@ -787,6 +781,6 @@ export default function JoinTraining() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardShell>
   );
 }

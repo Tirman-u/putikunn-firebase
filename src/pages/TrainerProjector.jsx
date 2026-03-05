@@ -167,7 +167,7 @@ export default function TrainerProjector() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),_rgba(255,255,255,1)_55%)] px-6 pb-10 dark:bg-black dark:text-slate-100">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.15),_rgba(247,252,253,1)_55%)] px-6 pb-10 dark:bg-black dark:text-slate-100">
       <div className="max-w-7xl mx-auto pt-6">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-2">

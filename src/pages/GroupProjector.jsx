@@ -88,7 +88,7 @@ export default function GroupProjector() {
   const games = gameIds.map((id) => gamesById[id]).filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),_rgba(255,255,255,1)_55%)] px-6 pb-10 dark:bg-black">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.15),_rgba(247,252,253,1)_55%)] px-6 pb-10 dark:bg-black">
       <div className="max-w-7xl mx-auto pt-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">

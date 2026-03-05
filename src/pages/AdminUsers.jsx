@@ -555,7 +555,7 @@ export default function AdminUsers() {
     const hasSuperAdmin = visibleUsers.some((entry) => entry.app_role === 'super_admin');
 
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.14),_rgba(255,255,255,1)_55%)] dark:bg-black px-4 py-10">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.14),_rgba(247,252,253,1)_55%)] dark:bg-black px-4 py-10">
         <div className="mx-auto max-w-md rounded-[28px] border border-white/70 bg-white/80 p-6 text-center shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
           <Shield className="mx-auto mb-4 h-16 w-16 text-red-400" />
           <h1 className="mb-2 text-2xl font-bold text-slate-800 dark:text-slate-100">
@@ -594,7 +594,7 @@ export default function AdminUsers() {
   const healthStatus = errorsLast60m === 0 ? 'OK' : 'Hoiatus';
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_rgba(255,255,255,1)_55%)] dark:bg-black px-4 pb-12">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.14),_rgba(247,252,253,1)_55%)] dark:bg-black px-4 pb-12">
       <div className="mx-auto max-w-6xl pt-6">
         <div className="mb-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">

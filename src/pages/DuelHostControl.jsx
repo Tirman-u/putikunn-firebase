@@ -75,7 +75,7 @@ export default function DuelHostControl() {
 
   if (!gameId) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black">
         <div className="max-w-3xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
             <div className="flex items-center gap-2">
@@ -95,7 +95,7 @@ export default function DuelHostControl() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black">
         <div className="max-w-3xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
             <div className="flex items-center gap-2">
@@ -115,7 +115,7 @@ export default function DuelHostControl() {
 
   if (!game) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black">
         <div className="max-w-3xl mx-auto px-4 pb-10">
           <div className="flex items-center justify-between pt-6 pb-4">
             <div className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export default function DuelHostControl() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black">
       <div className="max-w-5xl mx-auto px-4 pb-10">
         <div className="flex items-center justify-between pt-6 pb-4">
           <div className="flex items-center gap-2">

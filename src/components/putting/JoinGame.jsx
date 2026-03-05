@@ -196,7 +196,7 @@ export default function JoinGame({ onJoin, onBack }) {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] px-4 dark:bg-black dark:text-slate-100">
       <div className="max-w-lg mx-auto pt-6 pb-12">
         {/* Back Button */}
         <div className="mb-6 flex items-center gap-2">

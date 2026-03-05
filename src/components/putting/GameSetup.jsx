@@ -37,7 +37,7 @@ export default function GameSetup({ onStartGame }) {
   const validPlayerCount = players.filter(p => p.trim()).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black p-4">
       <div className="max-w-lg mx-auto pt-8">
         {/* Header */}
         <div className="text-center mb-8">

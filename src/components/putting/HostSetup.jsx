@@ -82,7 +82,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)] px-4">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] px-4">
       <div className="max-w-xl mx-auto pt-6 pb-10">
         <div className="mb-4">
           <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3">
@@ -96,7 +96,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
             <button
               type="button"
               onClick={handleStart}
-              className="flex h-9 items-center gap-2 rounded-2xl bg-emerald-600/90 px-4 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,185,129,0.25)] hover:bg-emerald-700"
+              className="flex h-9 items-center gap-2 rounded-2xl bg-emerald-600/90 px-4 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(31,156,141,0.25)] hover:bg-emerald-700"
             >
               <Play className="h-4 w-4" />
               {t('host.start', 'Alusta')}
@@ -119,7 +119,7 @@ export default function HostSetup({ onStartGame, onBack, isSolo = false }) {
 
           <div className={`grid ${isSolo ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
             {!isSolo && (
-              <div className="rounded-[22px] border border-emerald-200/60 bg-white/80 p-3 shadow-[0_8px_18px_rgba(16,185,129,0.18)] backdrop-blur">
+              <div className="rounded-[22px] border border-emerald-200/60 bg-white/80 p-3 shadow-[0_8px_18px_rgba(31,156,141,0.18)] backdrop-blur">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700/80">

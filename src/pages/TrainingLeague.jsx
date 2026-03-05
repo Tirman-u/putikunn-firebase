@@ -235,7 +235,7 @@ export default function TrainingLeague() {
 
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.16),_rgba(255,255,255,1)_58%)] px-3 pb-10 pt-4 sm:px-4 sm:pb-12 sm:pt-6 dark:bg-black dark:text-slate-100">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.16),_rgba(247,252,253,1)_58%)] px-3 pb-10 pt-4 sm:px-4 sm:pb-12 sm:pt-6 dark:bg-black dark:text-slate-100">
       <div className="mx-auto max-w-4xl">
         <div className="mb-4 flex items-center gap-2 sm:mb-6">
           <BackButton fallbackTo={`${createPageUrl('TrainerGroupDashboard')}?id=${groupId}`} forceFallback label={tr('Tagasi', 'Back')} />

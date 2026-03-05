@@ -120,6 +120,75 @@
 }
 
 @layer utilities {
+  .rounded-xl {
+    border-radius: 1rem !important;
+  }
+
+  .rounded-2xl {
+    border-radius: 1.375rem !important;
+  }
+
+  .rounded-3xl {
+    border-radius: 1.75rem !important;
+  }
+
+  .shadow-sm,
+  .shadow,
+  .shadow-md {
+    box-shadow: 0 10px 28px rgba(16, 42, 52, 0.11) !important;
+  }
+
+  .shadow-lg {
+    box-shadow: 0 14px 34px rgba(16, 42, 52, 0.14) !important;
+  }
+
+  .bg-white {
+    background-color: rgba(255, 255, 255, 0.94) !important;
+  }
+
+  .bg-white\/90 {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+  }
+
+  .bg-white\/80 {
+    background-color: rgba(255, 255, 255, 0.86) !important;
+  }
+
+  .bg-white\/70 {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+  }
+
+  .bg-slate-50 {
+    background-color: #eef6f8 !important;
+  }
+
+  .bg-slate-100 {
+    background-color: #ddebef !important;
+  }
+
+  .border-slate-100 {
+    border-color: #d7e4e8 !important;
+  }
+
+  .border-slate-200 {
+    border-color: #cbdde3 !important;
+  }
+
+  .border-slate-300 {
+    border-color: #bed4db !important;
+  }
+
+  button[class*="bg-emerald-600"],
+  a[class*="bg-emerald-600"],
+  button[class*="bg-blue-600"],
+  a[class*="bg-blue-600"],
+  button[class*="bg-indigo-600"],
+  a[class*="bg-indigo-600"] {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    box-shadow: 0 10px 22px rgba(16, 42, 52, 0.18);
+  }
+
   .dark [class*="bg-gradient-to"] {
     background-image: none !important;
     background-color: #000 !important;

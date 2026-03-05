@@ -332,7 +332,7 @@ export default function GameResult() {
 
   if (error || !game) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black flex items-center justify-center p-4">
         <div className="text-center">
           <div className="text-slate-400 mb-4">{t('result.game_not_found', 'Mängu ei leitud')}</div>
           <div className="flex items-center justify-center gap-2">
@@ -459,7 +459,7 @@ export default function GameResult() {
   const isSoloATW = game.game_type === 'around_the_world' && game.pin === '0000';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black">
       <div className="max-w-4xl mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pt-4">

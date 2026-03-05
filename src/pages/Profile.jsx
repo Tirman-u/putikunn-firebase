@@ -198,7 +198,7 @@ export default function Profile() {
   }
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 text-center">
           <p className="text-slate-700 mb-4">Kasutaja profiili ei õnnestu laadida.</p>
           <Button onClick={() => navigate(createPageUrl('Login'))}>Logi uuesti sisse</Button>
@@ -669,7 +669,7 @@ export default function Profile() {
   const cardClass = "bg-white/80 rounded-[28px] p-5 shadow-[0_12px_28px_rgba(15,23,42,0.08)] border border-white/80 backdrop-blur";
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_rgba(255,255,255,1)_55%)]">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)]">
       <div className="max-w-4xl mx-auto p-4">
         {/* Header */}
         <div className="mb-5 pt-2">

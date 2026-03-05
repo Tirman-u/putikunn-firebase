@@ -7,9 +7,14 @@ module.exports = {
   theme: {
     extend: {
       borderRadius: {
+        none: "0px",
+        sm: "0.5rem",
+        DEFAULT: "0.75rem",
+        md: "0.875rem",
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        xl: "1rem",
+        "2xl": "1.375rem",
+        "3xl": "1.75rem",
       },
       fontFamily: {
         sans: ['"SF Pro Text"', '"SF Pro Display"', "Inter", ...defaultTheme.fontFamily.sans],

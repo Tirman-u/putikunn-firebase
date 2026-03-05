@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 export default function LoadingState({ title = 'Laen...', description = 'Palun oota hetk', fullPage = true }) {
   const Wrapper = fullPage ? 'div' : 'div';
   return (
-    <Wrapper className={fullPage ? 'min-h-screen flex items-center justify-center bg-gradient-to-b from-emerald-50 to-white' : ''}>
+    <Wrapper className={fullPage ? 'min-h-screen flex items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black' : ''}>
       <div className="flex flex-col items-center gap-4">
         <div className="w-14 h-14 rounded-full bg-white shadow-sm flex items-center justify-center">
           <Loader2 className="w-7 h-7 text-emerald-500 animate-spin" />

@@ -79,7 +79,7 @@ export default function Login() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,156,141,0.18),_rgba(247,252,253,1)_55%)] dark:bg-black p-4 flex items-center justify-center">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-6">
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-semibold text-slate-800">Putikunn</h1>
+          <h1 className="text-2xl font-semibold text-slate-800">Wisedisc</h1>
           <p className="text-sm text-slate-500">
             {mode === 'signup' ? 'Loo uus konto' : 'Logi sisse'}
           </p>

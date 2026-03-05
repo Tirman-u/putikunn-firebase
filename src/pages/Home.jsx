@@ -350,7 +350,7 @@ export default function Home() {
             <div>
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#d7e4e8] bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:border-[#14363f] dark:bg-black dark:text-slate-300">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Putikunn
+                Wisedisc
               </div>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-800 mb-2">
                 {t('home.welcome', 'Tere tulemast, {name}!', {

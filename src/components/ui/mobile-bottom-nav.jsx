@@ -48,6 +48,7 @@ export default function MobileBottomNav() {
   const path = location?.pathname || '';
   const searchParams = new URLSearchParams(location?.search || '');
   const homeMode = searchParams.get('mode');
+  const navRef = React.useRef(null);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -57,9 +58,10 @@ export default function MobileBottomNav() {
   const userRole = user?.app_role || 'user';
   const canManageTraining = ['trainer', 'admin', 'super_admin'].includes(userRole);
 
-  if (!BASE_VISIBLE_ROUTES.has(path)) return null;
-  if (path === '/Login') return null;
-  if ((path === '/' || path === '/Home') && homeMode && HIDDEN_HOME_MODES.has(homeMode)) return null;
+  const shouldShowNav =
+    BASE_VISIBLE_ROUTES.has(path)
+    && path !== '/Login'
+    && !((path === '/' || path === '/Home') && homeMode && HIDDEN_HOME_MODES.has(homeMode));
 
   const items = [
     {
@@ -111,8 +113,50 @@ export default function MobileBottomNav() {
 
   const gridColsClass = items.length >= 6 ? 'grid-cols-6' : items.length === 5 ? 'grid-cols-5' : 'grid-cols-4';
 
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return undefined;
+
+    const root = document.documentElement;
+
+    const applyOffset = () => {
+      const isMobile = window.matchMedia('(max-width: 767px)').matches;
+      if (!shouldShowNav || !isMobile || !navRef.current) {
+        root.classList.remove('pk-mobile-nav-active');
+        root.style.setProperty('--pk-mobile-nav-offset', '0px');
+        return;
+      }
+
+      const navHeight = Math.ceil(navRef.current.getBoundingClientRect().height);
+      // Include a small breathing gap so bottom content never sits under the nav.
+      root.style.setProperty('--pk-mobile-nav-offset', `${navHeight + 16}px`);
+      root.classList.add('pk-mobile-nav-active');
+    };
+
+    const rafId = window.requestAnimationFrame(applyOffset);
+    window.addEventListener('resize', applyOffset);
+
+    let observer;
+    if (typeof window.ResizeObserver !== 'undefined' && navRef.current) {
+      observer = new window.ResizeObserver(applyOffset);
+      observer.observe(navRef.current);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', applyOffset);
+      if (observer) observer.disconnect();
+      root.classList.remove('pk-mobile-nav-active');
+      root.style.setProperty('--pk-mobile-nav-offset', '0px');
+    };
+  }, [shouldShowNav, items.length]);
+
+  if (!shouldShowNav) return null;
+
   return (
-    <nav className="fixed inset-x-3 bottom-3 z-40 rounded-[24px] border border-white/80 bg-white/90 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-sm md:hidden dark:bg-black dark:border-white/15">
+    <nav
+      ref={navRef}
+      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-40 rounded-[24px] border border-white/80 bg-white/90 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-sm md:hidden dark:bg-black dark:border-white/15"
+    >
       <ul className={`grid gap-1 ${gridColsClass}`}>
         {items.map((item) => {
           const Icon = item.icon;

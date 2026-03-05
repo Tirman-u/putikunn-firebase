@@ -37,6 +37,7 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --pk-mobile-nav-offset: 0px;
   }
 
   .dark {
@@ -84,6 +85,12 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  @media (max-width: 767px) {
+    html.pk-mobile-nav-active body {
+      padding-bottom: calc(var(--pk-mobile-nav-offset, 0px) + env(safe-area-inset-bottom));
+    }
   }
 }
 

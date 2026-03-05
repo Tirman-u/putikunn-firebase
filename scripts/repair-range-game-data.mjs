@@ -207,6 +207,41 @@ const isBetterScore = (gameType, nextScore, prevScore) => {
   return isLowerBetter(gameType) ? safeNext < safePrev : safeNext > safePrev;
 };
 
+const mergeExpectedPayloads = (gameType, currentPayload, nextPayload) => {
+  const currentScore = Number(currentPayload?.score || 0);
+  const nextScore = Number(nextPayload?.score || 0);
+  const shouldUseNextAsPrimary = isBetterScore(gameType, nextScore, currentScore)
+    || (nextScore === currentScore
+      && Number(nextPayload?.total_putts || 0) > Number(currentPayload?.total_putts || 0));
+
+  const primary = shouldUseNextAsPrimary ? nextPayload : currentPayload;
+  const madePutts = Math.max(
+    Number(currentPayload?.made_putts || 0),
+    Number(nextPayload?.made_putts || 0)
+  );
+  const totalPutts = Math.max(
+    Number(currentPayload?.total_putts || 0),
+    Number(nextPayload?.total_putts || 0)
+  );
+
+  let accuracy = 0;
+  if (totalPutts > 0) {
+    accuracy = round1((madePutts / totalPutts) * 100);
+  } else {
+    accuracy = Math.max(
+      Number(currentPayload?.accuracy || 0),
+      Number(nextPayload?.accuracy || 0)
+    );
+  }
+
+  return {
+    ...primary,
+    made_putts: madePutts,
+    total_putts: totalPutts,
+    accuracy
+  };
+};
+
 const userByUidCache = new Map();
 const userByEmailCache = new Map();
 
@@ -416,6 +451,7 @@ const run = async () => {
 
   for (const game of games) {
     const players = resolveGamePlayers(game);
+    const expectedBySignature = new Map();
 
     for (const rawPlayerName of players) {
       scannedPlayers += 1;
@@ -443,9 +479,7 @@ const run = async () => {
 
       const variant = buildVariantForGame(game, rawPlayerName);
       const signature = `${playerKey}|game:${game.id}|type:${game.game_type}|${variant.key}`;
-      expectedRecords += 1;
-
-      const payload = {
+      const candidatePayload = {
         game_id: game.id,
         ...(identity.playerUid ? { player_uid: identity.playerUid } : {}),
         player_email: identity.playerEmail || 'unknown',
@@ -463,6 +497,20 @@ const run = async () => {
         _server_updated_at: admin.firestore.FieldValue.serverTimestamp()
       };
 
+      const currentExpected = expectedBySignature.get(signature);
+      if (!currentExpected) {
+        expectedBySignature.set(signature, candidatePayload);
+      } else {
+        expectedBySignature.set(
+          signature,
+          mergeExpectedPayloads(game.game_type, currentExpected, candidatePayload)
+        );
+      }
+    }
+
+    expectedRecords += expectedBySignature.size;
+
+    for (const [signature, payload] of expectedBySignature.entries()) {
       const existing = bySignature.get(signature);
       if (!existing?.id) {
         created += 1;

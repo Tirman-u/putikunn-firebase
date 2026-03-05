@@ -52,6 +52,15 @@ const getGamePlayers = (game) => {
   return Array.from(players).filter(Boolean);
 };
 
+const normalizeParticipantId = (value) => {
+  const sanitize = (part) => String(part || '').trim().toLowerCase().replaceAll('/', '-');
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (!raw.includes(':')) return sanitize(raw);
+  const [kind, ...rest] = raw.split(':');
+  return `${sanitize(kind)}:${sanitize(rest.join(':'))}`;
+};
+
 export default function TrainingSession() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('sessionId');
@@ -182,7 +191,18 @@ export default function TrainingSession() {
   const statsByParticipant = React.useMemo(() => {
     const map = {};
     stats.forEach((entry) => {
-      map[entry.participant_id] = entry;
+      const rawId = String(entry?.participant_id || '').trim();
+      const normalizedId = normalizeParticipantId(rawId);
+      if (rawId) {
+        map[rawId] = entry;
+      }
+      if (normalizedId && !map[normalizedId]) {
+        map[normalizedId] = entry;
+      }
+      const uidKey = entry?.user_id ? `uid:${String(entry.user_id).trim().toLowerCase().replaceAll('/', '-')}` : '';
+      if (uidKey && !map[uidKey]) {
+        map[uidKey] = entry;
+      }
     });
     return map;
   }, [stats]);
@@ -499,7 +519,11 @@ export default function TrainingSession() {
       const memberByEmail = normalizedEmail ? membersByEmail[normalizedEmail] : null;
       const displayName = String(memberByUid?.name || memberByEmail?.name || fallbackEntry?.player_name || playerName || 'Mängija').trim();
       const participantId = getParticipantId({ uid, email: normalizedEmail || email, name: displayName });
-      const existing = statsByParticipant[participantId];
+      const normalizedParticipantId = normalizeParticipantId(participantId) || participantId;
+      const existing =
+        statsByParticipant[participantId]
+        || statsByParticipant[normalizedParticipantId]
+        || (uid ? statsByParticipant[`uid:${String(uid).trim().toLowerCase().replaceAll('/', '-')}`] : null);
       const seasonBest = existing?.best_by_metric?.[metricKey];
       const { hc, hcBonus, points } = computeHcPoints({
         score,
@@ -526,7 +550,7 @@ export default function TrainingSession() {
 
       const nextStats = {
         season_id: season.id,
-        participant_id: participantId,
+        participant_id: normalizedParticipantId,
         user_id: uid || memberByEmail?.uid || null,
         player_name: displayName,
         points_total: round1((existing?.points_total || 0) + points),
@@ -543,7 +567,7 @@ export default function TrainingSession() {
         season_id: season.id,
         group_id: season.group_id || null,
         slot_id: targetSlotId,
-        participant_id: participantId,
+        participant_id: normalizedParticipantId,
         user_id: uid || memberByEmail?.uid || null,
         player_name: displayName,
         score,
@@ -553,7 +577,11 @@ export default function TrainingSession() {
         created_at: serverTimestamp()
       });
 
-      const statsRef = doc(db, 'training_season_stats', `${season.id}_${participantId}`);
+      const statsRef = doc(
+        db,
+        'training_season_stats',
+        existing?.id || `${season.id}_${normalizedParticipantId}`
+      );
       batch.set(statsRef, nextStats, { merge: true });
     });
 
@@ -698,7 +726,11 @@ export default function TrainingSession() {
           const member = membersByUid[uid];
           const displayName = member?.name || member?.email || 'Mängija';
           const participantId = getParticipantId({ uid, email: member?.email, name: displayName });
-          const existing = statsByParticipant[participantId];
+          const normalizedParticipantId = normalizeParticipantId(participantId) || participantId;
+          const existing =
+            statsByParticipant[participantId]
+            || statsByParticipant[normalizedParticipantId]
+            || statsByParticipant[`uid:${String(uid).trim().toLowerCase().replaceAll('/', '-')}`];
           const { cutBonus: bonus, points } = computeRankCutPoints({
             rank,
             participantsCount: offlineParticipantsCount,
@@ -711,7 +743,7 @@ export default function TrainingSession() {
           };
           const nextStats = {
             season_id: season.id,
-            participant_id: participantId,
+            participant_id: normalizedParticipantId,
             user_id: uid,
             player_name: displayName,
             points_total: round1((existing?.points_total || 0) + points),
@@ -727,7 +759,7 @@ export default function TrainingSession() {
             season_id: season.id,
             group_id: season.group_id,
             slot_id: targetSlotId,
-            participant_id: participantId,
+            participant_id: normalizedParticipantId,
             user_id: uid,
             player_name: displayName,
             rank,
@@ -736,7 +768,11 @@ export default function TrainingSession() {
             created_at: serverTimestamp()
           });
 
-          const statsRef = doc(db, 'training_season_stats', `${season.id}_${participantId}`);
+          const statsRef = doc(
+            db,
+            'training_season_stats',
+            existing?.id || `${season.id}_${normalizedParticipantId}`
+          );
           batch.set(statsRef, nextStats, { merge: true });
         });
 
@@ -773,14 +809,18 @@ export default function TrainingSession() {
           const member = membersByUid[uid];
           const displayName = member?.name || member?.email || 'Mängija';
           const participantId = getParticipantId({ uid, email: member?.email, name: displayName });
-          const existing = statsByParticipant[participantId];
+          const normalizedParticipantId = normalizeParticipantId(participantId) || participantId;
+          const existing =
+            statsByParticipant[participantId]
+            || statsByParticipant[normalizedParticipantId]
+            || statsByParticipant[`uid:${String(uid).trim().toLowerCase().replaceAll('/', '-')}`];
           const nextPointsBySlot = {
             ...(existing?.points_by_slot || {}),
             [targetSlotId]: round1((existing?.points_by_slot?.[targetSlotId] || 0) + points)
           };
           const nextStats = {
             season_id: season.id,
-            participant_id: participantId,
+            participant_id: normalizedParticipantId,
             user_id: uid,
             player_name: displayName,
             points_total: round1((existing?.points_total || 0) + points),
@@ -796,14 +836,18 @@ export default function TrainingSession() {
             season_id: season.id,
             group_id: season.group_id,
             slot_id: targetSlotId,
-            participant_id: participantId,
+            participant_id: normalizedParticipantId,
             user_id: uid,
             player_name: displayName,
             points: round1(points),
             created_at: serverTimestamp()
           });
 
-          const statsRef = doc(db, 'training_season_stats', `${season.id}_${participantId}`);
+          const statsRef = doc(
+            db,
+            'training_season_stats',
+            existing?.id || `${season.id}_${normalizedParticipantId}`
+          );
           batch.set(statsRef, nextStats, { merge: true });
         });
 
@@ -882,17 +926,21 @@ export default function TrainingSession() {
       if (eventResults.length > 0) {
         const statsUpdates = {};
         eventResults.forEach((entry) => {
-          const participantId = entry.participant_id;
+          const rawParticipantId = entry.participant_id;
+          const participantId = normalizeParticipantId(rawParticipantId);
           if (!participantId) return;
-          const existing = statsByParticipant[participantId];
+          const existing =
+            statsByParticipant[rawParticipantId]
+            || statsByParticipant[participantId];
           if (!existing) return;
+          const statsDocId = existing?.id || `${season.id}_${participantId}`;
           const deduction = Number(entry.points || 0);
           const slotId = entry.slot_id || event.slot_id || session?.slot_id;
           const currentSlotPoints = Number(existing.points_by_slot?.[slotId] || 0);
           const nextSlotPoints = round1(Math.max(0, currentSlotPoints - deduction));
           const nextTotal = round1(Math.max(0, Number(existing.points_total || 0) - deduction));
           const nextAttendance = Math.max(0, (existing.attendance_count || 0) - 1);
-          statsUpdates[participantId] = {
+          statsUpdates[statsDocId] = {
             points_total: nextTotal,
             attendance_count: nextAttendance,
             points_by_slot: {
@@ -907,8 +955,8 @@ export default function TrainingSession() {
         eventResults.forEach((entry) => {
           batch.delete(doc(db, 'training_event_results', entry.id));
         });
-        Object.entries(statsUpdates).forEach(([participantId, payload]) => {
-          const statsRef = doc(db, 'training_season_stats', `${season.id}_${participantId}`);
+        Object.entries(statsUpdates).forEach(([statsDocId, payload]) => {
+          const statsRef = doc(db, 'training_season_stats', statsDocId);
           batch.set(statsRef, payload, { merge: true });
         });
         batch.delete(doc(db, 'training_events', event.id));

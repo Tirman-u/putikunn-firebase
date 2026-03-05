@@ -40,9 +40,8 @@ export default function JoinGame({ onJoin, onBack }) {
       return buildJoinableEntries({ hostedGames, duelGames, limit: 10 });
     },
     enabled: true,
-    staleTime: 5000,
-    refetchOnWindowFocus: true,
-    refetchInterval: 15000
+    staleTime: 60000,
+    refetchOnWindowFocus: false
   });
 
   // Realtime updates removed to keep Firestore read usage low.

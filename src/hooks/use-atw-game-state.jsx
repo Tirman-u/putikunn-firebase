@@ -3,7 +3,6 @@ import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
-import useRealtimeGame from '@/hooks/use-realtime-game';
 import { getATWMovement, isATWRoundComplete, shouldATWRestart } from '@/components/putting/gameRules';
 import { logSyncMetric } from '@/lib/metrics';
 import {
@@ -103,38 +102,6 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
   const getLatestGame = useCallback(() => {
     return queryClient.getQueryData(['game', gameId]) || game;
   }, [game, gameId, queryClient]);
-
-  const handleRealtimeEvent = useCallback((event) => {
-    let nextData = event.data;
-    const localGame = queryClient.getQueryData(['game', gameId]);
-    const localPlayerState = localGame?.atw_state?.[playerName];
-    const localSeq = localPlayerState?.client_seq ?? localSeqRef.current ?? 0;
-    const incomingSeq = nextData?.atw_state?.[playerName]?.client_seq ?? 0;
-
-    if (localPlayerState && incomingSeq < localSeq) {
-      nextData = {
-        ...nextData,
-        atw_state: {
-          ...(nextData.atw_state || {}),
-          [playerName]: localPlayerState
-        },
-        total_points: {
-          ...(nextData.total_points || {}),
-          [playerName]: localGame?.total_points?.[playerName] ?? nextData?.total_points?.[playerName] ?? 0
-        }
-      };
-    }
-
-    queryClient.setQueryData(['game', gameId], nextData);
-  }, [gameId, playerName, queryClient]);
-
-  useRealtimeGame({
-    gameId,
-    enabled: !!gameId && !isSolo,
-    throttleMs: 1000,
-    eventTypes: ['update', 'delete'],
-    onEvent: handleRealtimeEvent
-  });
 
   const defaultPlayerState = useMemo(() => ({
     current_distance_index: 0,

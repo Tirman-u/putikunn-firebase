@@ -1,6 +1,7 @@
 import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FieldPath, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Trophy, Upload, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,8 +13,8 @@ import StreakChallengeInput from './StreakChallengeInput';
 import TimeLadderInput from './TimeLadderInput';
 import MobileLeaderboard from './MobileLeaderboard';
 import PerformanceAnalysis from './PerformanceAnalysis';
-import useRealtimeGame from '@/hooks/use-realtime-game';
 import LoadingState from '@/components/ui/loading-state';
+import { db } from '@/lib/firebase';
 import { logSyncMetric } from '@/lib/metrics';
 import usePlayerGameState from '@/hooks/use-player-game-state';
 import { formatDuration } from '@/lib/time-format';
@@ -55,7 +56,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
   const localGameStateRef = React.useRef(null);
   const MULTIPLAYER_SYNC_INTERVAL_MS = 30000;
   const MULTIPLAYER_SYNC_DEBOUNCE_MS = 300;
-  const LIVE_SYNC_DEBOUNCE_MS = 200;
+  const LIVE_SYNC_DEBOUNCE_MS = 3000;
   const pendingUpdateRef = React.useRef(null);
   const pendingLiveRef = React.useRef(null);
   const syncTimeoutRef = React.useRef(null);
@@ -214,34 +215,6 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     };
   }, [playerName]);
 
-  const buildLivePayload = React.useCallback((payload, id) => {
-    const latest = queryClient.getQueryData(['game', id]) || game || {};
-    return {
-      live_stats: {
-        ...(latest.live_stats || {}),
-        ...(payload.live_stats || {})
-      },
-      total_points: {
-        ...(latest.total_points || {}),
-        ...(payload.total_points || {})
-      }
-    };
-  }, [game, queryClient]);
-
-  useRealtimeGame({
-    gameId,
-    enabled: !!gameId && game?.pin !== '0000',
-    throttleMs: 1000,
-    eventTypes: ['update', 'delete'],
-    onEvent: (event) => {
-      if (!event?.data) return;
-      const merged = mergeIncomingGame(event.data);
-      setLocalGameState(merged);
-      localGameStateRef.current = merged;
-      queryClient.setQueryData(['game', gameId], merged);
-    }
-  });
-
   // Initialize local state (solo + multiplayer)
   React.useEffect(() => {
     if (!game) return;
@@ -360,8 +333,18 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     syncInFlightRef.current = true;
     pendingLiveRef.current = null;
     try {
-      const mergedPayload = buildLivePayload(payload, id);
-      await base44.entities.Game.update(id, mergedPayload, { returnSnapshot: false });
+      const gameRef = doc(db, 'games', id);
+      await updateDoc(
+        gameRef,
+        new FieldPath('live_stats', payload.playerName),
+        payload.liveStats,
+        new FieldPath('total_points', payload.playerName),
+        payload.totalPoints,
+        'updated_date',
+        new Date().toISOString(),
+        '_server_updated_at',
+        serverTimestamp()
+      );
     } catch (error) {
       pendingLiveRef.current = payload;
     } finally {
@@ -376,7 +359,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         flushLivePendingRef.current?.(id, queued);
       }
     }
-  }, [buildLivePayload, game?.id, isSoloGame]);
+  }, [game?.id, isSoloGame]);
 
   React.useEffect(() => {
     flushPendingRef.current = flushPending;
@@ -455,9 +438,9 @@ export default function PlayerView({ gameId, playerName, onExit }) {
       scheduleFlush(forceSync);
 
       pendingLiveRef.current = {
-        ...(pendingLiveRef.current || {}),
-        live_stats: { [playerName]: liveStats },
-        total_points: { [playerName]: liveStats.total_points }
+        playerName,
+        liveStats,
+        totalPoints: liveStats.total_points
       };
       scheduleLiveFlush();
     }

@@ -22,8 +22,13 @@ import {
 
 const getGamePlayers = (game) => {
   if (!game) return [];
-  if (Array.isArray(game.players)) return game.players;
-  return Object.keys(game.total_points || {});
+  return Array.from(new Set([
+    ...(Array.isArray(game.players) ? game.players : []),
+    ...Object.keys(game.player_putts || {}),
+    ...Object.keys(game.total_points || {}),
+    ...Object.keys(game.live_stats || {}),
+    ...Object.keys(game.atw_state || {})
+  ].filter(Boolean)));
 };
 
 const buildTopPlayers = (games) => {
@@ -183,14 +188,6 @@ export default function TrainerGroupDashboard() {
 
   const topPlayers = React.useMemo(() => buildTopPlayers(games), [games]);
 
-  if (user && !canViewGroup) {
-    return null;
-  }
-
-  if (!groupId) {
-    return null;
-  }
-
   const slots = Array.isArray(group?.slots) ? group.slots : [];
 
   const collapsedStorageKey = React.useMemo(() => {
@@ -300,6 +297,14 @@ export default function TrainerGroupDashboard() {
         .map((uid) => ({ uid, ...((group?.members || {})[uid] || {}) })),
     [memberIds, rosterUidSet, group?.members]
   );
+
+  if (user && !canViewGroup) {
+    return null;
+  }
+
+  if (!groupId) {
+    return null;
+  }
 
   const updateGroupSlots = async (nextSlots) => {
     if (!groupId) return;
@@ -1175,7 +1180,8 @@ export default function TrainerGroupDashboard() {
     setJoiningGameId(game.id);
     try {
       const currentGame = game;
-      const hasPlayer = currentGame.players?.includes(playerName);
+      const players = getGamePlayers(currentGame);
+      const hasPlayer = players.includes(playerName);
       const updatedPlayerUids = {
         ...(currentGame.player_uids || {}),
         ...(user?.id ? { [playerName]: user.id } : {})
@@ -1191,10 +1197,10 @@ export default function TrainerGroupDashboard() {
           player_emails: updatedPlayerEmails
         });
       } else {
-        const gameType = currentGame.game_type || 'classic';
-        const format = GAME_FORMATS[gameType];
+        const gameType = GAME_FORMATS[currentGame.game_type] ? currentGame.game_type : 'classic';
+        const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
         const startDistance = format?.startDistance ?? 0;
-        const updatedPlayers = [...(currentGame.players || []), playerName];
+        const updatedPlayers = [...players, playerName];
         const updatedDistances = { ...(currentGame.player_distances || {}), [playerName]: startDistance };
         const updatedPutts = { ...(currentGame.player_putts || {}), [playerName]: [] };
         const updatedPoints = { ...(currentGame.total_points || {}), [playerName]: 0 };

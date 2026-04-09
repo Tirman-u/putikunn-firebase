@@ -87,14 +87,13 @@ export const MAX_ROUNDS = 20;
 export const STREAK_UNLIMITED = true;
 
 export function getTotalRounds(gameType) {
-  const format = GAME_FORMATS[gameType];
-  if (!format) return MAX_ROUNDS;
+  const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
   return format.totalRounds || MAX_ROUNDS;
 }
 
 // Calculate next distance for Classic/Short/Long formats
 export function getNextDistanceFromMade(gameType, madeCount) {
-  const format = GAME_FORMATS[gameType];
+  const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
   if (!format || !format.distanceMap) return format.startDistance;
   
   return format.distanceMap[madeCount] || format.maxDistance;
@@ -147,7 +146,7 @@ export function isGameComplete(gameType, puttCount) {
   if (gameType === 'time_ladder') {
     return false;
   }
-  const format = GAME_FORMATS[gameType];
+  const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
   const totalRounds = getTotalRounds(gameType);
   const totalPutts = totalRounds * format.puttsPerRound;
   return puttCount >= totalPutts;

@@ -88,6 +88,31 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     return localGameStateRef.current || game || {};
   }, [game]);
 
+  const mergeWithBaseGame = React.useCallback((current = {}, data = {}) => {
+    const cachedGame = queryClient.getQueryData(['game', gameId]) || {};
+    const baseGame = {
+      ...(baseGameRef.current || {}),
+      ...(game || {}),
+      ...cachedGame
+    };
+    return {
+      ...baseGame,
+      ...current,
+      ...data,
+      id: data.id || current.id || baseGame.id || gameId,
+      players: Array.isArray(data.players)
+        ? data.players
+        : Array.isArray(current.players)
+        ? current.players
+        : Array.isArray(baseGame.players)
+          ? baseGame.players
+          : [],
+      player_uids: data.player_uids || current.player_uids || baseGame.player_uids || {},
+      player_emails: data.player_emails || current.player_emails || baseGame.player_emails || {},
+      join_closed: data.join_closed ?? current.join_closed ?? baseGame.join_closed ?? false
+    };
+  }, [game, gameId, queryClient]);
+
   const buildRemotePatch = React.useCallback((data) => {
     const patch = { ...data };
     PLAYER_STATE_KEYS.forEach((key) => {
@@ -206,20 +231,26 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     if (!game) return;
     baseGameRef.current = { ...baseGameRef.current, ...game };
     const nextState = {
+      id: game.id,
       name: game.name,
       pin: game.pin,
       host_user: game.host_user,
       date: game.date,
       game_type: game.game_type,
       putt_type: game.putt_type,
+      players: Array.isArray(game.players) ? game.players : [],
       player_putts: game.player_putts || {},
       total_points: game.total_points || {},
       player_distances: game.player_distances || {},
+      player_uids: game.player_uids || {},
+      player_emails: game.player_emails || {},
+      live_stats: game.live_stats || {},
       player_current_streaks: game.player_current_streaks || {},
       player_highest_streaks: game.player_highest_streaks || {},
       player_time_started_at: game.player_time_started_at || {},
       player_time_finished_at: game.player_time_finished_at || {},
       time_ladder_config: game.time_ladder_config,
+      join_closed: game.join_closed ?? false,
       status: game.status
     };
 
@@ -399,8 +430,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const current = getLatestState();
     if (isSoloGame) {
       // For solo games, update local state only
-      const baseGame = queryClient.getQueryData(['game', gameId]) || game || current;
-      const nextState = { ...baseGame, ...current, ...data };
+      const nextState = mergeWithBaseGame(current, data);
       const liveStats = buildLiveStats(nextState);
       nextState.live_stats = {
         ...(nextState.live_stats || {}),
@@ -415,7 +445,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
         return;
       }
       // For multiplayer games, update local cache immediately and debounce DB writes
-      const nextState = { ...current, ...data };
+      const nextState = mergeWithBaseGame(current, data);
       const liveStats = buildLiveStats(nextState);
       nextState.live_stats = {
         ...(nextState.live_stats || {}),
@@ -571,8 +601,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
   // Handle Classic/Short/Long/Random format submission (5 putts at once)
   const handleClassicSubmit = (madeCount) => {
-    const gameType = game.game_type || 'classic';
-    const format = GAME_FORMATS[gameType];
+    const gameType = GAME_FORMATS[game.game_type] ? game.game_type : 'classic';
+    const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
     const currentState = getLatestState();
     const playerDist = currentState.player_distances || {};
     const currentDistance = playerDist[playerName] || format.startDistance;
@@ -640,8 +670,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
   // Handle Back & Forth / Streak / Random format (1 putt at a time)
   const handleBackAndForthPutt = (wasMade) => {
-    const gameType = game.game_type || 'classic';
-    const format = GAME_FORMATS[gameType];
+    const gameType = GAME_FORMATS[game.game_type] ? game.game_type : 'classic';
+    const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
     const currentState = getLatestState();
     const playerDist = currentState.player_distances || {};
     const timeConfig = currentState.time_ladder_config || {};
@@ -803,8 +833,8 @@ export default function PlayerView({ gameId, playerName, onExit }) {
     const playerPutts = currentState.player_putts?.[playerName];
     if (!playerPutts || playerPutts.length === 0) return;
 
-    const gameType = game.game_type || 'classic';
-    const format = GAME_FORMATS[gameType];
+    const gameType = GAME_FORMATS[game.game_type] ? game.game_type : 'classic';
+    const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
     const newPutts = [...playerPutts];
 
     if (format.singlePuttMode) {
@@ -1029,7 +1059,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
         {/* Mobile Leaderboard */}
         {showLeaderboard && (
-          <MobileLeaderboard game={game} onClose={() => setShowLeaderboard(false)} />
+          <MobileLeaderboard game={currentState} onClose={() => setShowLeaderboard(false)} />
         )}
       </div>
     );
@@ -1167,7 +1197,7 @@ export default function PlayerView({ gameId, playerName, onExit }) {
 
       {/* Mobile Leaderboard */}
       {showLeaderboard && (
-        <MobileLeaderboard game={game} onClose={() => setShowLeaderboard(false)} />
+        <MobileLeaderboard game={currentState} onClose={() => setShowLeaderboard(false)} />
       )}
     </div>
   );

@@ -13,15 +13,35 @@ export default function MobileLeaderboard({ game, onClose }) {
     throttleMs: 1000,
     eventTypes: ['update'],
     onEvent: (event) => {
-      setLiveGame(event.data);
+      setLiveGame((previous) => {
+        const base = previous || game || {};
+        const incoming = event.data || {};
+        const next = { ...base, ...incoming };
+        ['player_putts', 'total_points', 'live_stats'].forEach((key) => {
+          if (base[key] || incoming[key]) {
+            next[key] = {
+              ...(base[key] || {}),
+              ...(incoming[key] || {})
+            };
+          }
+        });
+        return next;
+      });
     }
   });
 
   const currentGame = liveGame || game;
   if (!currentGame) return null;
   const isTimeLadder = currentGame.game_type === 'time_ladder';
+  const players = Array.isArray(currentGame.players)
+    ? currentGame.players
+    : Array.from(new Set([
+        ...Object.keys(currentGame.player_putts || {}),
+        ...Object.keys(currentGame.total_points || {}),
+        ...Object.keys(currentGame.live_stats || {})
+      ].filter(Boolean)));
 
-  const playerStats = currentGame.players.map(player => {
+  const playerStats = players.map(player => {
     const putts = currentGame.player_putts?.[player] || [];
     const totalPutts = putts.length;
     const madePutts = putts.filter(p => p.result === 'made').length;

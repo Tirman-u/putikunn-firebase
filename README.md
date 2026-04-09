@@ -28,6 +28,12 @@ VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
 
 Run the app: `npm run dev`
 
+**Project Notes**
+
+- Release log: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+- Incident notes: [docs/incidents/2026-04-08-stability-and-atw.md](docs/incidents/2026-04-08-stability-and-atw.md)
+- Working rules / ongoing items: [BACKLOG.md](BACKLOG.md)
+
 **Publish your changes**
 
 Open [Base44.com](http://Base44.com) and click on Publish.

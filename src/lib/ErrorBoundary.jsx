@@ -1,5 +1,5 @@
 import React from "react";
-import { base44 } from "@/api/base44Client";
+import { reportClientError } from "@/lib/error-reporting";
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -31,40 +31,18 @@ export default class ErrorBoundary extends React.Component {
   };
 
   logError = async (error, info) => {
-    const message = typeof error === "string" ? error : error?.message || "Unknown error";
-    const stack = error?.stack ? String(error.stack) : "";
     const componentStack = info?.componentStack ? String(info.componentStack) : "";
-    const signature = `${message}\n${stack}\n${componentStack}`;
+    const signature = `${error?.message || String(error)}\n${error?.stack || ""}\n${componentStack}`;
     if (this.lastErrorSignature === signature) return;
     this.lastErrorSignature = signature;
 
-    const logger = base44?.entities?.ErrorLog?.create;
-    if (!logger) return;
-
-    let user = null;
-    try {
-      user = await base44.auth.me();
-    } catch {
-      user = null;
-    }
-
-    const payload = {
-      message,
-      stack,
-      component_stack: componentStack,
-      url: typeof window !== "undefined" ? window.location.href : null,
-      user_email: user?.email || null,
-      user_id: user?.id || null,
-      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
-      occurred_at: new Date().toISOString()
-    };
-
-    try {
-      await logger(payload);
-    } catch (logError) {
-      // eslint-disable-next-line no-console
-      console.error("Failed to log error:", logError);
-    }
+    await reportClientError({
+      source: "react.error_boundary",
+      error,
+      componentStack,
+      details: { boundary: "ErrorBoundary" },
+      tags: ["react", "error_boundary"]
+    });
   };
 
   render() {

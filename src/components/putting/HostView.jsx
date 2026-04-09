@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import useRealtimeGame from '@/hooks/use-realtime-game';
 import LoadingState from '@/components/ui/loading-state';
+import { resolveATWDisplayAttemptCount, resolveATWDisplayBestScore } from '@/lib/atw-metrics';
 import {
   buildLeaderboardIdentityFilter,
   getLeaderboardEmail,
@@ -127,8 +128,10 @@ export default function HostView({ gameId, onExit }) {
   const resolveGamePlayers = (gameData) => {
     const fromPlayers = Array.isArray(gameData?.players) ? gameData.players : [];
     const fromPutts = Object.keys(gameData?.player_putts || {});
+    const fromPoints = Object.keys(gameData?.total_points || {});
+    const fromLiveStats = Object.keys(gameData?.live_stats || {});
     const fromAtw = Object.keys(gameData?.atw_state || {});
-    return Array.from(new Set([...fromPlayers, ...fromPutts, ...fromAtw].filter(Boolean)));
+    return Array.from(new Set([...fromPlayers, ...fromPutts, ...fromPoints, ...fromLiveStats, ...fromAtw].filter(Boolean)));
   };
 
   const syncLeaderboardEntries = async ({ includeDiscgolf }) => {
@@ -281,6 +284,7 @@ export default function HostView({ gameId, onExit }) {
   const gameType = game?.game_type;
   const isATWGame = gameType === 'around_the_world';
   const isCompleted = game?.status === 'completed';
+  const players = resolveGamePlayers(game);
   const canSubmitDiscgolfForGame = canSubmitDiscgolf && isHostedClassicGame(game);
   const canSubmitGeneralForGame =
     Boolean(user?.email && game?.host_user && user.email === game.host_user) || canSubmitDiscgolf;
@@ -293,13 +297,13 @@ export default function HostView({ gameId, onExit }) {
   }
 
   // Calculate player stats for ATW
-  const playerStats = (game.players || []).map(playerName => {
+  const playerStats = players.map(playerName => {
     const playerState = game.atw_state?.[playerName] || {};
     const currentScore = game.total_points?.[playerName] || 0;
-    const bestScore = playerState.best_score || 0;
+    const bestScore = resolveATWDisplayBestScore(playerState, currentScore);
     const currentLaps = playerState.laps_completed || 0;
     const bestLaps = playerState.best_laps || 0;
-    const attemptsCount = playerState.attempts_count || 0;
+    const attemptsCount = resolveATWDisplayAttemptCount(playerState, currentScore);
 
     return {
       name: playerName,
@@ -312,7 +316,7 @@ export default function HostView({ gameId, onExit }) {
   }).sort((a, b) => b.bestScore - a.bestScore);
 
   const nonAtwPlayerStats = !isATWGame
-    ? (game.players || []).map((playerName) => {
+    ? players.map((playerName) => {
         const putts = game.player_putts?.[playerName] || [];
         const liveStats = game.live_stats?.[playerName];
         const totalPutts = liveStats?.total_putts ?? putts.length;
@@ -335,6 +339,8 @@ export default function HostView({ gameId, onExit }) {
     : [];
 
   const bestPlayer = playerStats[0];
+  const mostLaps = Math.max(...playerStats.map((p) => p.bestLaps || 0), 0);
+  const mostLapsPlayer = playerStats.find((p) => p.bestLaps === mostLaps);
   const mostAttempts = Math.max(...playerStats.map(p => p.attemptsCount || 0), 0);
   const mostAttemptsPlayer = playerStats.find(p => p.attemptsCount === mostAttempts);
 
@@ -369,7 +375,7 @@ export default function HostView({ gameId, onExit }) {
               </Button>
               <div className="flex items-center gap-2 text-sm opacity-90">
                 <Users className="w-4 h-4" />
-                <span>{t('host.players_count', '{count} mängijat', { count: game.players.length })}</span>
+                <span>{t('host.players_count', '{count} mängijat', { count: players.length })}</span>
               </div>
             </div>
           </div>
@@ -388,8 +394,8 @@ export default function HostView({ gameId, onExit }) {
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
               <div className="text-sm text-slate-600 mb-2">{t('host.most_laps', 'Enim ringe')}</div>
-              <div className="text-3xl font-bold text-blue-600">{bestPlayer.bestLaps}</div>
-              <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
+              <div className="text-3xl font-bold text-blue-600">{mostLaps}</div>
+              <div className="text-xs text-slate-500 mt-1">{mostLapsPlayer?.name}</div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
@@ -403,7 +409,7 @@ export default function HostView({ gameId, onExit }) {
         )}
 
         {/* Player Table */}
-        {isATWGame && game.players.length > 0 && (
+        {isATWGame && players.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -451,7 +457,7 @@ export default function HostView({ gameId, onExit }) {
           </div>
         )}
 
-        {!isATWGame && game.players.length > 0 && (
+        {!isATWGame && players.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2 text-slate-800 font-semibold">
@@ -562,7 +568,7 @@ export default function HostView({ gameId, onExit }) {
           </div>
         </div>
 
-        {game.players.length === 0 && (
+        {players.length === 0 && (
           <div className="bg-white rounded-2xl p-12 text-center text-slate-400 shadow-sm border border-slate-100">
             <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p>{t('host.waiting_players', 'Ootame mängijate liitumist...')}</p>

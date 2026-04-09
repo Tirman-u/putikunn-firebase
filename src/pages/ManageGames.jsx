@@ -196,10 +196,12 @@ export default function ManageGames() {
   );
 
   const resolveGamePlayers = (game) => {
-    const fromPlayers = Array.isArray(game.players) ? game.players : [];
-    const fromPutts = Object.keys(game.player_putts || {});
-    const fromAtw = Object.keys(game.atw_state || {});
-    return Array.from(new Set([...fromPlayers, ...fromPutts, ...fromAtw].filter(Boolean)));
+    const fromPlayers = Array.isArray(game?.players) ? game.players : [];
+    const fromPutts = Object.keys(game?.player_putts || {});
+    const fromPoints = Object.keys(game?.total_points || {});
+    const fromLiveStats = Object.keys(game?.live_stats || {});
+    const fromAtw = Object.keys(game?.atw_state || {});
+    return Array.from(new Set([...fromPlayers, ...fromPutts, ...fromPoints, ...fromLiveStats, ...fromAtw].filter(Boolean)));
   };
 
   const getEntryIdentityKey = (entry) => {
@@ -678,7 +680,7 @@ export default function ManageGames() {
               {activeEntries.map((entry) => {
                 const game = entry.game;
                 const isDuel = entry.kind === 'duel';
-                const playersCount = isDuel ? getDuelPlayersCount(game) : (game.players?.length || 0);
+                const playersCount = isDuel ? getDuelPlayersCount(game) : resolveGamePlayers(game).length;
                 const gameDate = entry.sortDate || game.date || null;
                 const isSelected = !isDuel && selectedGames.includes(game.id);
                 return (
@@ -853,7 +855,7 @@ export default function ManageGames() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-center text-slate-700">
-                        {game.players?.length || 0}
+                        {resolveGamePlayers(game).length}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">

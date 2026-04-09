@@ -5,8 +5,12 @@ import '@/index.css'
 import { initTheme } from '@/lib/theme'
 import { isTestEnv } from '@/lib/env'
 import { LanguageProvider } from '@/lib/i18n'
+import { installGlobalErrorHandlers } from '@/lib/error-reporting'
+import { cleanupLegacyServiceWorkers } from '@/lib/legacy-service-worker-cleanup'
 
 initTheme();
+installGlobalErrorHandlers();
+cleanupLegacyServiceWorkers();
 if (typeof document !== 'undefined') {
   document.documentElement.dataset.env = isTestEnv() ? 'test' : 'prod';
 }

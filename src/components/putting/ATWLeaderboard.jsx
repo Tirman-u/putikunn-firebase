@@ -1,14 +1,15 @@
 import React from 'react';
 import { Trophy, Target } from 'lucide-react';
+import { resolveATWDisplayAttemptCount, resolveATWDisplayBestScore } from '@/lib/atw-metrics';
 
 export default function ATWLeaderboard({ game }) {
   const playerStats = Object.entries(game.atw_state || {}).map(([playerName, state]) => {
     const totalScore = game.total_points?.[playerName] || 0;
-    const attemptsCount = state.attempts_count || 0;
+    const attemptsCount = resolveATWDisplayAttemptCount(state, totalScore);
     
     return {
       name: playerName,
-      score: totalScore,
+      score: resolveATWDisplayBestScore(state, totalScore),
       laps: state.laps_completed || 0,
       attempts: attemptsCount
     };

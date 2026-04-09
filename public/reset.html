@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="et">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <title>Putikunn reset</title>
+  </head>
+  <body>
+    <p>Puhastan Putikunni cache'i...</p>
+    <script>
+      (function () {
+        var clearCaches = 'caches' in window
+          ? caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (key) {
+                return caches.delete(key);
+              }));
+            })
+          : Promise.resolve();
+
+        var unregisterWorkers = 'serviceWorker' in navigator
+          ? navigator.serviceWorker.getRegistrations().then(function (registrations) {
+              return Promise.all(registrations.map(function (registration) {
+                return registration.unregister();
+              }));
+            })
+          : Promise.resolve();
+
+        Promise.all([clearCaches, unregisterWorkers])
+          .catch(function () {})
+          .then(function () {
+            window.location.replace('/?v=' + Date.now());
+          });
+      })();
+    </script>
+  </body>
+</html>

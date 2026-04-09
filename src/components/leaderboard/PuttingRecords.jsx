@@ -99,8 +99,8 @@ export default function PuttingRecords() {
       const sortOrder = effectiveView.gameType === 'time_ladder' ? 'score' : '-score';
       return fetchLeaderboardRows(filter, sortOrder);
     },
-    staleTime: 120000,
-    refetchInterval: 120000
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: false
   });
 
   const isATWView = effectiveView?.gameType === 'around_the_world';

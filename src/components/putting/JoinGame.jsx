@@ -34,8 +34,8 @@ export default function JoinGame({ onJoin, onBack }) {
     queryKey: ['recent-games-v2'],
     queryFn: async () => {
       const [hostedGames, duelGames] = await Promise.all([
-        base44.entities.Game.filter({ pin: { $ne: '0000' } }, '-date', 80),
-        base44.entities.DuelGame.filter({}, '-created_at', 50)
+        base44.entities.Game.filter({ status: 'active', pin: { $ne: '0000' } }, '-date', 20),
+        base44.entities.DuelGame.filter({ status: { $in: ['lobby', 'active'] } }, '-created_at', 20)
       ]);
       return buildJoinableEntries({ hostedGames, duelGames, limit: 10 });
     },
@@ -108,6 +108,7 @@ export default function JoinGame({ onJoin, onBack }) {
       }
 
       const game = games[0];
+      const players = Array.isArray(game.players) ? game.players : [];
 
       if (game.join_closed === true || game.status === 'closed') {
         setError(t('join.error_closed', 'Mäng on hosti poolt suletud.'));
@@ -116,7 +117,7 @@ export default function JoinGame({ onJoin, onBack }) {
       }
 
       // Check if player already exists
-      if (game.players.includes(playerName.trim())) {
+      if (players.includes(playerName.trim())) {
         // Player already exists, ensure uid/email mapping is stored
         if (user?.id || user?.email) {
           const updatedPlayerUids = {
@@ -137,11 +138,11 @@ export default function JoinGame({ onJoin, onBack }) {
         }
       } else {
         // Add player to game
-        const gameType = game.game_type || 'classic';
+        const gameType = GAME_FORMATS[game.game_type] ? game.game_type : 'classic';
         const format = GAME_FORMATS[gameType];
         const startDistance = format.startDistance;
 
-        const updatedPlayers = [...game.players, playerName.trim()];
+        const updatedPlayers = [...players, playerName.trim()];
         const updatedDistances = { ...game.player_distances, [playerName.trim()]: startDistance };
         const updatedPutts = { ...game.player_putts, [playerName.trim()]: [] };
         const updatedPoints = { ...game.total_points, [playerName.trim()]: 0 };

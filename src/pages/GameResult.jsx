@@ -157,7 +157,7 @@ export default function GameResult() {
 
   const submitToLeaderboardMutation = useMutation({
     mutationFn: async () => {
-      const playerEntries = game.players || [];
+      const playerEntries = Array.isArray(game.players) ? game.players : [];
       const matchedName =
         playerEntries.find((name) => game.player_uids?.[name] && game.player_uids?.[name] === user?.id) ||
         playerEntries.find((name) => game.player_emails?.[name] && game.player_emails?.[name] === user?.email) ||
@@ -232,7 +232,8 @@ export default function GameResult() {
       const timeLadderDiscsPerTurn = Number(game?.time_ladder_config?.discs_per_turn);
       const hasTimeLadderDiscs = isTimeLadderGame && Number.isFinite(timeLadderDiscsPerTurn) && timeLadderDiscsPerTurn > 0;
       
-      for (const rawPlayerName of game.players || []) {
+      const players = Array.isArray(game.players) ? game.players : [];
+      for (const rawPlayerName of players) {
         const { score, madePutts, totalPutts, accuracy } = getLeaderboardStats(game, rawPlayerName);
         const resolvedPlayer = await resolveLeaderboardPlayer({
           game,
@@ -345,10 +346,17 @@ export default function GameResult() {
   }
 
   const myDisplayName = user?.display_name || user?.full_name || user?.email;
+  const players = Array.from(new Set([
+    ...(Array.isArray(game.players) ? game.players : []),
+    ...Object.keys(game.player_putts || {}),
+    ...Object.keys(game.total_points || {}),
+    ...Object.keys(game.live_stats || {}),
+    ...Object.keys(game.atw_state || {})
+  ].filter(Boolean)));
 
   // Show ATW views for Around The World games
   if (game.game_type === 'around_the_world') {
-    const isSolo = game.players.length === 1 && game.pin === '0000';
+    const isSolo = players.length === 1 && game.pin === '0000';
 
     if (!isSolo && game.status === 'completed') {
       return <HostView gameId={game.id} onExit={() => navigate(-1)} />;
@@ -371,7 +379,7 @@ export default function GameResult() {
   }
 
   const gameType = game.game_type || 'classic';
-  const gameFormat = GAME_FORMATS[gameType];
+  const gameFormat = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
   const isTimeLadder = gameType === 'time_ladder';
   const formatName = t(`format.${gameType}.name`, gameFormat?.name || 'Classic');
   const timeConfig = game.time_ladder_config || {};
@@ -389,7 +397,7 @@ export default function GameResult() {
   const canDelete = ['admin', 'super_admin'].includes(userRole) || user?.email === game?.host_user;
 
   // Calculate statistics for each player
-  const playerStats = game.players.map(player => {
+  const playerStats = players.map(player => {
     const putts = game.player_putts?.[player] || [];
     const totalPutts = putts.length;
     const madePutts = putts.filter(p => p.result === 'made').length;
@@ -573,8 +581,8 @@ export default function GameResult() {
         )}
 
         {/* Performance Analysis for single player games */}
-        {game.players.length === 1 && !isTimeLadder && (
-          <PerformanceAnalysis playerPutts={game.player_putts?.[game.players[0]] || []} />
+        {players.length === 1 && !isTimeLadder && (
+          <PerformanceAnalysis playerPutts={game.player_putts?.[players[0]] || []} />
         )}
 
         {/* Player Results */}

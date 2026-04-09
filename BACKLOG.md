@@ -4,6 +4,8 @@
 - Arendus ainult TEST keskkonnas (`test.putikunn.ee`). PROD/LIVE keskkonda ei muudeta.
 - Deploy vajadusel ainult `hosting:test`.
 - Iga deployga uuenda versioon (`package.json` + `package-lock.json`).
+- Iga deploy/hotfix lisa kirje ka `docs/CHANGELOG.md` faili.
+- Kui on incident / rollback / suurem jama, lisa note `docs/incidents/` alla.
 - LIVE deploy on lubatud ainult kasutaja eraldi, selge käsuga.
 - Vaikimisi töövoog: deploy testi + git push.
 - Uute UI flow’de puhul küsi enne disaini/flow kinnituse.

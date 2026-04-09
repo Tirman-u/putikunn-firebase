@@ -5,6 +5,12 @@ import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
 import { getATWMovement, isATWRoundComplete, shouldATWRestart } from '@/components/putting/gameRules';
 import { logSyncMetric } from '@/lib/metrics';
+import useRealtimeGame from '@/hooks/use-realtime-game';
+import {
+  calculateATWBestMetrics,
+  isATWStateAhead,
+  resolveATWDisplayBestScore
+} from '@/lib/atw-metrics';
 import {
   buildLeaderboardIdentityFilter,
   getLeaderboardEmail,
@@ -23,6 +29,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
   const turnsSinceSyncRef = React.useRef(0);
   const UNDO_SOFT_LOCK_MS = 200;
   const hydratedFromStorageRef = React.useRef(false);
+  const recoverySyncSeqRef = React.useRef(null);
   const atwStorageKey = React.useMemo(() => {
     if (!gameId || !playerName) return null;
     return `putikunn:atw:${gameId}:${playerName}`;
@@ -50,37 +57,6 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
   });
 
   React.useEffect(() => {
-    if (!atwStorageKey || hydratedFromStorageRef.current) return;
-    try {
-      const stored = localStorage.getItem(atwStorageKey);
-      if (!stored) return;
-      const parsed = JSON.parse(stored);
-      if (!parsed || (parsed.id && parsed.id !== gameId)) return;
-      const latestGame = queryClient.getQueryData(['game', gameId]);
-      const localSeq = parsed?.atw_state?.[playerName]?.client_seq ?? 0;
-      const serverSeq = latestGame?.atw_state?.[playerName]?.client_seq ?? 0;
-      if (!latestGame || localSeq > serverSeq) {
-        const merged = {
-          ...(latestGame || {}),
-          ...parsed,
-          atw_state: {
-            ...(latestGame?.atw_state || {}),
-            ...(parsed.atw_state || {})
-          },
-          total_points: {
-            ...(latestGame?.total_points || {}),
-            ...(parsed.total_points || {})
-          }
-        };
-        queryClient.setQueryData(['game', gameId], merged);
-      }
-      hydratedFromStorageRef.current = true;
-    } catch {
-      // ignore storage errors
-    }
-  }, [atwStorageKey, gameId, playerName, queryClient]);
-
-  React.useEffect(() => {
     if (!atwStorageKey || !game) return;
     if (game.status === 'completed' || game.status === 'closed') {
       localStorage.removeItem(atwStorageKey);
@@ -102,6 +78,54 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
   const getLatestGame = useCallback(() => {
     return queryClient.getQueryData(['game', gameId]) || game;
   }, [game, gameId, queryClient]);
+
+  const mergeRealtimeGame = useCallback((previous, incoming) => {
+    if (!previous) return incoming;
+    if (!incoming) return previous;
+
+    const merged = { ...previous, ...incoming };
+    const mapKeys = [
+      'atw_state',
+      'total_points',
+      'player_distances',
+      'player_putts',
+      'player_uids',
+      'player_emails'
+    ];
+
+    mapKeys.forEach((key) => {
+      if (previous?.[key] || incoming?.[key]) {
+        merged[key] = {
+          ...(previous?.[key] || {}),
+          ...(incoming?.[key] || {})
+        };
+      }
+    });
+
+    if (Array.isArray(previous?.players) && !Array.isArray(incoming?.players)) {
+      merged.players = previous.players;
+    }
+
+    const previousPlayerState = previous?.atw_state?.[playerName];
+    const incomingPlayerState = incoming?.atw_state?.[playerName];
+    const previousPoints = previous?.total_points?.[playerName] || 0;
+    const incomingPoints = incoming?.total_points?.[playerName] || 0;
+
+    if (previousPlayerState && isATWStateAhead(previousPlayerState, previousPoints, incomingPlayerState, incomingPoints)) {
+      merged.atw_state = {
+        ...(merged.atw_state || {}),
+        [playerName]: previousPlayerState
+      };
+      if (previous?.total_points && Object.prototype.hasOwnProperty.call(previous.total_points, playerName)) {
+        merged.total_points = {
+          ...(merged.total_points || {}),
+          [playerName]: previous.total_points[playerName]
+        };
+      }
+    }
+
+    return merged;
+  }, [playerName]);
 
   const defaultPlayerState = useMemo(() => ({
     current_distance_index: 0,
@@ -157,6 +181,84 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
     });
   }, [gameId, mergePlayerUpdate, playerName, queryClient]);
 
+  const syncRecoveredState = useCallback(({ updatedState, updatedPoints }) => {
+    const incomingSeq = Number(updatedState?.client_seq ?? -1);
+    if (!updatedState || incomingSeq < 0) return;
+    if (recoverySyncSeqRef.current === incomingSeq) return;
+
+    recoverySyncSeqRef.current = incomingSeq;
+    void updateGameWithLatest({ updatedState, updatedPoints }).catch(() => {
+      recoverySyncSeqRef.current = null;
+    });
+  }, [updateGameWithLatest]);
+
+  React.useEffect(() => {
+    if (!atwStorageKey || hydratedFromStorageRef.current) return;
+    try {
+      const stored = localStorage.getItem(atwStorageKey);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (!parsed || (parsed.id && parsed.id !== gameId)) return;
+
+      const latestGame = queryClient.getQueryData(['game', gameId]);
+      const localPlayerState = parsed?.atw_state?.[playerName];
+      const localPoints = parsed?.total_points?.[playerName] || 0;
+      const serverPlayerState = latestGame?.atw_state?.[playerName];
+      const serverPoints = latestGame?.total_points?.[playerName] || 0;
+
+      if (!latestGame || isATWStateAhead(localPlayerState, localPoints, serverPlayerState, serverPoints)) {
+        const merged = {
+          ...(latestGame || {}),
+          ...parsed,
+          atw_state: {
+            ...(latestGame?.atw_state || {}),
+            ...(parsed.atw_state || {})
+          },
+          total_points: {
+            ...(latestGame?.total_points || {}),
+            ...(parsed.total_points || {})
+          }
+        };
+        queryClient.setQueryData(['game', gameId], merged);
+        syncRecoveredState({
+          updatedState: localPlayerState,
+          updatedPoints: localPoints
+        });
+      }
+
+      hydratedFromStorageRef.current = true;
+    } catch {
+      // ignore storage errors
+    }
+  }, [atwStorageKey, gameId, playerName, queryClient, syncRecoveredState]);
+
+  useRealtimeGame({
+    gameId,
+    enabled: !!gameId,
+    throttleMs: 1000,
+    eventTypes: ['update', 'delete'],
+    onEvent: (event) => {
+      if (event.type === 'delete') {
+        queryClient.setQueryData(['game', gameId], undefined);
+        return;
+      }
+      if (!event?.data) return;
+      const previousGame = queryClient.getQueryData(['game', gameId]);
+      const previousPlayerState = previousGame?.atw_state?.[playerName];
+      const previousPoints = previousGame?.total_points?.[playerName] || 0;
+      const incomingPlayerState = event.data?.atw_state?.[playerName];
+      const incomingPoints = event.data?.total_points?.[playerName] || 0;
+
+      if (previousPlayerState && isATWStateAhead(previousPlayerState, previousPoints, incomingPlayerState, incomingPoints)) {
+        syncRecoveredState({
+          updatedState: previousPlayerState,
+          updatedPoints: previousPoints
+        });
+      }
+      queryClient.setQueryData(['game', gameId], (previous) => mergeRealtimeGame(previous, event.data));
+    }
+  });
+
   const submitTurnMutation = useMutation({
     mutationFn: async ({ updatedState, updatedPoints }) => {
       await updateGameWithLatest({ updatedState, updatedPoints });
@@ -179,12 +281,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
     const latestGame = getLatestGame();
     const playerState = { ...defaultPlayerState, ...(latestGame.atw_state?.[playerName] || {}) };
     const currentScore = latestGame.total_points?.[playerName] || 0;
-    const bestScore = latestGame.atw_state[playerName]?.best_score || 0;
-
-    const currentAccuracy = playerState.total_putts > 0
-      ? ((playerState.total_makes / playerState.total_putts) * 100)
-      : 0;
-    const bestAccuracy = playerState.best_accuracy || 0;
+    const { bestScore, bestLaps, bestAccuracy } = calculateATWBestMetrics(playerState, currentScore);
 
     const resetState = {
       current_distance_index: 0,
@@ -196,9 +293,9 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       current_distance_points: 0,
       current_round_draft: { attempts: [], is_finalized: false },
       history: [],
-      best_score: Math.max(bestScore, currentScore),
-      best_laps: Math.max(playerState.best_laps || 0, playerState.laps_completed || 0),
-      best_accuracy: Math.max(bestAccuracy, currentAccuracy),
+      best_score: bestScore,
+      best_laps: bestLaps,
+      best_accuracy: bestAccuracy,
       attempts_count: (playerState.attempts_count || 0) + 1,
       client_seq: bumpLocalSeq()
     };
@@ -273,14 +370,27 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
     const movedToNewDistance = newIndex !== currentIndex;
     const newDistancePoints = movedToNewDistance ? 0 : distancePointsTotal;
     const isRoundComplete = isATWRoundComplete({ lapEvent, newIndex, newDirection });
+    const nextTotalPoints = (latestGame.total_points?.[playerName] || 0) + pointsAwarded;
+    const nextLapsCompleted = playerState.laps_completed + (lapEvent ? 1 : 0);
+    const nextTotalMakes = playerState.total_makes + actualMakes;
+    const nextTotalPutts = playerState.total_putts + discsPerTurn;
+    const { bestScore, bestLaps, bestAccuracy } = calculateATWBestMetrics(
+      playerState,
+      nextTotalPoints,
+      {
+        totalMakes: nextTotalMakes,
+        totalPutts: nextTotalPutts,
+        lapsCompleted: nextLapsCompleted
+      }
+    );
 
     const updatedState = {
       current_distance_index: newIndex,
       direction: newDirection,
-      laps_completed: playerState.laps_completed + (lapEvent ? 1 : 0),
+      laps_completed: nextLapsCompleted,
       turns_played: playerState.turns_played + 1,
-      total_makes: playerState.total_makes + actualMakes,
-      total_putts: playerState.total_putts + discsPerTurn,
+      total_makes: nextTotalMakes,
+      total_putts: nextTotalPutts,
       current_distance_points: newDistancePoints,
       current_round_draft: { attempts: [], is_finalized: false },
       attempts_count: playerState.attempts_count || 0,
@@ -296,7 +406,9 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
         failed_to_advance: actualMakes > 0 && (discsPerTurn >= 3 ? misses >= 1 : actualMakes < threshold),
         missed_all: actualMakes === 0
       }],
-      best_score: playerState.best_score,
+      best_score: bestScore,
+      best_laps: bestLaps,
+      best_accuracy: bestAccuracy,
       client_seq: bumpLocalSeq()
     };
 
@@ -308,7 +420,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       },
       total_points: {
         ...latestGame.total_points,
-        [playerName]: (latestGame.total_points?.[playerName] || 0) + pointsAwarded
+        [playerName]: nextTotalPoints
       }
     });
 
@@ -351,7 +463,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
     mutationFn: async () => {
       const playerState = { ...defaultPlayerState, ...(game.atw_state?.[playerName] || {}) };
       const currentScore = game.total_points?.[playerName] || 0;
-      const bestScore = Math.max(playerState.best_score || 0, currentScore);
+      const { bestScore, bestLaps, bestAccuracy } = calculateATWBestMetrics(playerState, currentScore);
 
       await base44.entities.Game.update(gameId, {
         status: 'completed',
@@ -359,7 +471,9 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
           ...game.atw_state,
           [playerName]: {
             ...playerState,
-            best_score: bestScore
+            best_score: bestScore,
+            best_laps: bestLaps,
+            best_accuracy: bestAccuracy
           }
         }
       }, { returnSnapshot: false });
@@ -440,7 +554,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
     const latestGame = getLatestGame();
     const playerState = { ...defaultPlayerState, ...(latestGame.atw_state?.[playerName] || {}) };
     const currentScore = latestGame.total_points?.[playerName] || 0;
-    const bestScore = Math.max(playerState.best_score || 0, currentScore);
+    const { bestScore, bestLaps, bestAccuracy } = calculateATWBestMetrics(playerState, currentScore);
 
     const resetState = {
       current_distance_index: 0,
@@ -453,6 +567,8 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
       current_round_draft: { attempts: [], is_finalized: false },
       history: [],
       best_score: bestScore,
+      best_laps: bestLaps,
+      best_accuracy: bestAccuracy,
       attempts_count: (playerState.attempts_count || 0) + 1,
       client_seq: bumpLocalSeq()
     };
@@ -489,20 +605,16 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
   const handleExit = useCallback(async () => {
     const latestPlayerState = game.atw_state?.[playerName] || {};
     const currentScore = game.total_points?.[playerName] || 0;
-    const bestScore = latestPlayerState.best_score || 0;
-    const currentAccuracy = latestPlayerState.total_putts > 0
-      ? ((latestPlayerState.total_makes / latestPlayerState.total_putts) * 100)
-      : 0;
-    const bestAccuracy = latestPlayerState.best_accuracy || 0;
+    const { bestScore, bestLaps, bestAccuracy } = calculateATWBestMetrics(latestPlayerState, currentScore);
 
     await base44.entities.Game.update(gameId, {
       atw_state: {
         ...game.atw_state,
         [playerName]: {
           ...latestPlayerState,
-          best_score: Math.max(bestScore, currentScore),
-          best_laps: Math.max(latestPlayerState.best_laps || 0, latestPlayerState.laps_completed || 0),
-          best_accuracy: Math.max(bestAccuracy, currentAccuracy)
+          best_score: bestScore,
+          best_laps: bestLaps,
+          best_accuracy: bestAccuracy
         }
       }
     }, { returnSnapshot: false });
@@ -649,7 +761,7 @@ export default function useATWGameState({ gameId, playerName, isSolo }) {
 
     const currentDistance = config.distances?.[playerState.current_distance_index || 0];
     const totalScore = game?.total_points?.[playerName] || 0;
-    const bestScore = playerState.best_score || 0;
+    const bestScore = resolveATWDisplayBestScore(playerState, totalScore);
     const makeRate = playerState.total_putts > 0
       ? ((playerState.total_makes / playerState.total_putts) * 100).toFixed(0)
       : 0;

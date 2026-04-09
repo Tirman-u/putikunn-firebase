@@ -415,6 +415,14 @@ export default function AdminUsers() {
     [errorLogs, nowTs]
   );
 
+  const recentErrorLogs = React.useMemo(
+    () =>
+      [...errorLogs]
+        .sort((a, b) => toMillis(b?.occurred_at || b?.created_date) - toMillis(a?.occurred_at || a?.created_date))
+        .slice(0, 10),
+    [errorLogs]
+  );
+
   const lastPresenceAt = React.useMemo(() => {
     let latest = 0;
     presenceHeartbeats.forEach((entry) => {
@@ -916,6 +924,53 @@ export default function AdminUsers() {
                   Viimane audit kirje: <span className="font-semibold text-slate-800 dark:text-slate-100">{formatActivityTime(lastAuditAt)}</span>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-[24px] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-100">
+                <Bug className="h-4 w-4 text-red-600" />
+                Viimased errorid
+              </div>
+              {recentErrorLogs.length === 0 ? (
+                <div className="text-sm text-slate-500 dark:text-slate-300">Erroreid pole logitud.</div>
+              ) : (
+                <div className="space-y-2">
+                  {recentErrorLogs.map((entry) => {
+                    const occurredAt = toMillis(entry?.occurred_at || entry?.created_date);
+                    const stackPreview = entry?.component_stack || entry?.stack || '';
+                    return (
+                      <div key={entry.id} className="rounded-xl border border-red-100 bg-white/90 px-3 py-2 dark:bg-black dark:border-red-400/30">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
+                              {entry.message || 'Unknown error'}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                              {formatActivityTime(occurredAt)} • {entry.app_version ? `v${entry.app_version}` : 'version puudub'} • {entry.app_env || resolveEnvLabel()} • {entry.source || 'client.error'}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                              {entry.path || entry.url || '-'}{entry.user_email ? ` • ${entry.user_email}` : ''}
+                            </div>
+                          </div>
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-black dark:text-red-300 dark:border dark:border-red-400/40">
+                            ERROR
+                          </span>
+                        </div>
+                        {entry.details ? (
+                          <div className="mt-2 rounded-lg bg-slate-50 px-2 py-1 text-[11px] text-slate-600 dark:bg-white/5 dark:text-slate-300">
+                            {JSON.stringify(entry.details)}
+                          </div>
+                        ) : null}
+                        {stackPreview ? (
+                          <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600 whitespace-pre-wrap dark:bg-white/5 dark:text-slate-300">
+                            {String(stackPreview).slice(0, 1600)}
+                          </pre>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="rounded-[24px] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">

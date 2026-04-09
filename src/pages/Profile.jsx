@@ -246,7 +246,8 @@ export default function Profile() {
       [normalizedDisplayName, normalizedFullName, normalizedEmail].filter(Boolean)
     );
 
-    (game.players || []).forEach((name) => {
+    const players = Array.isArray(game.players) ? game.players : [];
+    players.forEach((name) => {
       if (!name) return;
       if (normalizedCandidates.has(normalize(name))) {
         keys.push(name);
@@ -321,7 +322,7 @@ export default function Profile() {
 
   const isPlayerInGame = (game) => {
     if (!game) return false;
-    const players = (game.players || []).map(normalize);
+    const players = (Array.isArray(game.players) ? game.players : []).map(normalize);
     if (
       (normalizedDisplayName && players.includes(normalizedDisplayName)) ||
       (normalizedFullName && players.includes(normalizedFullName)) ||
@@ -1206,7 +1207,7 @@ export default function Profile() {
                       const isTimeLadder = game.game_type === 'time_ladder';
                       const scoreLabel = isTimeLadder ? formatDuration(score) : score;
                       const percentageLabel = isTimeLadder ? '—' : `${percentage}%`;
-                      const gameFormat = GAME_FORMATS[game.game_type || 'classic'];
+                      const gameFormat = GAME_FORMATS[game.game_type || 'classic'] || GAME_FORMATS.classic;
                       const canDeleteThis = canDeleteGame(game);
                       const isSelected = selectedGameIds.includes(game.id);
 

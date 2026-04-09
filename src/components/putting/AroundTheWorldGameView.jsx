@@ -6,6 +6,7 @@ import { createPageUrl } from '@/utils';
 import LoadingState from '@/components/ui/loading-state';
 import useATWGameState from '@/hooks/use-atw-game-state';
 import { deleteGameAndLeaderboardEntries } from '@/lib/leaderboard-utils';
+import { resolveATWDisplayAttemptCount, resolveATWDisplayBestScore } from '@/lib/atw-metrics';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
 
@@ -105,7 +106,7 @@ export default function AroundTheWorldGameView({ gameId, playerName, isSolo }) {
         handlePlayAgain,
         gameId, submitToLeaderboardMutation, user 
         }) => {
-        const attemptsCount = playerState.attempts_count || 0;
+        const attemptsCount = resolveATWDisplayAttemptCount(playerState, totalScore);
         const failedTurns = useMemo(() => 
         playerState.history.filter(turn => turn.failed_to_advance || turn.missed_all),
         [playerState.history]
@@ -242,7 +243,7 @@ const ActiveGameView = React.memo(({
   onViewLeaderboard, onExit 
 }) => {
   const discsPerTurn = config.discs_per_turn || 1;
-  const attemptsCount = playerState.attempts_count || 0;
+  const attemptsCount = resolveATWDisplayAttemptCount(playerState, totalScore);
   const usePerDiscInput = discsPerTurn >= 3;
   const [shotResults, setShotResults] = React.useState(
     Array.from({ length: discsPerTurn }, () => null)
@@ -455,17 +456,17 @@ const ActiveGameView = React.memo(({
 });
 
 const ATWTournamentLeaderboard = React.memo(({ game }) => {
-  const playerNames = (game.players && game.players.length > 0)
+  const playerNames = (Array.isArray(game.players) && game.players.length > 0)
     ? game.players
     : Object.keys(game.atw_state || {});
 
   const playerStats = playerNames.map(playerName => {
     const playerState = game.atw_state?.[playerName] || {};
     const currentScore = game.total_points?.[playerName] || 0;
-    const bestScore = playerState.best_score || 0;
+    const bestScore = resolveATWDisplayBestScore(playerState, currentScore);
     const currentLaps = playerState.laps_completed || 0;
     const bestLaps = playerState.best_laps || 0;
-    const attemptsCount = playerState.attempts_count || 0;
+    const attemptsCount = resolveATWDisplayAttemptCount(playerState, currentScore);
 
     return {
       name: playerName,
@@ -478,6 +479,8 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
   }).sort((a, b) => b.bestScore - a.bestScore);
 
   const bestPlayer = playerStats[0];
+  const mostLaps = Math.max(...playerStats.map((p) => p.bestLaps || 0), 0);
+  const mostLapsPlayer = playerStats.find((p) => p.bestLaps === mostLaps);
   const mostAttempts = Math.max(...playerStats.map(p => p.attemptsCount || 0), 0);
   const mostAttemptsPlayer = playerStats.find(p => p.attemptsCount === mostAttempts);
   const isCompleted = game.status === 'completed';
@@ -510,8 +513,8 @@ const ATWTournamentLeaderboard = React.memo(({ game }) => {
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
             <div className="text-sm text-slate-600 mb-2">Enim ringe</div>
-            <div className="text-3xl font-bold text-blue-600">{bestPlayer.bestLaps}</div>
-            <div className="text-xs text-slate-500 mt-1">{bestPlayer.name}</div>
+            <div className="text-3xl font-bold text-blue-600">{mostLaps}</div>
+            <div className="text-xs text-slate-500 mt-1">{mostLapsPlayer?.name}</div>
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
             <div className="flex items-center justify-center gap-2 mb-2">

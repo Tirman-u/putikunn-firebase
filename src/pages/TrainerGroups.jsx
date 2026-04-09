@@ -56,10 +56,6 @@ export default function TrainerGroups() {
     }
   }, [user, canManageTraining, navigate]);
 
-  if (user && !canManageTraining) {
-    return null;
-  }
-
   const { data: groups = [], isLoading, refetch } = useQuery({
     queryKey: ['trainer-groups', user?.id, userRole],
     enabled: !!user?.id,
@@ -306,7 +302,7 @@ export default function TrainerGroups() {
     }
   };
 
-  if (!user) {
+  if (!user || !canManageTraining) {
     return null;
   }
 

@@ -300,14 +300,19 @@ export default function JoinTraining() {
     }
   };
 
+  const getGamePlayers = (game) => {
+    if (!game) return [];
+    return Array.from(new Set([
+      ...(Array.isArray(game.players) ? game.players : []),
+      ...Object.keys(game.player_putts || {}),
+      ...Object.keys(game.total_points || {}),
+      ...Object.keys(game.live_stats || {}),
+      ...Object.keys(game.atw_state || {})
+    ].filter(Boolean)));
+  };
+
   const getPlayerCount = (game) => {
-    if (!game) return 0;
-    return (
-      game.players?.length ||
-      Object.keys(game.player_putts || {}).length ||
-      Object.keys(game.atw_state || {}).length ||
-      0
-    );
+    return getGamePlayers(game).length;
   };
 
   const joinTrainingGame = async (game) => {
@@ -320,7 +325,8 @@ export default function JoinTraining() {
     setJoiningGameId(game.id);
     try {
       const currentGame = game;
-      const hasPlayer = currentGame.players?.includes(playerName);
+      const players = getGamePlayers(currentGame);
+      const hasPlayer = players.includes(playerName);
       const updatedPlayerUids = {
         ...(currentGame.player_uids || {}),
         ...(user?.id ? { [playerName]: user.id } : {})
@@ -336,10 +342,10 @@ export default function JoinTraining() {
           player_emails: updatedPlayerEmails
         });
       } else {
-        const gameType = currentGame.game_type || 'classic';
-        const format = GAME_FORMATS[gameType];
+        const gameType = GAME_FORMATS[currentGame.game_type] ? currentGame.game_type : 'classic';
+        const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
         const startDistance = format?.startDistance ?? 0;
-        const updatedPlayers = [...(currentGame.players || []), playerName];
+        const updatedPlayers = [...players, playerName];
         const updatedDistances = { ...(currentGame.player_distances || {}), [playerName]: startDistance };
         const updatedPutts = { ...(currentGame.player_putts || {}), [playerName]: [] };
         const updatedPoints = { ...(currentGame.total_points || {}), [playerName]: 0 };

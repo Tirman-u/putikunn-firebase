@@ -293,8 +293,7 @@ export default function Home() {
 
   const handleHostGame = async (gameData) => {
     const user = await base44.auth.me();
-    const gameType = gameData.gameType || 'classic';
-    const format = GAME_FORMATS[gameType];
+    const gameType = GAME_FORMATS[gameData.gameType] ? gameData.gameType : 'classic';
 
     const game = await base44.entities.Game.create({
       name: gameData.name,
@@ -381,24 +380,26 @@ export default function Home() {
   if (mode === 'solo') {
     return <HostSetup onStartGame={async (gameData) => {
       const user = await base44.auth.me();
+      const playerName = user?.display_name || user?.full_name || user?.email || t('home.guest', 'Player');
+      const gameType = GAME_FORMATS[gameData.gameType] ? gameData.gameType : 'classic';
       const game = await base44.entities.Game.create({
         name: gameData.name || t('home.solo', 'Soolotreening'),
         pin: '0000',
-        game_type: gameData.gameType || 'classic',
+        game_type: gameType,
         putt_type: gameData.puttType || 'regular',
         host_user: user.email,
-        players: [user.full_name],
-        player_distances: { [user.full_name]: GAME_FORMATS[gameData.gameType || 'classic'].startDistance },
-        player_putts: { [user.full_name]: [] },
-        total_points: { [user.full_name]: 0 },
-        player_uids: { [user.full_name]: user.id },
-        player_emails: { [user.full_name]: user.email },
+        players: [playerName],
+        player_distances: { [playerName]: GAME_FORMATS[gameType].startDistance },
+        player_putts: { [playerName]: [] },
+        total_points: { [playerName]: 0 },
+        player_uids: { [playerName]: user.id },
+        player_emails: { [playerName]: user.email },
         join_closed: false,
         status: 'active',
         date: new Date().toISOString()
       });
       setGameId(game.id);
-      setPlayerName(user.full_name);
+      setPlayerName(playerName);
       setMode('player');
       window.history.replaceState({}, '', `${createPageUrl('Home')}?mode=player&gameId=${game.id}`);
     }} onBack={goHome} isSolo={true} />;

@@ -51,7 +51,14 @@ export default function GroupResult() {
       : 0;
     allGameBestScores.push(gameBestScore);
     
-    game.players?.forEach(player => {
+    const players = Array.from(new Set([
+      ...(Array.isArray(game.players) ? game.players : []),
+      ...Object.keys(game.player_putts || {}),
+      ...Object.keys(game.total_points || {}),
+      ...Object.keys(game.live_stats || {}),
+      ...Object.keys(game.atw_state || {})
+    ].filter(Boolean)));
+    players.forEach(player => {
       const points = game.total_points?.[player] || 0;
       const putts = game.player_putts?.[player] || [];
       
@@ -83,11 +90,18 @@ export default function GroupResult() {
   // Games with stats
   const gamesWithStats = games.map(game => {
     const gameType = game.game_type || 'classic';
-    const format = GAME_FORMATS[gameType];
+    const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
     
     let totalPutts = 0;
     let madePutts = 0;
-    game.players?.forEach(player => {
+    const players = Array.from(new Set([
+      ...(Array.isArray(game.players) ? game.players : []),
+      ...Object.keys(game.player_putts || {}),
+      ...Object.keys(game.total_points || {}),
+      ...Object.keys(game.live_stats || {}),
+      ...Object.keys(game.atw_state || {})
+    ].filter(Boolean)));
+    players.forEach(player => {
       const putts = game.player_putts?.[player] || [];
       totalPutts += putts.length;
       madePutts += putts.filter(p => p.result === 'made').length;

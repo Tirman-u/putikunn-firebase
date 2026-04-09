@@ -32,6 +32,7 @@ Run the app: `npm run dev`
 
 - Release log: [docs/CHANGELOG.md](docs/CHANGELOG.md)
 - Incident notes: [docs/incidents/2026-04-08-stability-and-atw.md](docs/incidents/2026-04-08-stability-and-atw.md)
+- Master prompt / working rules: [docs/MASTER_PROMPT.md](docs/MASTER_PROMPT.md)
 - Working rules / ongoing items: [BACKLOG.md](BACKLOG.md)
 
 **Publish your changes**

@@ -1,34 +1,57 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BarChart3, Trophy, Users, Activity, Pencil, Trash2, Check, X, Plus, Megaphone, ChevronDown } from 'lucide-react';
+import { format, parseISO, startOfMonth } from 'date-fns';
+import { BarChart3, Trophy, Users, Activity, Pencil, Trash2, Check, X, Plus, Megaphone, ChevronDown, CalendarDays } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, runTransaction, serverTimestamp, arrayUnion, deleteField } from 'firebase/firestore';
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  runTransaction,
+  serverTimestamp,
+  updateDoc,
+  where,
+  arrayUnion,
+  deleteField,
+  setDoc,
+  writeBatch
+} from 'firebase/firestore';
 import { createPageUrl } from '@/utils';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
+import MultiDatePicker from '@/components/training/MultiDatePicker';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/i18n';
 import {
   TRAINING_DAYS,
+  applyDirectSlotClaim,
+  compareTrainingSlots,
+  formatSlotOccurrenceDate,
+  getDayValueFromDate,
   getDayFullLabel,
   getEffectiveSlotAttendance,
   getSlotAvailability,
+  getSlotWeekKey,
   getWeekKey,
   createSlotId
 } from '@/lib/training-utils';
+import {
+  compareSpecialEvents,
+  getSpecialEventAvailability,
+  getSpecialEventStart,
+  isGroupPoolMember
+} from '@/lib/training-special-events';
 
 const getGamePlayers = (game) => {
   if (!game) return [];
-  return Array.from(new Set([
-    ...(Array.isArray(game.players) ? game.players : []),
-    ...Object.keys(game.player_putts || {}),
-    ...Object.keys(game.total_points || {}),
-    ...Object.keys(game.live_stats || {}),
-    ...Object.keys(game.atw_state || {})
-  ].filter(Boolean)));
+  if (Array.isArray(game.players)) return game.players;
+  return Object.keys(game.total_points || {});
 };
 
 const buildTopPlayers = (games) => {
@@ -57,17 +80,6 @@ const DAY_FULL_EN = {
   sun: 'Sunday'
 };
 
-const DAY_SHORT_EN = {
-  mon: 'M',
-  tue: 'T',
-  wed: 'W',
-  thu: 'T',
-  fri: 'F',
-  sat: 'S',
-  sun: 'S'
-};
-
-
 export default function TrainerGroupDashboard() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -79,37 +91,62 @@ export default function TrainerGroupDashboard() {
   const [announcementDraft, setAnnouncementDraft] = React.useState('');
   const [isSavingAnnouncement, setIsSavingAnnouncement] = React.useState(false);
   const [newSlot, setNewSlot] = React.useState({
-    day: 'mon',
     time: '18:00',
     maxSpots: 8,
     price: '',
-    duration: 90
+    duration: 90,
+    selectedDates: []
   });
+  const [slotPickerMonth, setSlotPickerMonth] = React.useState(() => startOfMonth(new Date()));
+  const [newSpecialEvent, setNewSpecialEvent] = React.useState({
+    title: '',
+    time: '18:00',
+    maxSpots: 4,
+    duration: 90,
+    selectedDates: []
+  });
+  const [specialEventPickerMonth, setSpecialEventPickerMonth] = React.useState(() => startOfMonth(new Date()));
   const [editingSlotId, setEditingSlotId] = React.useState(null);
   const [editingSlot, setEditingSlot] = React.useState(null);
   const [isSavingSlot, setIsSavingSlot] = React.useState(false);
+  const [isSavingSpecialEvent, setIsSavingSpecialEvent] = React.useState(false);
   const [isUpdatingAttendance, setIsUpdatingAttendance] = React.useState({});
   const [slotSearch, setSlotSearch] = React.useState({});
   const [addingRoster, setAddingRoster] = React.useState({});
   const [selectedMember, setSelectedMember] = React.useState(null);
   const [isAssigningMember, setIsAssigningMember] = React.useState(false);
   const [removingMemberId, setRemovingMemberId] = React.useState(null);
+  const [removingSpecialEventId, setRemovingSpecialEventId] = React.useState(null);
+  const [specialEventAction, setSpecialEventAction] = React.useState({});
   const [collapsedSlots, setCollapsedSlots] = React.useState({});
   const [joiningGameId, setJoiningGameId] = React.useState(null);
   const defaultCollapsed = React.useMemo(() => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth < 768;
   }, []);
-  const dayOptions = React.useMemo(() => {
-    return TRAINING_DAYS.map((day) => ({
-      ...day,
-      full: lang === 'en' ? (DAY_FULL_EN[day.value] || day.full) : day.full,
-      label: lang === 'en' ? (DAY_SHORT_EN[day.value] || day.label) : day.label
-    }));
-  }, [lang]);
   const getDayLabel = React.useCallback((value) => {
     if (lang !== 'en') return getDayFullLabel(value);
     return DAY_FULL_EN[value] || getDayFullLabel(value);
+  }, [lang]);
+  const slotLocale = lang === 'en' ? 'en-GB' : 'et-EE';
+  const getSlotDateLabel = React.useCallback(
+    (slot) => formatSlotOccurrenceDate(slot, weekKey, slotLocale) || getDayLabel(slot?.day),
+    [getDayLabel, slotLocale, weekKey]
+  );
+  const getSlotWeekdayLabel = React.useCallback(
+    (slot) => formatSlotOccurrenceDate(slot, weekKey, slotLocale, { weekday: 'long' }) || getDayLabel(slot?.day),
+    [getDayLabel, slotLocale, weekKey]
+  );
+  const formatSpecialEventLabel = React.useCallback((event) => {
+    const start = getSpecialEventStart(event);
+    if (!start) return `${event?.date || ''} • ${event?.time || ''}`.trim();
+    const locale = lang === 'en' ? 'en-GB' : 'et-EE';
+    const dateLabel = start.toLocaleDateString(locale, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short'
+    });
+    return `${dateLabel} • ${event?.time || ''}`;
   }, [lang]);
 
   const { data: user } = useQuery({
@@ -138,6 +175,24 @@ export default function TrainerGroupDashboard() {
     staleTime: 30000
   });
 
+  const { data: specialEventsData = [] } = useQuery({
+    queryKey: ['training-special-events', groupId],
+    enabled: !!groupId,
+    queryFn: async () => {
+      const q = query(collection(db, 'training_special_events'), where('group_id', '==', groupId));
+      const snap = await getDocs(q);
+      return snap.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .filter((entry) => entry?.status !== 'cancelled')
+        .sort(compareSpecialEvents);
+    },
+    staleTime: 20000
+  });
+  const specialEvents = React.useMemo(
+    () => (Array.isArray(specialEventsData) ? specialEventsData : []),
+    [specialEventsData]
+  );
+
   React.useEffect(() => {
     if (group?.announcement) {
       setAnnouncementDraft(group.announcement);
@@ -161,6 +216,13 @@ export default function TrainerGroupDashboard() {
   const searchableUsers = React.useMemo(
     () => allUsers.filter((entry) => !entry.merged_into),
     [allUsers]
+  );
+  const allUsersById = React.useMemo(
+    () => searchableUsers.reduce((acc, entry) => {
+      if (entry?.id) acc[entry.id] = entry;
+      return acc;
+    }, {}),
+    [searchableUsers]
   );
 
   const activeGames = React.useMemo(
@@ -189,6 +251,18 @@ export default function TrainerGroupDashboard() {
   const topPlayers = React.useMemo(() => buildTopPlayers(games), [games]);
 
   const slots = Array.isArray(group?.slots) ? group.slots : [];
+  const sortedSlots = React.useMemo(
+    () => [...slots].sort((left, right) => compareTrainingSlots(left, right, weekKey)),
+    [slots, weekKey]
+  );
+  const upcomingSpecialEvents = React.useMemo(
+    () => specialEvents.filter((event) => !getSpecialEventAvailability(event).isPast),
+    [specialEvents]
+  );
+  const pastSpecialEventsCount = React.useMemo(
+    () => specialEvents.filter((event) => getSpecialEventAvailability(event).isPast).length,
+    [specialEvents]
+  );
 
   const collapsedStorageKey = React.useMemo(() => {
     if (!groupId) return null;
@@ -262,14 +336,40 @@ export default function TrainerGroupDashboard() {
     const attendance = getEffectiveSlotAttendance(group, weekKey, slot);
     return attendance.released_uids.includes(user?.id);
   });
+  const memberRequestedSlots = slots.filter((slot) => {
+    const attendance = getEffectiveSlotAttendance(group, weekKey, slot);
+    return attendance.request_uids.includes(user?.id);
+  });
+  const memberWaitlistSlots = slots.filter((slot) => {
+    const attendance = getEffectiveSlotAttendance(group, weekKey, slot);
+    return attendance.waitlist_uids.includes(user?.id);
+  });
   const hasConfirmedSpot = canManageTraining || memberRosterSlots.length > 0 || memberClaimedSlots.length > 0;
+  const isPoolMemberOnly = !canManageTraining && isGroupMember && memberRosterSlots.length === 0;
+  const hasPendingSpotApproval = memberRequestedSlots.length > 0;
+  const hasPoolSpotOpportunity = isPoolMemberOnly && slots.some((slot) => attendanceBySlot(slot).available > 0);
   const hasActiveSwap = memberClaimedSlots.length > 0;
   const hasReleasedOwnSpot = memberReleasedSlots.length > 0;
   const memberRosterSlotIds = memberRosterSlots.map((slot) => slot.id);
+  const fallbackMemberIds = React.useMemo(
+    () =>
+      searchableUsers
+        .filter((entry) => entry?.training_groups && groupId && entry.training_groups[groupId])
+        .map((entry) => entry.id)
+        .filter(Boolean),
+    [searchableUsers, groupId]
+  );
   const getMemberLabel = React.useCallback(
     (uid, meta = null) =>
-      meta?.name || group?.members?.[uid]?.name || group?.members?.[uid]?.email || meta?.email || uid,
-    [group]
+      meta?.name ||
+      group?.members?.[uid]?.name ||
+      group?.members?.[uid]?.email ||
+      allUsersById?.[uid]?.display_name ||
+      allUsersById?.[uid]?.full_name ||
+      allUsersById?.[uid]?.email ||
+      meta?.email ||
+      uid,
+    [group, allUsersById]
   );
   const handleSelectMember = React.useCallback((uid, sourceSlotId = null) => {
     setSelectedMember((prev) => {
@@ -280,9 +380,12 @@ export default function TrainerGroupDashboard() {
     });
   }, []);
   const memberIds = React.useMemo(() => {
-    if (group?.member_uids?.length) return group.member_uids;
-    return Object.keys(group?.members || {});
-  }, [group?.member_uids, group?.members]);
+    const ids = new Set();
+    (group?.member_uids || []).forEach((uid) => ids.add(uid));
+    Object.keys(group?.members || {}).forEach((uid) => ids.add(uid));
+    fallbackMemberIds.forEach((uid) => ids.add(uid));
+    return Array.from(ids);
+  }, [group?.member_uids, group?.members, fallbackMemberIds]);
   const rosterUidSet = React.useMemo(() => {
     const set = new Set();
     slots.forEach((slot) => {
@@ -294,8 +397,12 @@ export default function TrainerGroupDashboard() {
     () =>
       memberIds
         .filter((uid) => !rosterUidSet.has(uid))
-        .map((uid) => ({ uid, ...((group?.members || {})[uid] || {}) })),
-    [memberIds, rosterUidSet, group?.members]
+        .map((uid) => ({
+          uid,
+          ...((allUsersById?.[uid] || {})),
+          ...((group?.members || {})[uid] || {})
+        })),
+    [memberIds, rosterUidSet, group?.members, allUsersById]
   );
 
   if (user && !canViewGroup) {
@@ -310,9 +417,10 @@ export default function TrainerGroupDashboard() {
     if (!groupId) return;
     setIsSavingSlot(true);
     try {
-      const hasPublic = nextSlots.some((slot) => slot.is_public);
+      const sortedNextSlots = [...nextSlots].sort((left, right) => compareTrainingSlots(left, right, weekKey));
+      const hasPublic = sortedNextSlots.some((slot) => slot.is_public);
       await updateDoc(doc(db, 'training_groups', groupId), {
-        slots: nextSlots,
+        slots: sortedNextSlots,
         has_public_slots: hasPublic
       });
       queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
@@ -322,32 +430,61 @@ export default function TrainerGroupDashboard() {
   };
 
   const handleAddSlot = async () => {
-    if (!newSlot.day || !newSlot.time || Number(newSlot.maxSpots) < 1) return;
-    const nextSlots = [
-      ...slots,
-      {
+    const selectedDates = Array.isArray(newSlot.selectedDates) ? newSlot.selectedDates : [];
+    if (!newSlot.time || Number(newSlot.maxSpots) < 1 || selectedDates.length === 0) {
+      toast.error(tr('Vali vähemalt üks kuupäev, kellaaeg ja kohtade arv', 'Select at least one date, time and spot count'));
+      return;
+    }
+
+    const existingKeys = new Set(
+      slots.map((slot) => `${slot.date || ''}|${slot.time || ''}`)
+    );
+    const datesToAdd = [...selectedDates].sort();
+    const nextSlots = [...slots];
+    let addedCount = 0;
+
+    datesToAdd.forEach((selectedDate) => {
+      const slotKey = `${selectedDate}|${newSlot.time}`;
+      if (existingKeys.has(slotKey)) return;
+      existingKeys.add(slotKey);
+      addedCount += 1;
+      nextSlots.push({
         id: createSlotId(),
-        day: newSlot.day,
+        date: selectedDate,
+        day: getDayValueFromDate(selectedDate),
         time: newSlot.time,
         max_spots: Number(newSlot.maxSpots),
         duration_minutes: Number(newSlot.duration) || 90,
         price: newSlot.price,
         is_public: false,
         roster_uids: []
-      }
-    ];
+      });
+    });
+
+    if (addedCount === 0) {
+      toast.error(tr('Need kuupäevad on juba olemas', 'Those dates already exist'));
+      return;
+    }
+
     await updateGroupSlots(nextSlots);
     setNewSlot((prev) => ({
       ...prev,
       time: prev.time,
-      price: prev.price
+      price: prev.price,
+      selectedDates: []
     }));
+    toast.success(
+      addedCount === 1
+        ? tr('Trenn lisatud', 'Training added')
+        : tr(`Lisatud ${addedCount} trenni`, `Added ${addedCount} trainings`)
+    );
   };
 
   const startEditingSlot = (slot) => {
     setEditingSlotId(slot.id);
     setEditingSlot({
       ...slot,
+      date: slot.date || '',
       max_spots: slot.max_spots,
       duration_minutes: slot.duration_minutes || 90,
       price: slot.price || ''
@@ -363,15 +500,24 @@ export default function TrainerGroupDashboard() {
     if (!editingSlotId || !editingSlot) return;
     const nextSlots = slots.map((slot) =>
       slot.id === editingSlotId
-        ? {
-            ...slot,
-            day: editingSlot.day,
-            time: editingSlot.time,
-            max_spots: Number(editingSlot.max_spots) || 1,
-            duration_minutes: Number(editingSlot.duration_minutes) || 90,
-            price: editingSlot.price || '',
-            is_public: Boolean(editingSlot.is_public)
-          }
+        ? (() => {
+            const nextSlot = {
+              ...slot,
+              time: editingSlot.time,
+              max_spots: Number(editingSlot.max_spots) || 1,
+              duration_minutes: Number(editingSlot.duration_minutes) || 90,
+              price: editingSlot.price || '',
+              is_public: Boolean(editingSlot.is_public)
+            };
+            if (editingSlot.date) {
+              nextSlot.date = editingSlot.date;
+              nextSlot.day = getDayValueFromDate(editingSlot.date) || editingSlot.day;
+            } else {
+              delete nextSlot.date;
+              nextSlot.day = editingSlot.day;
+            }
+            return nextSlot;
+          })()
         : slot
     );
     await updateGroupSlots(nextSlots);
@@ -382,6 +528,199 @@ export default function TrainerGroupDashboard() {
     if (!confirm(tr('Kustuta see trenniaeg?', 'Delete this training time?'))) return;
     const nextSlots = slots.filter((slot) => slot.id !== slotId);
     await updateGroupSlots(nextSlots);
+  };
+
+  const handleCreateSpecialEvent = async () => {
+    if (!groupId || !canManageTraining) return;
+    const selectedDates = Array.isArray(newSpecialEvent.selectedDates) ? [...newSpecialEvent.selectedDates].sort() : [];
+    const maxSpots = Number(newSpecialEvent.maxSpots) || 0;
+    const duration = Number(newSpecialEvent.duration) || 90;
+    const title = newSpecialEvent.title.trim() || tr('Välitrenn', 'Outdoor training');
+    if (selectedDates.length === 0 || !newSpecialEvent.time || maxSpots < 1) {
+      toast.error(tr('Vali vähemalt üks kuupäev, kellaaeg ja kohtade arv', 'Select at least one date, time and spot count'));
+      return;
+    }
+
+    for (const dateValue of selectedDates) {
+      const startsAt = getSpecialEventStart({
+        date: dateValue,
+        time: newSpecialEvent.time,
+        duration_minutes: duration
+      });
+      if (!startsAt || Number.isNaN(startsAt.getTime())) {
+        toast.error(tr('Kuupäev või kellaaeg on vigane', 'Date or time is invalid'));
+        return;
+      }
+      if (startsAt.getTime() <= Date.now()) {
+        toast.error(tr('Kõik välitrennid peavad olema tulevikus', 'All special events must be in the future'));
+        return;
+      }
+    }
+
+    setIsSavingSpecialEvent(true);
+    try {
+      const batch = writeBatch(db);
+      selectedDates.forEach((dateValue) => {
+        const eventRef = doc(collection(db, 'training_special_events'));
+        batch.set(eventRef, {
+          group_id: groupId,
+          title,
+          date: dateValue,
+          time: newSpecialEvent.time,
+          duration_minutes: duration,
+          max_spots: maxSpots,
+          status: 'active',
+          booked_uids: [],
+          booked_meta: {},
+          created_by_uid: user?.id || null,
+          created_at: serverTimestamp()
+        });
+      });
+      await batch.commit();
+      setNewSpecialEvent((prev) => ({
+        ...prev,
+        title: '',
+        maxSpots: 4,
+        selectedDates: []
+      }));
+      queryClient.invalidateQueries({ queryKey: ['training-special-events', groupId] });
+      toast.success(
+        selectedDates.length === 1
+          ? tr('Välitrenn lisatud', 'Special event added')
+          : tr(`Lisatud ${selectedDates.length} välitrenni`, `Added ${selectedDates.length} special events`)
+      );
+    } catch (error) {
+      toast.error(error?.message || tr('Välitrenni loomine ebaõnnestus', 'Failed to create special event'));
+    } finally {
+      setIsSavingSpecialEvent(false);
+    }
+  };
+
+  const handleDeleteSpecialEvent = async (eventId) => {
+    if (!eventId) return;
+    if (!confirm(tr('Kustuta see välitrenn?', 'Delete this special event?'))) return;
+    setRemovingSpecialEventId(eventId);
+    try {
+      await deleteDoc(doc(db, 'training_special_events', eventId));
+      queryClient.invalidateQueries({ queryKey: ['training-special-events', groupId] });
+      toast.success(tr('Välitrenn kustutatud', 'Special event deleted'));
+    } catch (error) {
+      toast.error(error?.message || tr('Välitrenni kustutamine ebaõnnestus', 'Failed to delete special event'));
+    } finally {
+      setRemovingSpecialEventId(null);
+    }
+  };
+
+  const invalidateSpecialEventQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['training-special-events', groupId] });
+    queryClient.invalidateQueries({ queryKey: ['training-special-events'] });
+    queryClient.invalidateQueries({ queryKey: ['training-special-events-by-group'] });
+  };
+
+  const handleRemoveSpecialEventBooking = async (eventId, targetUid) => {
+    if (!eventId || !targetUid) return;
+    try {
+      await runTransaction(db, async (transaction) => {
+        const eventRef = doc(db, 'training_special_events', eventId);
+        const snap = await transaction.get(eventRef);
+        if (!snap.exists()) throw new Error(tr('Välitrenni ei leitud', 'Special event not found'));
+        const data = snap.data() || {};
+        const booked = Array.isArray(data.booked_uids) ? data.booked_uids : [];
+        if (!booked.includes(targetUid)) return;
+        const nextBooked = booked.filter((uid) => uid !== targetUid);
+        const nextMeta = { ...(data.booked_meta || {}) };
+        delete nextMeta[targetUid];
+        transaction.update(eventRef, {
+          booked_uids: nextBooked,
+          booked_meta: nextMeta
+        });
+      });
+      queryClient.invalidateQueries({ queryKey: ['training-special-events', groupId] });
+      toast.success(tr('Broneering eemaldatud', 'Booking removed'));
+    } catch (error) {
+      toast.error(error?.message || tr('Broneeringu eemaldamine ebaõnnestus', 'Failed to remove booking'));
+    }
+  };
+
+  const handleBookOwnSpecialEvent = async (event) => {
+    if (!event?.id || !user?.id || !groupId) return;
+
+    if (!isGroupPoolMember(group, user.id, { knownMember: isGroupMember })) {
+      toast.error(tr('Välitrenn on ainult pooli liikmetele', 'Special event is only for pool members'));
+      return;
+    }
+
+    const displayName = user?.display_name || user?.full_name || user?.email || tr('Trenniline', 'Trainee');
+    const userEmail = user?.email || '';
+    setSpecialEventAction((prev) => ({ ...prev, [event.id]: true }));
+    try {
+      await runTransaction(db, async (transaction) => {
+        const eventRef = doc(db, 'training_special_events', event.id);
+        const groupRef = doc(db, 'training_groups', groupId);
+        const eventSnap = await transaction.get(eventRef);
+        const groupSnap = await transaction.get(groupRef);
+
+        if (!eventSnap.exists()) throw new Error(tr('Välitrenni ei leitud', 'Special event not found'));
+        if (!groupSnap.exists()) throw new Error(tr('Gruppi ei leitud', 'Group not found'));
+
+        const eventData = { id: eventSnap.id, ...eventSnap.data() };
+        const groupData = groupSnap.data() || {};
+        if (!isGroupPoolMember(groupData, user.id, { knownMember: isGroupMember })) {
+          throw new Error(tr('Välitrenn on ainult pooli liikmetele', 'Special event is only for pool members'));
+        }
+
+        const availability = getSpecialEventAvailability(eventData);
+        if (availability.isPast) throw new Error(tr('See välitrenn on juba möödunud', 'This special event has already passed'));
+        if (availability.booked.includes(user.id)) return;
+        if (availability.available <= 0) throw new Error(tr('Vabu kohti pole', 'No free spots'));
+
+        transaction.update(eventRef, {
+          booked_uids: [...availability.booked, user.id],
+          booked_meta: {
+            ...(eventData.booked_meta || {}),
+            [user.id]: {
+              name: displayName,
+              email: userEmail,
+              booked_at: new Date().toISOString()
+            }
+          }
+        });
+      });
+      invalidateSpecialEventQueries();
+      toast.success(tr('Välitrenn broneeritud', 'Special event booked'));
+    } catch (error) {
+      toast.error(error?.message || tr('Välitrenni broneerimine ebaõnnestus', 'Failed to book special event'));
+    } finally {
+      setSpecialEventAction((prev) => ({ ...prev, [event.id]: false }));
+    }
+  };
+
+  const handleCancelOwnSpecialEvent = async (event) => {
+    if (!event?.id || !user?.id) return;
+    setSpecialEventAction((prev) => ({ ...prev, [event.id]: true }));
+    try {
+      await runTransaction(db, async (transaction) => {
+        const eventRef = doc(db, 'training_special_events', event.id);
+        const eventSnap = await transaction.get(eventRef);
+        if (!eventSnap.exists()) throw new Error(tr('Välitrenni ei leitud', 'Special event not found'));
+        const eventData = eventSnap.data() || {};
+        const booked = Array.isArray(eventData.booked_uids) ? eventData.booked_uids : [];
+        if (!booked.includes(user.id)) return;
+        const nextBooked = booked.filter((uid) => uid !== user.id);
+        const nextMeta = { ...(eventData.booked_meta || {}) };
+        delete nextMeta[user.id];
+        transaction.update(eventRef, {
+          booked_uids: nextBooked,
+          booked_meta: nextMeta
+        });
+      });
+      invalidateSpecialEventQueries();
+      toast.success(tr('Välitrenni broneering eemaldatud', 'Special event booking removed'));
+    } catch (error) {
+      toast.error(error?.message || tr('Välitrenni broneeringu eemaldamine ebaõnnestus', 'Failed to remove special event booking'));
+    } finally {
+      setSpecialEventAction((prev) => ({ ...prev, [event.id]: false }));
+    }
   };
 
   const handleTogglePublicSlot = async (slotId) => {
@@ -400,8 +739,10 @@ export default function TrainerGroupDashboard() {
         const snap = await transaction.get(groupRef);
         if (!snap.exists()) throw new Error(tr('Gruppi ei leitud', 'Group not found'));
         const data = snap.data();
-        const currentWeek = getWeekKey();
-        const weekData = data.attendance?.[currentWeek] || {};
+        const slotsList = Array.isArray(data.slots) ? data.slots : [];
+        const targetSlot = slotsList.find((slot) => slot.id === slotId);
+        const currentWeek = getSlotWeekKey(targetSlot, getWeekKey());
+        const weekData = { ...(data.attendance?.[currentWeek] || {}) };
         const slotData = normalizeSlotData(weekData[slotId]);
         const nextSlotData = updater(slotData, data, currentWeek);
         weekData[slotId] = nextSlotData;
@@ -417,8 +758,8 @@ export default function TrainerGroupDashboard() {
     }
   };
 
-  const updateAttendanceMulti = async (updater) => {
-    if (!groupId) return;
+  const updateAttendanceMulti = async (slotId, updater) => {
+    if (!groupId || !slotId) return;
     setIsUpdatingAttendance((prev) => ({ ...prev, global: true }));
     try {
       await runTransaction(db, async (transaction) => {
@@ -426,9 +767,11 @@ export default function TrainerGroupDashboard() {
         const snap = await transaction.get(groupRef);
         if (!snap.exists()) throw new Error(tr('Gruppi ei leitud', 'Group not found'));
         const data = snap.data();
-        const currentWeek = getWeekKey();
+        const slotsList = Array.isArray(data.slots) ? data.slots : [];
+        const targetSlot = slotsList.find((slot) => slot.id === slotId);
+        const currentWeek = getSlotWeekKey(targetSlot, getWeekKey());
         const weekData = { ...(data.attendance?.[currentWeek] || {}) };
-        const nextWeekData = updater(weekData, data, currentWeek);
+        const nextWeekData = updater(weekData, data, currentWeek, targetSlot);
         transaction.update(groupRef, {
           [`attendance.${currentWeek}`]: nextWeekData
         });
@@ -444,7 +787,7 @@ export default function TrainerGroupDashboard() {
   const handleToggleRelease = async (slotId) => {
     const userId = user?.id;
     if (!userId) return;
-    await updateAttendanceMulti((weekData) => {
+    await updateAttendanceMulti(slotId, (weekData) => {
       const slotData = normalizeSlotData(weekData[slotId]);
       const released = new Set(slotData.released_uids || []);
       const wasReleased = released.has(userId);
@@ -513,7 +856,33 @@ export default function TrainerGroupDashboard() {
     if (!userId) return;
     await updateAttendance(slotId, (slotData) => {
       const claimed = (slotData.claimed_uids || []).filter((uid) => uid !== userId);
-      return { ...slotData, claimed_uids: claimed };
+      const claimedMeta = { ...(slotData.claimed_meta || {}) };
+      delete claimedMeta[userId];
+      return { ...slotData, claimed_uids: claimed, claimed_meta: claimedMeta };
+    });
+  };
+
+  const handlePoolSpotClaim = async (targetSlotId) => {
+    const userId = user?.id;
+    if (!userId) return;
+    const userName = user?.display_name || user?.full_name || user?.email || tr('Trenniline', 'Trainee');
+    const userEmail = user?.email || '';
+    await updateAttendanceMulti(targetSlotId, (weekData, groupData, currentWeek) => {
+      const slotsList = Array.isArray(groupData.slots) ? groupData.slots : [];
+      const targetSlot = slotsList.find((slot) => slot.id === targetSlotId);
+      if (!targetSlot) return weekData;
+      const availability = getSlotAvailability(targetSlot, groupData, currentWeek);
+      if (availability.available <= 0) {
+        throw new Error(tr('Vabu kohti pole', 'No free spots'));
+      }
+
+      return applyDirectSlotClaim(weekData, targetSlotId, {
+        userId,
+        name: userName,
+        email: userEmail,
+        source: 'pool',
+        type: 'claim'
+      });
     });
   };
 
@@ -687,9 +1056,15 @@ export default function TrainerGroupDashboard() {
           joined_at: serverTimestamp()
         }
       });
-      await updateDoc(doc(db, 'users', uid), {
-        [`training_groups.${groupId}`]: group?.name || 'Treening'
-      });
+      await setDoc(
+        doc(db, 'users', uid),
+        {
+          training_groups: {
+            [groupId]: group?.name || 'Treening'
+          }
+        },
+        { merge: true }
+      );
     } catch (error) {
       toast.error(error?.message || tr('Liikme lisamine ebaõnnestus', 'Failed to add member'));
     }
@@ -822,7 +1197,7 @@ export default function TrainerGroupDashboard() {
     if (!userId) return;
     const userName = user?.display_name || user?.full_name || user?.email || tr('Trenniline', 'Trainee');
     const userEmail = user?.email || '';
-    await updateAttendanceMulti((weekData, groupData, currentWeek) => {
+    await updateAttendanceMulti(targetSlotId, (weekData, groupData, currentWeek) => {
       const slotsList = Array.isArray(groupData.slots) ? groupData.slots : [];
       const targetSlot = slotsList.find((slot) => slot.id === targetSlotId);
       if (!targetSlot) return weekData;
@@ -832,7 +1207,12 @@ export default function TrainerGroupDashboard() {
       }
 
       const rosterSlotIds = slotsList
-        .filter((slot) => Array.isArray(slot.roster_uids) && slot.roster_uids.includes(userId))
+        .filter(
+          (slot) =>
+            Array.isArray(slot.roster_uids) &&
+            slot.roster_uids.includes(userId) &&
+            getSlotWeekKey(slot, currentWeek) === currentWeek
+        )
         .map((slot) => slot.id);
       if (rosterSlotIds.length === 0) {
         throw new Error(tr('Sul pole püsikohta', 'You do not have a reserved spot'));
@@ -902,7 +1282,7 @@ export default function TrainerGroupDashboard() {
     if (!userId) return;
     const userName = user?.display_name || user?.full_name || user?.email || tr('Trenniline', 'Trainee');
     const userEmail = user?.email || '';
-    await updateAttendanceMulti((weekData, groupData, currentWeek) => {
+    await updateAttendanceMulti(targetSlotId, (weekData, groupData, currentWeek) => {
       const slotsList = Array.isArray(groupData.slots) ? groupData.slots : [];
       const targetSlot = slotsList.find((slot) => slot.id === targetSlotId);
       if (!targetSlot) return weekData;
@@ -912,7 +1292,12 @@ export default function TrainerGroupDashboard() {
       }
 
       const rosterSlotIds = slotsList
-        .filter((slot) => Array.isArray(slot.roster_uids) && slot.roster_uids.includes(userId))
+        .filter(
+          (slot) =>
+            Array.isArray(slot.roster_uids) &&
+            slot.roster_uids.includes(userId) &&
+            getSlotWeekKey(slot, currentWeek) === currentWeek
+        )
         .map((slot) => slot.id);
       if (rosterSlotIds.length === 0) {
         throw new Error(tr('Sul pole püsikohta', 'You do not have a reserved spot'));
@@ -1003,10 +1388,15 @@ export default function TrainerGroupDashboard() {
   };
 
   const handleRemoveClaimedMember = async (slotId, targetUid) => {
-    await updateAttendanceMulti((weekData, groupData) => {
+    await updateAttendanceMulti(slotId, (weekData, groupData, currentWeek) => {
       const slotsList = Array.isArray(groupData.slots) ? groupData.slots : [];
       const rosterSlotIds = slotsList
-        .filter((slot) => Array.isArray(slot.roster_uids) && slot.roster_uids.includes(targetUid))
+        .filter(
+          (slot) =>
+            Array.isArray(slot.roster_uids) &&
+            slot.roster_uids.includes(targetUid) &&
+            getSlotWeekKey(slot, currentWeek) === currentWeek
+        )
         .map((slot) => slot.id);
       const nextWeek = { ...weekData };
 
@@ -1138,11 +1528,30 @@ export default function TrainerGroupDashboard() {
         // User doc may be missing; group cleanup still succeeded.
       }
 
+      const affectedSpecialEvents = specialEvents.filter((event) =>
+        Array.isArray(event?.booked_uids) && event.booked_uids.includes(targetUid)
+      );
+      if (affectedSpecialEvents.length > 0) {
+        await Promise.all(
+          affectedSpecialEvents.map(async (event) => {
+            const nextBooked = (event.booked_uids || []).filter((uid) => uid !== targetUid);
+            const nextBookedMeta = { ...(event.booked_meta || {}) };
+            delete nextBookedMeta[targetUid];
+            await updateDoc(doc(db, 'training_special_events', event.id), {
+              booked_uids: nextBooked,
+              booked_meta: nextBookedMeta
+            });
+          })
+        );
+      }
+
       if (selectedMember?.uid === targetUid) {
         setSelectedMember(null);
       }
 
       queryClient.invalidateQueries({ queryKey: ['training-group', groupId] });
+      queryClient.invalidateQueries({ queryKey: ['training-special-events'] });
+      queryClient.invalidateQueries({ queryKey: ['all-users'] });
       queryClient.invalidateQueries({ queryKey: ['user'] });
       toast.success(tr('Trenniline eemaldatud grupist', 'Trainee removed from group'));
     } catch (error) {
@@ -1180,8 +1589,7 @@ export default function TrainerGroupDashboard() {
     setJoiningGameId(game.id);
     try {
       const currentGame = game;
-      const players = getGamePlayers(currentGame);
-      const hasPlayer = players.includes(playerName);
+      const hasPlayer = currentGame.players?.includes(playerName);
       const updatedPlayerUids = {
         ...(currentGame.player_uids || {}),
         ...(user?.id ? { [playerName]: user.id } : {})
@@ -1197,10 +1605,10 @@ export default function TrainerGroupDashboard() {
           player_emails: updatedPlayerEmails
         });
       } else {
-        const gameType = GAME_FORMATS[currentGame.game_type] ? currentGame.game_type : 'classic';
-        const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
+        const gameType = currentGame.game_type || 'classic';
+        const format = GAME_FORMATS[gameType];
         const startDistance = format?.startDistance ?? 0;
-        const updatedPlayers = [...players, playerName];
+        const updatedPlayers = [...(currentGame.players || []), playerName];
         const updatedDistances = { ...(currentGame.player_distances || {}), [playerName]: startDistance };
         const updatedPutts = { ...(currentGame.player_putts || {}), [playerName]: [] };
         const updatedPoints = { ...(currentGame.total_points || {}), [playerName]: 0 };
@@ -1303,13 +1711,7 @@ export default function TrainerGroupDashboard() {
           )}
         </div>
 
-        {!canManageTraining && !hasConfirmedSpot && (
-          <div className="rounded-[24px] border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800 mb-6">
-            {tr('Ootab kinnitust – treener peab koha kinnitama, enne kui trenn avaneb.', 'Waiting for confirmation – the coach must confirm your spot before training opens.')}
-          </div>
-        )}
-
-        {(canManageTraining || hasConfirmedSpot) && (
+        {canViewGroup && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <div className="rounded-[24px] border border-white/70 bg-white/70 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
               <div className="text-xs text-slate-500 uppercase mb-2">{tr('Aktiivsed mängud', 'Active games')}</div>
@@ -1338,9 +1740,9 @@ export default function TrainerGroupDashboard() {
         <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm mb-8 dark:bg-black dark:border-white/10">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
-              <div className="text-sm font-semibold text-slate-800">{tr('Treeningu ajad', 'Training times')}</div>
+              <div className="text-sm font-semibold text-slate-800">{tr('Põhitrennid', 'Primary trainings')}</div>
               <div className="text-xs text-slate-500">
-                {tr('Kestvus vaikimisi 1.5h', 'Default duration 1.5h')} • {tr('Nädal', 'Week')} {weekKey}
+                {tr('Siia lisa tavalised trenniajad, mis juhivad püsikohti, 1x kohti ja attendance’i.', 'Use this for regular training dates that drive reserved spots, one-time spots, and attendance.')}
               </div>
             </div>
             {canManageTraining && (
@@ -1351,7 +1753,7 @@ export default function TrainerGroupDashboard() {
           </div>
 
           {slots.length === 0 && (
-            <div className="text-sm text-slate-500">{tr('Aegu pole veel lisatud.', 'No times added yet.')}</div>
+            <div className="text-sm text-slate-500">{tr('Põhitrenne pole veel lisatud.', 'No primary trainings added yet.')}</div>
           )}
 
           {canManageTraining ? (
@@ -1407,7 +1809,7 @@ export default function TrainerGroupDashboard() {
                     {tr('Valitud', 'Selected')}: {getMemberLabel(selectedMember.uid)}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {slots.map((slot) => {
+                    {sortedSlots.map((slot) => {
                       const rosterCount = Array.isArray(slot.roster_uids) ? slot.roster_uids.length : 0;
                       const maxSpots = Number(slot.max_spots || 0);
                       const isFull = maxSpots > 0 && rosterCount >= maxSpots;
@@ -1427,9 +1829,10 @@ export default function TrainerGroupDashboard() {
                           }`}
                         >
                           <div className="text-sm font-semibold">
-                            {getDayLabel(slot.day)} • {slot.time}
+                            {getSlotDateLabel(slot)} • {slot.time}
                           </div>
                           <div className="text-[10px] text-slate-500 mt-1">
+                            {getSlotWeekdayLabel(slot)} • {' '}
                             {tr('Püsikohti', 'Reserved')}: {rosterCount}/{maxSpots || '-'}
                           </div>
                           {isCurrent && (
@@ -1454,7 +1857,7 @@ export default function TrainerGroupDashboard() {
                 </div>
               )}
 
-              {slots.map((slot) => {
+	              {sortedSlots.map((slot) => {
               const availability = attendanceBySlot(slot);
               const maxSpots = availability.maxSpots || Number(slot.max_spots) || 0;
               const attendance = getEffectiveSlotAttendance(group, weekKey, slot);
@@ -1554,10 +1957,10 @@ export default function TrainerGroupDashboard() {
                       </span>
                       <div>
                         <div className="text-sm font-semibold text-slate-800">
-                          {getDayLabel(slot.day)} • {slot.time}
+                          {getSlotDateLabel(slot)} • {slot.time}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {slot.duration_minutes || 90} min • {tr('Max', 'Max')} {slot.max_spots} {tr('kohta', 'spots')}
+                          {getSlotWeekdayLabel(slot)} • {slot.duration_minutes || 90} min • {tr('Max', 'Max')} {slot.max_spots} {tr('kohta', 'spots')}
                         </div>
                       </div>
                     </div>
@@ -1580,17 +1983,26 @@ export default function TrainerGroupDashboard() {
                     <>
                       {editingSlotId === slot.id && canManageTraining && editingSlot ? (
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-                      <select
-                        value={editingSlot.day}
-                        onChange={(event) => setEditingSlot((prev) => ({ ...prev, day: event.target.value }))}
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
-                      >
-                        {TRAINING_DAYS.map((day) => (
-                          <option key={day.value} value={day.value}>
-                            {day.full}
-                          </option>
-                        ))}
-                      </select>
+                      {editingSlot.date ? (
+                        <input
+                          type="date"
+                          value={editingSlot.date}
+                          onChange={(event) => setEditingSlot((prev) => ({ ...prev, date: event.target.value }))}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+                        />
+                      ) : (
+                        <select
+                          value={editingSlot.day}
+                          onChange={(event) => setEditingSlot((prev) => ({ ...prev, day: event.target.value }))}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+                        >
+                          {TRAINING_DAYS.map((day) => (
+                            <option key={day.value} value={day.value}>
+                              {day.full}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <input
                         type="time"
                         value={editingSlot.time}
@@ -1940,7 +2352,7 @@ export default function TrainerGroupDashboard() {
               </div>
            ) : (
             <div className="space-y-3">
-              {slots.map((slot) => {
+              {sortedSlots.map((slot) => {
                 const availability = attendanceBySlot(slot);
                 const maxSpots = availability.maxSpots || Number(slot.max_spots) || 0;
                 const attendance = getEffectiveSlotAttendance(group, weekKey, slot);
@@ -1950,6 +2362,9 @@ export default function TrainerGroupDashboard() {
                 const releasedRosterIds = rosterIds.filter((uid) => releasedSet.has(uid));
                 const isRosterMember = rosterIds.includes(user?.id);
                 const isReleased = releasedSet.has(user?.id);
+                const isClaimedByUser = attendance.claimed_uids.includes(user?.id);
+                const isRequestedByUser = attendance.request_uids.includes(user?.id);
+                const isWaitlistedByUser = attendance.waitlist_uids.includes(user?.id);
                 const waitlistEntries = (attendance.waitlist_uids || []).map((uid) => {
                   const meta = attendance?.waitlist_meta?.[uid];
                   return { uid, ...meta, kind: 'waitlist' };
@@ -1981,6 +2396,7 @@ export default function TrainerGroupDashboard() {
                 const isOwnSlot = memberRosterSlotIds.includes(slot.id);
                 const canMemberSwap = memberRosterSlots.length > 0 && !hasActiveSwap;
                 const canSecondSessionClaim = canMemberSwap && !hasReleasedOwnSpot;
+                const canPoolClaimSeat = isPoolMemberOnly && availability.available > 0;
                 const isCollapsed = collapsedSlots[slot.id] ?? false;
                 const isExpanded = !isCollapsed;
 
@@ -2028,10 +2444,10 @@ export default function TrainerGroupDashboard() {
                         </span>
                         <div>
                           <div className="text-sm font-semibold text-slate-800">
-                            {getDayLabel(slot.day)} • {slot.time}
+                            {getSlotDateLabel(slot)} • {slot.time}
                           </div>
                           <div className="text-xs text-slate-500">
-                            {slot.duration_minutes || 90} min • Max {slot.max_spots} kohta
+                            {getSlotWeekdayLabel(slot)} • {slot.duration_minutes || 90} min • Max {slot.max_spots} kohta
                           </div>
                         </div>
                       </div>
@@ -2064,6 +2480,36 @@ export default function TrainerGroupDashboard() {
                                 ? tr('Tulen siiski', 'I can make it')
                                 : tr('Täna trenni ei jõua', 'Cannot make training today')}
                             </button>
+                          )}
+                          {!isRosterMember && isClaimedByUser && (
+                            <button
+                              type="button"
+                              disabled={isUpdatingAttendance[slot.id]}
+                              onClick={() => handleLeaveClaimedSpot(slot.id)}
+                              className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-700"
+                            >
+                              {tr('Loobu 1x kohast', 'Cancel one-time spot')}
+                            </button>
+                          )}
+                          {!isRosterMember && canPoolClaimSeat && !isClaimedByUser && (
+                            <button
+                              type="button"
+                              disabled={isUpdatingAttendance[slot.id]}
+                              onClick={() => handlePoolSpotClaim(slot.id)}
+                              className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white"
+                            >
+                              {tr('Broneeri 1x koht', 'Book one-time spot')}
+                            </button>
+                          )}
+                          {!isRosterMember && !isClaimedByUser && isRequestedByUser && !canPoolClaimSeat && (
+                            <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
+                              {tr('Ootab kinnitust', 'Waiting for approval')}
+                            </span>
+                          )}
+                          {!isRosterMember && !isClaimedByUser && isWaitlistedByUser && availability.available === 0 && (
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                              {tr('Ootelistus', 'On waitlist')}
+                            </span>
                           )}
                         </div>
 
@@ -2145,7 +2591,292 @@ export default function TrainerGroupDashboard() {
 
         </div>
 
-        {(canManageTraining || hasConfirmedSpot) && (
+        {!canManageTraining && (
+          <div className="mb-6 rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div>
+                <div className="text-sm font-semibold text-slate-800">{tr('Välitrennid', 'Outdoor trainings')}</div>
+                <div className="text-xs text-slate-500">
+                  {tr('Broneeri ühekorra välitrennid siit grupi seest. Võid võtta mitu tulevast välitrenni.', 'Book one-time outdoor trainings here inside the group. You can book multiple upcoming special events.')}
+                </div>
+              </div>
+            </div>
+
+            {upcomingSpecialEvents.length === 0 ? (
+              <div className="text-sm text-slate-500">{tr('Tulevasi välitrenne pole hetkel lisatud.', 'No upcoming outdoor trainings added right now.')}</div>
+            ) : (
+              <div className="space-y-3">
+                {upcomingSpecialEvents.map((event) => {
+                  const availability = getSpecialEventAvailability(event);
+                  const isBooked = availability.booked.includes(user?.id);
+                  const isPoolMember = isGroupPoolMember(group, user?.id, { knownMember: isGroupMember });
+                  const bookedEntries = availability.booked.map((uid) => ({
+                    uid,
+                    meta: availability.bookedMeta?.[uid] || null
+                  }));
+
+                  return (
+                    <div
+                      key={event.id}
+                      className="rounded-2xl border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-800">
+                            {event.title || tr('Välitrenn', 'Outdoor training')}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1">
+                            {formatSpecialEventLabel(event)} • {event.duration_minutes || 90} min
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1">
+                            {tr('Vabu kohti', 'Free spots')}: {availability.available} • {tr('Broneeritud', 'Booked')}: {availability.booked.length}/{availability.maxSpots}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isBooked ? (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelOwnSpecialEvent(event)}
+                              disabled={specialEventAction[event.id]}
+                              className="rounded-full border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-50 disabled:opacity-60"
+                            >
+                              {specialEventAction[event.id] ? tr('Eemaldan...', 'Removing...') : tr('Loobu kohast', 'Cancel spot')}
+                            </button>
+                          ) : !isPoolMember ? (
+                            <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500">
+                              {tr('Ainult pooli liikmetele', 'Only for pool members')}
+                            </span>
+                          ) : availability.isFull ? (
+                            <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500">
+                              {tr('Täis', 'Full')}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleBookOwnSpecialEvent(event)}
+                              disabled={specialEventAction[event.id]}
+                              className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
+                            >
+                              {specialEventAction[event.id] ? tr('Broneerin...', 'Booking...') : tr('Broneeri koht', 'Book spot')}
+                            </button>
+                          )}
+                          {isBooked && (
+                            <span className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700">
+                              {tr('Sinu broneering', 'Your booking')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        {bookedEntries.length === 0 ? (
+                          <div className="text-xs text-slate-500">{tr('Broneeringuid veel pole.', 'No bookings yet.')}</div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                            {bookedEntries.map((entry) => (
+                              <div
+                                key={`${event.id}-${entry.uid}`}
+                                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs text-emerald-800"
+                              >
+                                <div className="text-[10px] uppercase text-emerald-600">{tr('Broneeritud', 'Booked')}</div>
+                                <div className="text-sm font-semibold truncate">{getMemberLabel(entry.uid, entry.meta)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {canManageTraining && (
+          <div className="mb-6 rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div>
+                <div className="text-sm font-semibold text-slate-800">{tr('Eraldi välitrennid / erisündmused', 'Separate outdoor trainings / special events')}</div>
+                <div className="text-xs text-slate-500">
+                  {tr('Kasuta ainult üksikute erisündmuste jaoks. Need ei ole tavalised põhitrenni slotid.', 'Use this only for one-off special events. These are not regular training slots.')}
+                </div>
+              </div>
+              {pastSpecialEventsCount > 0 && (
+                <div className="text-[11px] text-slate-400">
+                  {tr('Möödunud sündmused ei mõjuta enam pooli', 'Past events no longer affect the pool')}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
+              <div className="md:col-span-2">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <CalendarDays className="h-4 w-4 text-emerald-600" />
+                    {tr('Vali kuupäevad', 'Pick dates')}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setNewSpecialEvent((prev) => ({ ...prev, selectedDates: [] }))}
+                    disabled={!newSpecialEvent.selectedDates?.length}
+                    className="text-xs font-semibold text-slate-500 disabled:opacity-40"
+                  >
+                    {tr('Puhasta', 'Clear')}
+                  </button>
+                </div>
+                <MultiDatePicker
+                  month={specialEventPickerMonth}
+                  onMonthChange={setSpecialEventPickerMonth}
+                  selectedDates={newSpecialEvent.selectedDates}
+                  onToggleDate={(dateValue) => {
+                    setNewSpecialEvent((prev) => {
+                      const selected = new Set(prev.selectedDates || []);
+                      if (selected.has(dateValue)) {
+                        selected.delete(dateValue);
+                      } else {
+                        selected.add(dateValue);
+                      }
+                      return { ...prev, selectedDates: Array.from(selected).sort() };
+                    });
+                  }}
+                  lang={lang}
+                />
+                {newSpecialEvent.selectedDates?.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {newSpecialEvent.selectedDates.map((dateValue) => (
+                      <span
+                        key={dateValue}
+                        className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700"
+                      >
+                        {format(parseISO(dateValue), 'dd.MM')}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-3 md:col-span-3">
+                <div className="text-xs text-slate-400">
+                  {tr('Iga valitud kuupäev luuakse eraldi ühekorra välitrennina.', 'Each selected date becomes a separate one-time special event.')}
+                </div>
+                <input
+                  type="text"
+                  value={newSpecialEvent.title}
+                  onChange={(event) => setNewSpecialEvent((prev) => ({ ...prev, title: event.target.value }))}
+                  placeholder={tr('Erisündmuse nimi', 'Special event name')}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+                />
+                <input
+                  type="time"
+                  value={newSpecialEvent.time}
+                  onChange={(event) => setNewSpecialEvent((prev) => ({ ...prev, time: event.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  value={newSpecialEvent.maxSpots}
+                  onChange={(event) => setNewSpecialEvent((prev) => ({ ...prev, maxSpots: event.target.value }))}
+                  placeholder={tr('Kohti', 'Spots')}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+                />
+                <input
+                  type="number"
+                  min={30}
+                  step={15}
+                  value={newSpecialEvent.duration}
+                  onChange={(event) => setNewSpecialEvent((prev) => ({ ...prev, duration: event.target.value }))}
+                  placeholder={tr('Kestus minutites', 'Duration in minutes')}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateSpecialEvent}
+                  disabled={isSavingSpecialEvent}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
+                >
+                  <Plus className="w-3 h-3" />
+                  {isSavingSpecialEvent ? tr('Lisan...', 'Adding...') : tr('Lisa valitud välitrennid', 'Add selected special events')}
+                </button>
+              </div>
+            </div>
+
+            {upcomingSpecialEvents.length === 0 ? (
+              <div className="text-sm text-slate-500">{tr('Eraldi välitrenne või erisündmusi pole veel lisatud.', 'No separate outdoor trainings or special events added yet.')}</div>
+            ) : (
+              <div className="space-y-3">
+                {upcomingSpecialEvents.map((event) => {
+                  const availability = getSpecialEventAvailability(event);
+                  const bookedEntries = availability.booked.map((uid) => ({
+                    uid,
+                    meta: availability.bookedMeta?.[uid] || null
+                  }));
+
+                  return (
+                    <div
+                      key={event.id}
+                      className="rounded-2xl border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-800">
+                            {event.title || tr('Välitrenn', 'Special event')}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1">
+                            {formatSpecialEventLabel(event)} • {event.duration_minutes || 90} min
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                            {tr('Vabu', 'Free')}: {availability.available}
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                            {tr('Broneeritud', 'Booked')}: {availability.booked.length}/{availability.maxSpots}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSpecialEvent(event.id)}
+                            disabled={removingSpecialEventId === event.id}
+                            className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-60"
+                          >
+                            <Trash2 className="w-3 h-3 inline-block mr-1" />
+                            {removingSpecialEventId === event.id ? tr('Kustutan...', 'Deleting...') : tr('Kustuta', 'Delete')}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        {bookedEntries.length === 0 ? (
+                          <div className="text-xs text-slate-500">{tr('Broneeringuid veel pole.', 'No bookings yet.')}</div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                            {bookedEntries.map((entry) => (
+                              <div
+                                key={`${event.id}-${entry.uid}`}
+                                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs text-emerald-800"
+                              >
+                                <div className="text-[10px] uppercase text-emerald-600">{tr('Broneeritud', 'Booked')}</div>
+                                <div className="text-sm font-semibold truncate">{getMemberLabel(entry.uid, entry.meta)}</div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSpecialEventBooking(event.id, entry.uid)}
+                                  className="mt-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
+                                >
+                                  {tr('Eemalda', 'Remove')}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {canViewGroup && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-black dark:border-white/10">
             <div className="flex items-center justify-between mb-4">
@@ -2252,41 +2983,89 @@ export default function TrainerGroupDashboard() {
 
         {canManageTraining && (
           <div className="mt-6 rounded-[22px] border border-slate-100 bg-white px-4 py-4 dark:bg-black dark:border-white/10">
-            <div className="text-xs font-semibold text-slate-500 mb-3">{tr('Lisa uus aeg', 'Add new time')}</div>
+            <div className="text-xs font-semibold text-slate-500 mb-1">{tr('Lisa põhitrennid kalendrisse', 'Add primary trainings to calendar')}</div>
+            <div className="mb-3 text-xs text-slate-400">
+              {tr('Vali kuupäevad, millele tahad tavalise trennikohaga sessioonid luua.', 'Pick the dates where you want standard training sessions with spots.')}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <select
-                value={newSlot.day}
-                onChange={(event) => setNewSlot((prev) => ({ ...prev, day: event.target.value }))}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
-              >
-                {dayOptions.map((day) => (
-                  <option key={day.value} value={day.value}>
-                    {day.full}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="time"
-                value={newSlot.time}
-                onChange={(event) => setNewSlot((prev) => ({ ...prev, time: event.target.value }))}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
-              />
-              <input
-                type="number"
-                min={1}
-                value={newSlot.maxSpots}
-                onChange={(event) => setNewSlot((prev) => ({ ...prev, maxSpots: event.target.value }))}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
-                placeholder={tr('Kohti', 'Spots')}
-              />
-              <button
-                type="button"
-                onClick={handleAddSlot}
-                disabled={isSavingSlot}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
-              >
-                <Plus className="w-3 h-3" /> {tr('Lisa', 'Add')}
-              </button>
+                <div className="md:col-span-2">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+                      <CalendarDays className="h-4 w-4 text-emerald-600" />
+                      {tr('Vali kuupäevad', 'Pick dates')}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNewSlot((prev) => ({ ...prev, selectedDates: [] }))}
+                      disabled={!newSlot.selectedDates?.length}
+                      className="text-xs font-semibold text-slate-500 disabled:opacity-40"
+                    >
+                      {tr('Puhasta', 'Clear')}
+                    </button>
+                  </div>
+                  <MultiDatePicker
+                    month={slotPickerMonth}
+                    onMonthChange={setSlotPickerMonth}
+                    selectedDates={newSlot.selectedDates}
+                    onToggleDate={(dateValue) => {
+                      setNewSlot((prev) => {
+                        const selected = new Set(prev.selectedDates || []);
+                        if (selected.has(dateValue)) {
+                          selected.delete(dateValue);
+                        } else {
+                          selected.add(dateValue);
+                        }
+                        return { ...prev, selectedDates: Array.from(selected).sort() };
+                      });
+                    }}
+                    lang={lang}
+                  />
+                  {newSlot.selectedDates?.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {newSlot.selectedDates.map((dateValue) => (
+                        <span
+                          key={dateValue}
+                          className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700"
+                        >
+                          {format(parseISO(dateValue), 'dd.MM')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3 md:col-span-2">
+                  <input
+                    type="time"
+                    value={newSlot.time}
+                    onChange={(event) => setNewSlot((prev) => ({ ...prev, time: event.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={newSlot.maxSpots}
+                    onChange={(event) => setNewSlot((prev) => ({ ...prev, maxSpots: event.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+                    placeholder={tr('Kohti', 'Spots')}
+                  />
+                  <input
+                    type="number"
+                    min={30}
+                    step={15}
+                    value={newSlot.duration}
+                    onChange={(event) => setNewSlot((prev) => ({ ...prev, duration: event.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-black dark:border-white/10"
+                    placeholder={tr('Kestus minutites', 'Duration in minutes')}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddSlot}
+                    disabled={isSavingSlot}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
+                  >
+                    <Plus className="w-3 h-3" /> {tr('Lisa valitud kuupäevad', 'Add selected dates')}
+                  </button>
+                </div>
             </div>
           </div>
         )}

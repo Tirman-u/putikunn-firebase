@@ -39,7 +39,9 @@ export const round1 = (value) => Math.round((Number(value) || 0) * 10) / 10;
 
 export const formatSlotLabel = (slot) => {
   if (!slot) return '';
-  const dayLabel = getDayLabel(slot.day);
+  const dayLabel = slot.date
+    ? new Date(`${slot.date}T12:00:00`).toLocaleDateString('et-EE', { day: '2-digit', month: '2-digit' })
+    : getDayLabel(slot.day);
   const timeLabel = slot.time || '';
   return `${dayLabel} ${timeLabel}`.trim();
 };

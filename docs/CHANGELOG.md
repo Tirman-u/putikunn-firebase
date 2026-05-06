@@ -10,6 +10,12 @@ This file is the lightweight release history for Putikunn.
 - If the build is part of an incident or rollback chain, link the incident note.
 - Version numbers may skip when an emergency build was rolled back or never kept.
 
+## 0.1.134 - 2026-05-06 - test + prod
+
+- Restored the latest outdoor-training special-event flow and version base.
+- Let regular group members see every upcoming outdoor-training event with booked participant names, even when the event is full.
+- Kept outdoor special events separate from regular indoor training slots and removed the misleading permanent-spot confirmation gate from the group view.
+
 ## 0.1.107 - 2026-04-08 - test
 
 - Unified ATW hosted-game display logic for `Parim tulemus` and `Katseid` across host, player and leaderboard views.

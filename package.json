@@ -1,17 +1,20 @@
 {
   "name": "base44-app",
   "private": true,
-  "version": "0.1.107",
+  "version": "0.1.134",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/alias-legacy-assets.mjs",
+    "build": "vite build",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
+    "functions:install": "npm --prefix functions install",
+    "deploy:functions": "firebase deploy --only functions,firestore:rules --project putikunn-migration",
+    "deploy:dev": "firebase deploy --only hosting:dev --project putikunn-migration",
     "training:recalc-rank-hc": "node scripts/recalc-training-rank-hc-points.mjs"
   },
   "dependencies": {

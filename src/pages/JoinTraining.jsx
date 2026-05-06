@@ -9,7 +9,19 @@ import { createPageUrl } from '@/utils';
 import { GAME_FORMATS } from '@/components/putting/gameRules';
 import BackButton from '@/components/ui/back-button';
 import HomeButton from '@/components/ui/home-button';
-import { getDayFullLabel, getEffectiveSlotAttendance, getSlotAvailability, getWeekKey } from '@/lib/training-utils';
+import {
+  applyDirectSlotClaim,
+  compareTrainingSlots,
+  formatSlotOccurrenceDate,
+  getDayFullLabel,
+  getSlotAvailability,
+  getSlotWeekKey,
+  getWeekKey
+} from '@/lib/training-utils';
+import {
+  compareSpecialEvents,
+  getSpecialEventAvailability
+} from '@/lib/training-special-events';
 import { cn } from '@/lib/utils';
 import {
   collection,
@@ -21,8 +33,10 @@ import {
   updateDoc,
   doc,
   deleteField,
+  arrayUnion,
   arrayRemove,
-  runTransaction
+  runTransaction,
+  serverTimestamp
 } from 'firebase/firestore';
 
 export default function JoinTraining() {
@@ -41,12 +55,11 @@ export default function JoinTraining() {
   React.useEffect(() => {
     if (!pendingGroup || pendingSlots.length !== 1) return;
     const slot = pendingSlots[0];
-    const maxSpots = Number(slot?.max_spots || 0);
-    const rosterCount = Array.isArray(slot?.roster_uids) ? slot.roster_uids.length : 0;
-    if (maxSpots === 0 || rosterCount < maxSpots) {
+    const availability = getSlotAvailability(slot, pendingGroup, weekKey);
+    if (availability.available > 0) {
       setSelectedSlotId(slot.id);
     }
-  }, [pendingGroup, pendingSlots]);
+  }, [pendingGroup, pendingSlots, weekKey]);
 
 
   const { data: user } = useQuery({
@@ -66,6 +79,10 @@ export default function JoinTraining() {
   );
 
   const groupIds = React.useMemo(() => Object.keys(trainingGroupNames), [trainingGroupNames]);
+  const invalidateSpecialEventQueries = React.useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['training-special-events-by-group'] });
+    queryClient.invalidateQueries({ queryKey: ['training-special-events'] });
+  }, [queryClient]);
 
   const { data: publicGroups = [] } = useQuery({
     queryKey: ['training-public-groups'],
@@ -79,12 +96,15 @@ export default function JoinTraining() {
   });
 
   const publicSlots = React.useMemo(() => {
-    return publicGroups.flatMap((group) =>
-      (group.slots || [])
-        .filter((slot) => slot?.is_public)
-        .map((slot) => ({ group, slot }))
-    );
-  }, [publicGroups]);
+    return publicGroups
+      .flatMap((group) =>
+        (group.slots || [])
+          .filter((slot) => slot?.is_public)
+          .map((slot) => ({ group, slot }))
+      )
+      .filter(({ group, slot }) => !getSlotAvailability(slot, group, weekKey).isPast)
+      .sort((left, right) => compareTrainingSlots(left.slot, right.slot, weekKey));
+  }, [publicGroups, weekKey]);
 
   const { data: trainingGames = [], isLoading: isLoadingGames } = useQuery({
     queryKey: ['training-games', groupIds.join('|')],
@@ -130,27 +150,30 @@ export default function JoinTraining() {
     staleTime: 30000
   });
 
-  const isPrivileged = ['trainer', 'admin', 'super_admin'].includes(user?.app_role || '');
-  const confirmedByGroup = React.useMemo(() => {
-    if (!user?.id) return {};
-    const map = {};
-    groupIds.forEach((groupId) => {
-      const detail = trainingGroupDetails[groupId];
-      if (!detail) {
-        map[groupId] = false;
-        return;
+  const { data: specialEventsByGroup = {} } = useQuery({
+    queryKey: ['training-special-events-by-group', groupIds.join('|')],
+    enabled: groupIds.length > 0,
+    queryFn: async () => {
+      const events = [];
+      const chunkSize = 10;
+      for (let i = 0; i < groupIds.length; i += chunkSize) {
+        const chunk = groupIds.slice(i, i + chunkSize);
+        const q = query(collection(db, 'training_special_events'), where('group_id', 'in', chunk));
+        const snap = await getDocs(q);
+        events.push(...snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
       }
-      const slots = Array.isArray(detail.slots) ? detail.slots : [];
-      map[groupId] = slots.some((slot) => {
-        const roster = Array.isArray(slot?.roster_uids) ? slot.roster_uids : [];
-        if (roster.includes(user.id)) return true;
-        const attendance = getEffectiveSlotAttendance(detail, weekKey, slot);
-        const claimed = Array.isArray(attendance?.claimed_uids) ? attendance.claimed_uids : [];
-        return claimed.includes(user.id);
-      });
-    });
-    return map;
-  }, [groupIds, trainingGroupDetails, user?.id, weekKey]);
+
+      return events
+        .filter((event) => event?.status !== 'cancelled')
+        .sort(compareSpecialEvents)
+        .reduce((acc, event) => {
+          if (!acc[event.group_id]) acc[event.group_id] = [];
+          acc[event.group_id].push(event);
+          return acc;
+        }, {});
+    },
+    staleTime: 20000
+  });
 
   const resetPendingJoin = () => {
     setPendingGroup(null);
@@ -158,7 +181,45 @@ export default function JoinTraining() {
     setSelectedSlotId('');
   };
 
-  const submitJoinRequest = async (group, slotId, source = 'pin') => {
+  const joinGroupPoolDirectly = async (group, source = 'pin_pool') => {
+    if (!group?.id || !user?.id) {
+      throw new Error('Gruppi ei leitud');
+    }
+
+    const displayName = user?.display_name || user?.full_name || user?.email || 'Trenniline';
+    const userEmail = user?.email || '';
+
+    await runTransaction(db, async (transaction) => {
+      const groupRef = doc(db, 'training_groups', group.id);
+      const userRef = doc(db, 'users', user.id);
+      const snap = await transaction.get(groupRef);
+      if (!snap.exists()) throw new Error('Gruppi ei leitud');
+
+      const groupData = snap.data() || {};
+      const existingMember = groupData.members?.[user.id] || {};
+
+      transaction.update(groupRef, {
+        member_uids: arrayUnion(user.id),
+        [`members.${user.id}`]: {
+          name: existingMember.name || displayName,
+          email: existingMember.email || userEmail,
+          joined_at: existingMember.joined_at || serverTimestamp(),
+          source
+        }
+      });
+      transaction.set(
+        userRef,
+        {
+          training_groups: {
+            [group.id]: groupData.name || group.name || 'Treening'
+          }
+        },
+        { merge: true }
+      );
+    });
+  };
+
+  const joinGroupAndClaimSlotDirectly = async (group, slotId, source = 'pin') => {
     if (!group?.id || !user?.id || !slotId) {
       throw new Error('Vali trenn');
     }
@@ -168,50 +229,50 @@ export default function JoinTraining() {
 
     await runTransaction(db, async (transaction) => {
       const groupRef = doc(db, 'training_groups', group.id);
+      const userRef = doc(db, 'users', user.id);
       const snap = await transaction.get(groupRef);
       if (!snap.exists()) throw new Error('Gruppi ei leitud');
-      const groupData = snap.data();
+
+      const groupData = snap.data() || {};
       const currentWeek = getWeekKey();
       const slots = Array.isArray(groupData.slots) ? groupData.slots : [];
       const targetSlot = slots.find((slot) => slot.id === slotId);
       if (!targetSlot) throw new Error('Valitud trenni ei leitud');
+      const slotWeekKey = getSlotWeekKey(targetSlot, currentWeek);
 
-      const weekData = { ...(groupData.attendance?.[currentWeek] || {}) };
-      const slotData = weekData[slotId] || {
-        released_uids: [],
-        claimed_uids: [],
-        waitlist_uids: [],
-        waitlist_meta: {},
-        request_uids: [],
-        request_meta: {}
-      };
+      const availability = getSlotAvailability(targetSlot, groupData, slotWeekKey);
+      if (availability.available <= 0) {
+        throw new Error('Vabu kohti pole');
+      }
 
-      const requests = new Set(slotData.request_uids || []);
-      requests.add(user.id);
-      const waitlist = (slotData.waitlist_uids || []).filter((uid) => uid !== user.id);
-      const waitlistMeta = { ...(slotData.waitlist_meta || {}) };
-      delete waitlistMeta[user.id];
-
-      weekData[slotId] = {
-        ...slotData,
-        request_uids: Array.from(requests),
-        request_meta: {
-          ...(slotData.request_meta || {}),
-          [user.id]: {
-            name: displayName,
-            email: userEmail,
-            type: 'roster',
-            source,
-            requested_at: new Date().toISOString()
-          }
-        },
-        waitlist_uids: waitlist,
-        waitlist_meta: waitlistMeta
-      };
+      const existingMember = groupData.members?.[user.id] || {};
+      const nextWeekData = applyDirectSlotClaim(groupData.attendance?.[slotWeekKey] || {}, slotId, {
+        userId: user.id,
+        name: existingMember.name || displayName,
+        email: existingMember.email || userEmail,
+        source,
+        type: 'claim'
+      });
 
       transaction.update(groupRef, {
-        [`attendance.${currentWeek}`]: weekData
+        member_uids: arrayUnion(user.id),
+        [`members.${user.id}`]: {
+          name: existingMember.name || displayName,
+          email: existingMember.email || userEmail,
+          joined_at: existingMember.joined_at || serverTimestamp(),
+          source
+        },
+        [`attendance.${slotWeekKey}`]: nextWeekData
       });
+      transaction.set(
+        userRef,
+        {
+          training_groups: {
+            [group.id]: groupData.name || group.name || 'Treening'
+          }
+        },
+        { merge: true }
+      );
     });
   };
 
@@ -238,31 +299,33 @@ export default function JoinTraining() {
       const docSnap = snap.docs[0];
       const group = { id: docSnap.id, ...docSnap.data() };
       const slots = Array.isArray(group.slots) ? group.slots : [];
+      const visibleSlots = slots
+        .filter((slot) => !getSlotAvailability(slot, group, weekKey).isPast)
+        .sort((left, right) => compareTrainingSlots(left, right, weekKey));
       const hasExistingGroups = groupIds.length > 0;
       const joiningNewGroup = !groupIds.includes(group.id);
       if (hasExistingGroups && joiningNewGroup) {
-        const wantsExtra = window.confirm('Sul on juba aktiivne grupp olemas. Kas soovid teist püsiaega juurde?');
+        const wantsExtra = window.confirm('Sul on juba aktiivne grupp olemas. Kas soovid selle trenniga samuti liituda?');
         if (!wantsExtra) {
           return;
         }
       }
-      if (slots.length > 0) {
+      if (visibleSlots.length > 0) {
         setPendingGroup(group);
-        setPendingSlots(slots);
+        setPendingSlots(visibleSlots);
         setSelectedSlotId('');
         return;
       }
 
-      toast.error('Selles grupis pole ühtegi trenniaega. Palu treenerilt kinnitust käsitsi.');
+      await joinGroupPoolDirectly(group, 'pin_pool');
+      toast.success(`Liitusid grupi "${group?.name || 'Treening'}" pooliga`);
+      queryClient.invalidateQueries({ queryKey: ['user'] });
       queryClient.invalidateQueries({ queryKey: ['training-group-details'] });
+      invalidateSpecialEventQueries();
       queryClient.invalidateQueries({ queryKey: ['training-games'] });
       resetPendingJoin();
       setPin('');
-      if (hasExistingGroups) {
-        setShowJoinForm(false);
-      } else {
-        navigate(-1);
-      }
+      if (hasExistingGroups) setShowJoinForm(false);
     } catch (error) {
       toast.error(error?.message || 'Liitumine ebaõnnestus');
     } finally {
@@ -270,29 +333,31 @@ export default function JoinTraining() {
     }
   };
 
-  const handleConfirmJoin = async (skipSlot = false) => {
+  const handleConfirmJoin = async (joinPoolOnly = false) => {
     if (!pendingGroup) return;
-    const fallbackSlotId = pendingSlots[0]?.id || '';
-    const targetSlotId = skipSlot ? fallbackSlotId : selectedSlotId;
-    if (!targetSlotId) {
+    const targetSlotId = joinPoolOnly ? '' : selectedSlotId;
+    if (!joinPoolOnly && !targetSlotId) {
       toast.error('Vali trenn');
       return;
     }
     setIsJoining(true);
     try {
       const hadGroups = groupIds.length > 0;
-      await submitJoinRequest(pendingGroup, targetSlotId, 'pin');
-      toast.success(`Taotlus saadetud treenerile: "${pendingGroup?.name || 'Treening'}"`);
+      if (joinPoolOnly) {
+        await joinGroupPoolDirectly(pendingGroup, 'pin_pool');
+        toast.success(`Liitusid grupi "${pendingGroup?.name || 'Treening'}" pooliga`);
+      } else {
+        await joinGroupAndClaimSlotDirectly(pendingGroup, targetSlotId, 'pin_claim');
+        toast.success(`Koht broneeritud trennis "${pendingGroup?.name || 'Treening'}"`);
+      }
+      queryClient.invalidateQueries({ queryKey: ['user'] });
       queryClient.invalidateQueries({ queryKey: ['training-group-details'] });
       queryClient.invalidateQueries({ queryKey: ['training-public-groups'] });
+      invalidateSpecialEventQueries();
       queryClient.invalidateQueries({ queryKey: ['training-games'] });
       resetPendingJoin();
       setPin('');
-      if (hadGroups) {
-        setShowJoinForm(false);
-      } else {
-        navigate(-1);
-      }
+      if (hadGroups) setShowJoinForm(false);
     } catch (error) {
       toast.error(error?.message || 'Liitumine ebaõnnestus');
     } finally {
@@ -300,19 +365,14 @@ export default function JoinTraining() {
     }
   };
 
-  const getGamePlayers = (game) => {
-    if (!game) return [];
-    return Array.from(new Set([
-      ...(Array.isArray(game.players) ? game.players : []),
-      ...Object.keys(game.player_putts || {}),
-      ...Object.keys(game.total_points || {}),
-      ...Object.keys(game.live_stats || {}),
-      ...Object.keys(game.atw_state || {})
-    ].filter(Boolean)));
-  };
-
   const getPlayerCount = (game) => {
-    return getGamePlayers(game).length;
+    if (!game) return 0;
+    return (
+      game.players?.length ||
+      Object.keys(game.player_putts || {}).length ||
+      Object.keys(game.atw_state || {}).length ||
+      0
+    );
   };
 
   const joinTrainingGame = async (game) => {
@@ -325,8 +385,7 @@ export default function JoinTraining() {
     setJoiningGameId(game.id);
     try {
       const currentGame = game;
-      const players = getGamePlayers(currentGame);
-      const hasPlayer = players.includes(playerName);
+      const hasPlayer = currentGame.players?.includes(playerName);
       const updatedPlayerUids = {
         ...(currentGame.player_uids || {}),
         ...(user?.id ? { [playerName]: user.id } : {})
@@ -342,10 +401,10 @@ export default function JoinTraining() {
           player_emails: updatedPlayerEmails
         });
       } else {
-        const gameType = GAME_FORMATS[currentGame.game_type] ? currentGame.game_type : 'classic';
-        const format = GAME_FORMATS[gameType] || GAME_FORMATS.classic;
+        const gameType = currentGame.game_type || 'classic';
+        const format = GAME_FORMATS[gameType];
         const startDistance = format?.startDistance ?? 0;
-        const updatedPlayers = [...players, playerName];
+        const updatedPlayers = [...(currentGame.players || []), playerName];
         const updatedDistances = { ...(currentGame.player_distances || {}), [playerName]: startDistance };
         const updatedPutts = { ...(currentGame.player_putts || {}), [playerName]: [] };
         const updatedPoints = { ...(currentGame.total_points || {}), [playerName]: 0 };
@@ -403,6 +462,8 @@ export default function JoinTraining() {
       });
       toast.success('Lahkusid trennist');
       queryClient.invalidateQueries({ queryKey: ['user'] });
+      queryClient.invalidateQueries({ queryKey: ['training-group-details'] });
+      invalidateSpecialEventQueries();
       queryClient.invalidateQueries({ queryKey: ['training-games'] });
     } catch (error) {
       toast.error(error?.message || 'Trennist lahkumine ebaõnnestus');
@@ -418,7 +479,10 @@ export default function JoinTraining() {
         if (!snap.exists()) throw new Error('Gruppi ei leitud');
         const groupData = snap.data();
         const currentWeek = getWeekKey();
-        const weekData = groupData.attendance?.[currentWeek] || {};
+        const slots = Array.isArray(groupData.slots) ? groupData.slots : [];
+        const targetSlot = slots.find((slot) => slot.id === slotId);
+        const slotWeekKey = getSlotWeekKey(targetSlot, currentWeek);
+        const weekData = { ...(groupData.attendance?.[slotWeekKey] || {}) };
         const slotData = weekData[slotId] || {
           released_uids: [],
           claimed_uids: [],
@@ -427,10 +491,10 @@ export default function JoinTraining() {
           request_uids: [],
           request_meta: {}
         };
-        const nextSlotData = updater(slotData, groupData, currentWeek);
+        const nextSlotData = updater(slotData, groupData, slotWeekKey);
         weekData[slotId] = nextSlotData;
         transaction.update(groupRef, {
-          [`attendance.${currentWeek}`]: weekData
+          [`attendance.${slotWeekKey}`]: weekData
         });
       });
       queryClient.invalidateQueries({ queryKey: ['training-public-groups'] });
@@ -511,58 +575,70 @@ export default function JoinTraining() {
 
         {trainingGroupEntries.length > 0 && (
           <div className="mb-6 rounded-3xl border border-white/70 bg-white/70 p-4 shadow-sm backdrop-blur-sm dark:bg-black dark:border-white/10">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <div className="text-xs font-semibold text-slate-500 uppercase">Sinu trennid</div>
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold text-slate-500 uppercase">Sinu trennid</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Ava olemasolev trenn või lisa uus trenn treeneri PIN-iga.
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowJoinForm((prev) => !prev)}
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:bg-black dark:border-white/10 dark:text-emerald-300"
+                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 dark:bg-emerald-500 dark:text-black"
               >
                 <Plus className="w-3 h-3" />
-                {showJoinForm ? 'Peida PIN' : 'Lisa uus PIN'}
+                {showJoinForm ? 'Peida PIN-vorm' : 'Lisa trenn PIN-iga'}
               </button>
             </div>
             <div className="space-y-2">
-              {trainingGroupEntries.map((group) => (
-                <div
-                  key={group.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-black dark:text-emerald-300 dark:border dark:border-white/10"
-                >
-                  <div className="inline-flex items-center gap-2">
-                    <GraduationCap className="w-3 h-3" />
-                    {group.name}
+              {trainingGroupEntries.map((group) => {
+                const upcomingSpecialEventCount = (specialEventsByGroup[group.id] || [])
+                  .filter((event) => !getSpecialEventAvailability(event).isPast)
+                  .length;
+                return (
+                  <div
+                    key={group.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-sm shadow-sm dark:bg-black dark:text-emerald-300 dark:border-white/10"
+                  >
+                    <div>
+                    <div className="inline-flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">
+                      <GraduationCap className="w-4 h-4 text-emerald-600" />
+                      {group.name}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">Olemasolev trenn</div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {isLoadingGroupDetails && !trainingGroupDetails[group.id] ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400">
-                        Laen...
-                      </span>
-                    ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {upcomingSpecialEventCount > 0 && (
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700">
+                          {upcomingSpecialEventCount} {upcomingSpecialEventCount === 1 ? 'välitrenn sees' : 'välitrenni sees'}
+                        </span>
+                      )}
+                      {isLoadingGroupDetails && !trainingGroupDetails[group.id] ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+                          Laen...
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`${createPageUrl('TrainerGroupDashboard')}?id=${group.id}`)}
+                          className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+                        >
+                          Ava trenni vaade
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => navigate(`${createPageUrl('TrainerGroupDashboard')}?id=${group.id}`)}
-                        disabled={!isPrivileged && !confirmedByGroup[group.id]}
-                        className={cn(
-                          'inline-flex items-center gap-1 text-[11px] font-semibold',
-                          !isPrivileged && !confirmedByGroup[group.id]
-                            ? 'text-slate-400 cursor-not-allowed'
-                            : 'text-emerald-600 hover:text-emerald-700'
-                        )}
+                        onClick={() => handleLeaveGroup(group.id, group.name)}
+                        className="inline-flex items-center gap-1 rounded-full border border-red-100 px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-50 hover:text-red-600 dark:border-red-400/30"
                       >
-                        {(!isPrivileged && !confirmedByGroup[group.id]) ? 'Ootab kinnitust' : 'Ava trenn'}
+                        <LogOut className="w-3 h-3" />
+                        Lahku
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleLeaveGroup(group.id, group.name)}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600"
-                    >
-                      <LogOut className="w-3 h-3" />
-                      Lahku
-                    </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -570,7 +646,12 @@ export default function JoinTraining() {
         {(trainingGroupEntries.length === 0 || showJoinForm) && (
           <div className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm space-y-4 dark:bg-black dark:border-white/10">
             {trainingGroupEntries.length > 0 && (
-              <div className="text-xs font-semibold text-slate-500 uppercase">Lisa uus trenn</div>
+              <div>
+                <div className="text-xs font-semibold text-slate-500 uppercase">Lisa trenn PIN-iga</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Sisesta treenerilt saadud 4-kohaline grupi PIN.
+                </div>
+              </div>
             )}
             <div>
               <label className="text-xs font-semibold text-slate-500 uppercase">PIN</label>
@@ -600,10 +681,10 @@ export default function JoinTraining() {
                 <div className="text-xs font-semibold text-slate-500 uppercase">Vali trenn</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {pendingSlots.map((slot) => {
-                    const maxSpots = Number(slot?.max_spots || 0);
-                    const rosterCount = Array.isArray(slot?.roster_uids) ? slot.roster_uids.length : 0;
-                    const isFull = maxSpots > 0 && rosterCount >= maxSpots;
+                    const availability = getSlotAvailability(slot, pendingGroup, weekKey);
+                    const isFull = availability.available <= 0;
                     const isSelected = selectedSlotId === slot.id;
+                    const slotDateLabel = formatSlotOccurrenceDate(slot, weekKey);
                     return (
                       <button
                         key={slot.id}
@@ -619,10 +700,13 @@ export default function JoinTraining() {
                         )}
                       >
                         <div className="text-sm font-semibold">
-                          {getDayFullLabel(slot.day)} • {slot.time}
+                          {slotDateLabel || getDayFullLabel(slot.day)} • {slot.time}
                         </div>
                         <div className="text-[11px] text-slate-500 mt-1">
-                          Püsikohti: {rosterCount}/{maxSpots || '-'}
+                          {getDayFullLabel(slot.day)}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">
+                          Vabu kohti: {availability.available} · Püsikohti: {availability.roster.length}/{availability.maxSpots || '-'}
                         </div>
                         {isFull && (
                           <div className="text-[11px] text-amber-600 mt-1">Täis</div>
@@ -638,22 +722,16 @@ export default function JoinTraining() {
                     disabled={isJoining || !selectedSlotId}
                     className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
                   >
-                    {isJoining ? 'Saadan...' : 'Saada taotlus treenerile'}
+                    {isJoining ? 'Broneerin...' : 'Broneeri koht'}
                   </button>
-                  {pendingSlots.every((slot) => {
-                    const maxSpots = Number(slot?.max_spots || 0);
-                    const rosterCount = Array.isArray(slot?.roster_uids) ? slot.roster_uids.length : 0;
-                    return maxSpots > 0 && rosterCount >= maxSpots;
-                  }) && (
-                    <button
-                      type="button"
-                      onClick={() => handleConfirmJoin(true)}
-                      disabled={isJoining}
-                      className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
-                    >
-                      Saada taotlus (ilma kohata)
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmJoin(true)}
+                    disabled={isJoining}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
+                  >
+                    Liitu ainult pooliga
+                  </button>
                   <button
                     type="button"
                     onClick={resetPendingJoin}
@@ -736,6 +814,7 @@ export default function JoinTraining() {
                 const isWaitlisted = availability.waitlist.includes(user?.id);
                 const isRequested = availability.requests.includes(user?.id);
                 const actionKey = `${group.id}-${slot.id}`;
+                const slotDateLabel = formatSlotOccurrenceDate(slot, weekKey);
                 const dayLabel = getDayFullLabel(slot.day);
                 const trainerLabel = group?.trainer_name || group?.created_by || 'Treener';
                 return (
@@ -745,10 +824,10 @@ export default function JoinTraining() {
                   >
                     <div>
                       <div className="text-sm font-semibold text-slate-800">
-                        {dayLabel} • {slot.time}
+                        {slotDateLabel || dayLabel} • {slot.time}
                       </div>
                       <div className="text-xs text-slate-500">
-                        {trainerLabel} · {group?.name || 'Treening'}
+                        {dayLabel} · {trainerLabel} · {group?.name || 'Treening'}
                       </div>
                       <div className="text-xs text-slate-500 mt-1">
                         Vabu kohti: {availability.available} · Ootelist: {availability.waitlist.length}

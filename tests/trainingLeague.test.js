@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeRankCutPoints, getCutCount } from '../src/lib/training-league.js';
+import { computeRankCutPoints, formatSlotLabel, getCutCount } from '../src/lib/training-league.js';
 
 describe('training league rank cut scoring', () => {
   it('calculates cut count with ceil(percent of participants)', () => {
@@ -44,5 +44,15 @@ describe('training league rank cut scoring', () => {
       bonusStep: 0.3
     });
     expect(missingRank.points).toBe(null);
+  });
+
+  it('formats dated slots with a concrete date label', () => {
+    expect(
+      formatSlotLabel({
+        date: '2026-04-23',
+        day: 'thu',
+        time: '18:00'
+      })
+    ).toBe('23.04 18:00');
   });
 });
